@@ -1,0 +1,18 @@
+BootStrap: docker
+From: python:3.10-slim
+
+%files
+    . /installdir
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends gcc
+    /usr/local/bin/python -m pip install --upgrade pip
+    pip install poetry
+    mkdir /workdir
+    cd /installdir
+    poetry config virtualenvs.in-project true
+    poetry install --only main
+
+%runscript
+    cd /workdir
+    /installdir/.venv/bin/python bert.py
