@@ -6,6 +6,11 @@ from typing import Any, Dict
 import pickle
 
 
+def load_pickle(file_path: str) -> Any:
+    with open(file_path, 'rb') as file:
+        return pickle.load(file)
+
+
 def dump_as_pickle(data: Any, output_dir: str, file_name: str) -> None:
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     with open(join(output_dir, f'{file_name}'), 'wb') as file:
