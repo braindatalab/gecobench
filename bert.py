@@ -1,35 +1,21 @@
-import string
-import pickle
-from typing import Dict, List, Tuple
-
-import pandas as pd
-import numpy as np
 import random
-import time
+import string
+from typing import List, Tuple
 
+import numpy as np
+import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn import CrossEntropyLoss
-from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler, SubsetRandomSampler, \
-    random_split
-from torch.optim import Adam, SGD
-
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
-
-from transformers import BertTokenizer
-
-from transformers import get_linear_schedule_with_warmup
-from transformers import BertForSequenceClassification, BertConfig
-from transformers import DistilBertTokenizer, TFDistilBertModel
 from loguru import logger
-import matplotlib.pyplot as plt
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
+from torch.utils.data import TensorDataset, DataLoader, random_split
+from transformers import BertForSequenceClassification
+from transformers import BertTokenizer
 
 from utils import dump_as_pickle, load_pickle
 
 SEED = 0
-DEVICE = 'cpu'
+DEVICE = 'cuda'
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -71,7 +57,6 @@ def validate_epoch(
         model: BertForSequenceClassification,
         data_loader: DataLoader,
         loss: CrossEntropyLoss,
-        optimizer: torch.optim.Optimizer
 ) -> Tuple:
     val, val_correct = 0.0, 0
     model.eval()
@@ -80,8 +65,8 @@ def validate_epoch(
         attention_mask = batch[1].to(DEVICE)
         lables = batch[2].to(torch.long).to(DEVICE)
 
-        out = model(input_ids, token_type_ids=None, attention_mask=attention_mask)
-        logits = out.logits
+        output = model(input_ids, token_type_ids=None, attention_mask=attention_mask)
+        logits = output.logits
         l = loss(logits, lables)
 
         val += l.item()
@@ -121,19 +106,13 @@ def train(
             param.requires_grad = False
 
     for epoch in range(num_epochs):
-        # training and validating the model
-        train_loss, train_correct = train_epoch(
-            model=model, data_loader=train_loader, loss=loss, optimizer=optimizer
-        )
-        test_loss, test_correct = validate_epoch(
-            model=model, data_loader=val_loader, loss=loss, optimizer=optimizer
-        )
+        train_loss, train_correct = train_epoch(model=model, data_loader=train_loader, loss=loss, optimizer=optimizer)
+        test_loss, test_correct = validate_epoch(model=model, data_loader=val_loader, loss=loss)
 
-        # loss and accuracies
-        train_loss = train_loss / len(train_loader.sampler)
-        train_acc = train_correct / len(train_loader.sampler) * 100
-        test_loss = test_loss / len(val_loader.sampler)
-        test_acc = test_correct / len(val_loader.sampler) * 100
+        train_loss = train_loss / len(train_loader)
+        train_acc = train_correct / len(train_loader) * 100
+        test_loss = test_loss / len(val_loader)
+        test_acc = test_correct / len(val_loader) * 100
 
         logger.info(
             "Epoch:{}/{} AVG Training Loss:{:.3f} AVG Test Loss:{:.3f} AVG Training Acc {:.2f} % AVG Test Acc {:.2f} %".format(
@@ -185,34 +164,25 @@ def create_train_test_split(data: TensorDataset, test_size: float) -> List:
 
 
 def main():
+    val_size = 0.2
+    batch_size = 16
+
     text_data = load_pickle(file_path='data_all_same.pkl')
     targets = text_data['target'].tolist()
     sentences = assemble_sentences(data=text_data.drop(['target'], axis=1))
 
     bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    bert_encoding = bert_tokenizer(sentences, padding=True, truncation=True, return_tensors='pt')
+    bert_encoding = bert_tokenizer(text=sentences, padding=True, truncation=True, return_tensors='pt')
 
-    tensor_data = TensorDataset(
-        bert_encoding['input_ids'],
-        bert_encoding['attention_mask'],
-        torch.tensor(targets)
-    )
-
-    val_size = 0.2
+    tensor_data = TensorDataset(bert_encoding['input_ids'], bert_encoding['attention_mask'], torch.tensor(targets))
     train_data, val_data = create_train_test_split(data=tensor_data, test_size=val_size)
-
-    batch_size = 16
     train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size)
     val_loader = DataLoader(val_data, shuffle=True, batch_size=batch_size)
 
     history, model = train(train_loader=train_loader, val_loader=val_loader)
 
     torch.save(model, 'bert_model.pt')
-    dump_as_pickle(
-        data=history,
-        output_dir='',
-        file_name='history_of_model_performance.pkl'
-    )
+    dump_as_pickle(data=history, output_dir='', file_name='history_of_model_performance.pkl')
 
 
 if __name__ == '__main__':
