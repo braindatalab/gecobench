@@ -167,7 +167,7 @@ def main():
     val_size = 0.2
     batch_size = 16
 
-    text_data = load_pickle(file_path='data_all_same.pkl')
+    text_data = load_pickle(file_path='../data/data_all_same.pkl')
     targets = text_data['target'].tolist()
     sentences = assemble_sentences(data=text_data.drop(['target'], axis=1))
 
