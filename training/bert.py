@@ -76,7 +76,7 @@ def validate_epoch(
     return val, val_correct
 
 
-def train(
+def train_bert(
         train_loader: torch.utils.data.DataLoader,
         val_loader: torch.utils.data.DataLoader,
 ) -> Tuple:
@@ -179,7 +179,7 @@ def main():
     train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size)
     val_loader = DataLoader(val_data, shuffle=True, batch_size=batch_size)
 
-    history, model = train(train_loader=train_loader, val_loader=val_loader)
+    history, model = train_bert(train_loader=train_loader, val_loader=val_loader)
 
     torch.save(model, 'bert_model.pt')
     dump_as_pickle(data=history, output_dir='', file_name='history_of_model_performance.pkl')
