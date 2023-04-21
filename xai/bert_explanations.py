@@ -1,4 +1,5 @@
 import pickle
+from typing import Dict
 
 import pandas as pd
 import torch
@@ -107,7 +108,7 @@ def highlight_words(gt, model, tokenizer, validation_set, n, show_highlight=True
     return int(true_label), pred_label
 
 
-def main():
+def main(config: Dict) -> None:
     with open('../data/df_validation_male_all.pkl', 'rb') as f:
         val_all_male = pickle.load(f)
 
@@ -133,4 +134,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(config={})
