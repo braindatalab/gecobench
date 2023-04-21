@@ -1,0 +1,93 @@
+{
+  "general": {
+    "seed": 43532791,
+    "base_dir": "artifacts",
+    "data_scenario": "nlp-benchmark",
+    "data_path": ""
+  },
+  "data": {
+    "test_split": 0.2
+  },
+  "training": {
+    "output_dir": "training",
+    "num_workers": 4,
+    "training_records": "training_records.pkl",
+    "intermediate_records": "intermediate_training_records",
+    "static_parameterizations": {
+      "batch_size": 100,
+      "epochs": 200,
+      "learning_rate": 0.001,
+      "hidden_units": 32
+    },
+    "loop_parameterizations": {
+      "num_hidden_layers": [
+        1,
+        2
+      ]
+    }
+  },
+  "xai": {
+    "output_dir": "xai",
+    "xai_records": "xai_records.pkl",
+    "class_of_interest": 1,
+    "methods": [
+      "Integrated Gradients",
+      "Saliency",
+      "Gradient SHAP",
+      "Guided Backprop",
+      "Shapley Value Sampling",
+      "LIME",
+      "Kernel SHAP",
+      "LRP",
+      "PFI",
+      "PFI Scikit-learn",
+      "Uniform random"
+    ],
+    "innvestigate_methods": [
+      "pattern.net",
+      "pattern.attribution",
+      "deep_taylor"
+    ]
+  },
+  "evaluation": {
+    "output_dir": "evaluation",
+    "num_workers": 4,
+    "evaluation_records": "evaluation_results.pkl"
+  },
+  "visualization": {
+    "output_dir": "visualization",
+    "visualizations": {
+      "_data": [
+        "contourplot",
+        "_pairplot",
+        "_sankey"
+      ],
+      "_model": [
+        "performance_grid",
+        "model_performance"
+      ],
+      "_xai": [
+        "informative_suppressor",
+        "informative_suppressor_uninformative"
+      ],
+      "_xai_global": [
+        "informative_suppressor",
+        "informative_suppressor_uninformative"
+      ],
+      "evaluation": [
+        "_roc_auc",
+        "_precision_recall_auc",
+        "_avg_precision",
+        "_precision_specificity",
+        "top_k_precision"
+      ],
+      "_evaluation_global": [
+        "roc_auc",
+        "precision_recall_auc",
+        "avg_precision",
+        "precision_specificity",
+        "top_k_precision"
+      ]
+    }
+  }
+}
