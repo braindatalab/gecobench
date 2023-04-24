@@ -1,5 +1,6 @@
 import argparse
 
+from data.main import main as main_data
 from training.bert import main as main_training
 from utils import load_json_file
 
@@ -23,6 +24,7 @@ def main(config_path: str, mode: str):
 
 
 Modes = {
+    'data': main_data,
     'training': main_training,
 
 }

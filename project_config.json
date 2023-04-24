@@ -2,11 +2,13 @@
   "general": {
     "seed": 43532791,
     "base_dir": "artifacts",
-    "data_scenario": "nlp-benchmark",
-    "data_path": ""
+    "data_scenario": "nlp-benchmark"
   },
   "data": {
-    "test_split": 0.2
+    "raw_data": "data/data_all_same.pkl",
+    "test_split": 0.2,
+    "output_dir": "data",
+    "dataset_filename": "data-artifacts.pkl"
   },
   "training": {
     "output_dir": "training",
