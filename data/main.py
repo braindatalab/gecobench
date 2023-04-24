@@ -37,7 +37,7 @@ def assemble_sentences(data: pd.DataFrame) -> List:
 
 
 def create_train_test_split(x: List, y: List, config: Dict) -> DataSet:
-    x_train, x_val, y_train, y_val = train_test_split(
+    x_train, x_test, y_train, y_test = train_test_split(
         x, y,
         test_size=config['data']['test_split'],
         random_state=config['general']['seed']
@@ -45,7 +45,7 @@ def create_train_test_split(x: List, y: List, config: Dict) -> DataSet:
 
     return DataSet(
         x_train=x_train, y_train=y_train,
-        x_val=x_val, y_val=y_val
+        x_test=x_test, y_test=y_test
     )
 
 
