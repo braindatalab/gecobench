@@ -1,7 +1,7 @@
 import argparse
 
 from data.main import main as main_data
-from training.bert import main as main_training
+from training.main import main as main_training
 from utils import load_json_file
 
 

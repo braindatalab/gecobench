@@ -2,8 +2,14 @@ import json
 from datetime import datetime
 from os.path import join
 from pathlib import Path
-from typing import Any, Dict
+import random
+from typing import Any, Dict, List
 import pickle
+
+import numpy as np
+import torch
+from numpy.random import Generator
+from torch.utils.data import TensorDataset, random_split
 
 
 def load_pickle(file_path: str) -> Any:
@@ -41,6 +47,14 @@ def generate_data_dir(config: Dict) -> str:
     )
 
 
+def generate_training_dir(config: Dict) -> str:
+    return join(
+        config['general']['base_dir'],
+        config['general']['data_scenario'],
+        config['training']['output_dir']
+    )
+
+
 def generate_xai_dir(config: Dict) -> str:
     return join(
         config['general']['base_dir'],
@@ -54,4 +68,21 @@ def generate_evaluation_dir(config: Dict) -> str:
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['evaluation']['output_dir']
+    )
+
+
+def set_random_states(seed: int) -> Generator:
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    return np.random.default_rng(seed)
+
+
+def create_train_val_split(data: TensorDataset, val_size: float) -> List:
+    num_samples = len(data)
+    num_val_samples = int(val_size * num_samples)
+    num_train_samples = num_samples - num_val_samples
+    return random_split(
+        dataset=data,
+        lengths=[num_train_samples, num_val_samples]
     )

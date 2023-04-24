@@ -13,19 +13,18 @@
   "training": {
     "output_dir": "training",
     "num_workers": 4,
+    "val_size": 0.1,
+    "num_training_repetitions": 1,
+    "device": "cpu",
     "training_records": "training_records.pkl",
-    "intermediate_records": "intermediate_training_records",
-    "static_parameterizations": {
-      "batch_size": 100,
-      "epochs": 200,
-      "learning_rate": 0.001,
-      "hidden_units": 32
-    },
-    "loop_parameterizations": {
-      "num_hidden_layers": [
-        1,
-        2
-      ]
+    "models": {
+      "bert": {
+        "batch_size": 32,
+        "epochs": 20,
+        "learning_rate": 0.001,
+        "model_name": "bert_model",
+        "model_performance": "bert_history"
+      }
     }
   },
   "xai": {

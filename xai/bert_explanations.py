@@ -7,7 +7,7 @@ from captum.attr import LayerIntegratedGradients
 from IPython.display import display, HTML
 from transformers import BertTokenizer
 
-from training.bert import dataset_pre_processing
+from training.main import dataset_pre_processing
 
 DEVICE = 'cpu'
 
