@@ -53,7 +53,7 @@ def extract_tar_file(ssh_client: SSHClient, file_path: str) -> str:
 
 
 def main() -> None:
-    config_cluster = load_json_file(file_path='config_cluster.json')
+    config_cluster = load_json_file(file_path='cluster_config.json')
     current_dir = os.getcwd()
 
     filename_compressed_code = f'{append_date(s=basename(current_dir))}.tar.gz'
