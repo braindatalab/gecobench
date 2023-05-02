@@ -15,4 +15,4 @@ From: python:3.10-slim
 
 %runscript
     cd /workdir
-    /installdir/.venv/bin/python bert.py
+    /installdir/.venv/bin/python run_experiments.py --mode=$1 --config=$2
