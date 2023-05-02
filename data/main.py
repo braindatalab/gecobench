@@ -25,15 +25,14 @@ def join_punctuation_with_previews_word(words: List) -> List:
 def preprocess_list_of_words(words: List) -> List:
     words_without_nan = [w for w in words if not pd.isna(w)]
     words_are_strings = [str(w) for w in words_without_nan]
-    words_with_spaces = [w + SPACE for w in words_are_strings]
-    return join_punctuation_with_previews_word(words=words_with_spaces)
+    return words_are_strings
 
 
-def assemble_sentences_from_list_of_words(data: pd.DataFrame) -> List:
+def assemble_list_of_words(data: pd.DataFrame) -> List:
     sentences = list()
     for k, words in data.iterrows():
         processed_words = preprocess_list_of_words(words=words.tolist())
-        sentences += [JOIN_STRING.join(processed_words)]
+        sentences += [processed_words]
     return sentences
 
 
@@ -55,9 +54,9 @@ def is_ground_truth(data_name: str) -> bool:
 
 def adjust_data_format(data: pd.DataFrame, name: str) -> Tuple:
     if is_training_or_test_data(data_name=name):
-        target = data['target']
-        sentences = data.drop(['target'], axis=1)
-        output_data = DataTargetPair(data=sentences, target=target)
+        word_list = assemble_list_of_words(data=data.drop(['target'], axis=1))
+        target = data['target'].tolist()
+        output_data = DataTargetPair(data=word_list, target=target)
     elif is_ground_truth(data_name=name):
         columns = data[START_PADDING_COLUMNS]
         tmp = data.drop(START_PADDING_COLUMNS, axis=1)
