@@ -5,15 +5,33 @@
     "data_scenario": "nlp-benchmark"
   },
   "data": {
-    "raw_data": "data/data_all_same.pkl",
-    "test_split": 0.2,
+    "val_split": 0.2,
     "output_dir": "data",
-    "dataset_filename": "data-artifacts.pkl"
+    "raw_data": {
+      "train_all": "data/training_df_all.pkl",
+      "train_subject": "data/training_df_subj.pkl",
+      "test_female_all": "data/df_validation_female_all.pkl",
+      "test_female_subject": "data/df_validation_female_subj.pkl",
+      "test_male_all": "data/df_validation_male_all.pkl",
+      "test_male_subject": "data/df_validation_male_subj.pkl",
+      "ground_truth_all": "data/gt_all_val.pkl",
+      "ground_truth_subject": "data/gt_subj_val.pkl"
+    },
+    "output_filenames": {
+      "train_all": "training_all.pkl",
+      "train_subject": "training_subject.pkl",
+      "test_female_all": "test_female_all.pkl",
+      "test_female_subject": "test_female_subject.pkl",
+      "test_male_all": "test_male_all.pkl",
+      "test_male_subject": "test_male_subject.pkl",
+      "ground_truth_all": "ground_truth_all.pkl",
+      "ground_truth_subject": "ground_truth_subject.pkl"
+    }
   },
   "training": {
     "output_dir": "training",
     "num_workers": 4,
-    "val_size": 0.1,
+    "val_size": 0.2,
     "num_training_repetitions": 1,
     "device": "cpu",
     "training_records": "training_records.pkl",
