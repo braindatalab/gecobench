@@ -4,14 +4,14 @@ from os.path import join
 from typing import Dict, List, Tuple
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from transformers import BertTokenizer
 
-from common import DataSet, NAME_OF_PROJECT_CONFIG
+from common import NAME_OF_PROJECT_CONFIG, DataTargetPair
 from utils import load_pickle, dump_as_pickle, append_date, generate_data_dir, dump_as_json_file
 
 SPACE = ' '
 JOIN_STRING = ''
+START_PADDING_COLUMNS = [0, 1, 2]
+END_PADDING_COLUMNS = ['tmp1', 'tmp2', 'tmp3']
 
 
 def join_punctuation_with_previews_word(words: List) -> List:
@@ -37,19 +37,6 @@ def assemble_sentences_from_list_of_words(data: pd.DataFrame) -> List:
     return sentences
 
 
-def split_train_data_into_train_val_data(x: List, y: List, config: Dict) -> DataSet:
-    x_train, x_test, y_train, y_test = train_test_split(
-        x, y,
-        test_size=config['data']['val_split'],
-        random_state=config['general']['seed']
-    )
-
-    return DataSet(
-        x_train=x_train, y_train=y_train,
-        x_test=x_test, y_test=y_test
-    )
-
-
 def add_date_to_data_scenario_name(config: Dict) -> Dict:
     config_copy = deepcopy(config)
     config_copy['general']['data_scenario'] = append_date(
@@ -70,12 +57,12 @@ def adjust_data_format(data: pd.DataFrame, name: str) -> Tuple:
     if is_training_or_test_data(data_name=name):
         target = data['target']
         sentences = data.drop(['target'], axis=1)
-        output_data = (sentences, target)
+        output_data = DataTargetPair(data=sentences, target=target)
     elif is_ground_truth(data_name=name):
-        columns = data[[0, 1, 2]]
-        tmp = data.drop([0, 1, 2], axis=1)
-        tmp[['tmp1', 'tmp2', 'tmp3']] = columns
-        output_data = ('ground-truth', tmp)
+        columns = data[START_PADDING_COLUMNS]
+        tmp = data.drop(START_PADDING_COLUMNS, axis=1)
+        tmp[END_PADDING_COLUMNS] = columns
+        output_data = DataTargetPair(data=tmp, target=['ground-truth'])
     else:
         raise RuntimeError(f'Data type with name: {name} is not supported.')
     return output_data
