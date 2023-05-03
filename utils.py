@@ -1,4 +1,5 @@
 import json
+import platform
 from datetime import datetime
 from os.path import join
 from pathlib import Path
@@ -10,6 +11,9 @@ import numpy as np
 import torch
 from numpy.random import Generator
 from torch.utils.data import TensorDataset, random_split
+
+LOCAL_PLATFORM_NAME = 'PREEMPT_DYNAMIC'
+CLUSTER_DATA_DIR = '/mnt'
 
 
 def load_pickle(file_path: str) -> Any:
@@ -41,6 +45,7 @@ def append_date(s: str) -> str:
 
 def generate_data_dir(config: Dict) -> str:
     return join(
+        '' if LOCAL_PLATFORM_NAME in platform.version() else CLUSTER_DATA_DIR,
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['data']['output_dir']
