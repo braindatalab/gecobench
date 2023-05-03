@@ -1,19 +1,55 @@
 from os.path import join
-from typing import List, Tuple, Dict
+from typing import List, Dict
 
-import torch
+import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from common import DataSet
 from training.bert import train_bert
 from utils import dump_as_pickle, load_pickle, generate_data_dir, generate_training_dir
 
 
-def train_models(dataset: DataSet, config: Dict) -> List:
+def split_train_data_into_train_val_data(
+        x: pd.DataFrame,
+        y: pd.DataFrame,
+        config: Dict
+) -> DataSet:
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y,
+        test_size=config['training']['val_size'],
+        random_state=config['general']['seed']
+    )
+
+    return DataSet(
+        x_train=x_train, y_train=y_train,
+        x_test=x_test, y_test=y_test
+    )
+
+
+def extract_name_of_dataset(s: str) -> str:
+    return s.split('/')[-1].split('.')[0]
+
+
+def train_models(data_paths: List, config: Dict) -> List:
     records = list()
-    for model_name, params in config['training']['models'].items():
-        records += [TrainModel[model_name](dataset, params, config)]
+    for path in data_paths:
+        name = extract_name_of_dataset(s=path)
+        raw_data = load_pickle(file_path=path)
+        dataset = split_train_data_into_train_val_data(
+            x=raw_data.data, y=raw_data.target, config=config
+        )
+        for model_name, params in config['training']['models'].items():
+            records += TrainModel[model_name](dataset, name, params, config)
 
     return records
+
+
+def generate_data_paths(config: Dict) -> List:
+    output_paths = list()
+    data_dir = generate_data_dir(config=config)
+    output_paths += [join(data_dir, config['data']['output_filenames']['train_all'])]
+    output_paths += [join(data_dir, config['data']['output_filenames']['train_subject'])]
+    return output_paths
 
 
 TrainModel = {
@@ -22,12 +58,8 @@ TrainModel = {
 
 
 def main(config: Dict) -> None:
-    data_dir = generate_data_dir(config=config)
-    dataset = load_pickle(
-        file_path=join(data_dir, config['data']['dataset_filename'])
-    )
-
-    training_records = train_models(dataset=dataset, config=config)
+    paths = generate_data_paths(config=config)
+    training_records = train_models(data_paths=paths, config=config)
     output_dir = generate_training_dir(config=config)
     dump_as_pickle(
         data=training_records,
