@@ -242,10 +242,10 @@ def train_bert(
         )
         history_path = dump_history(
             history=history, output_dir=generate_training_dir(config=config),
-            history_name=f'{dataset_name}_{params["model_performance"]}_{k}'
+            history_name=f'{dataset_name}_{params["model_performance"]}_{k}.pkl'
         )
         output_params = deepcopy(params)
         output_params['repetition'] = k
-        output += [dataset_name, output_params, model_path, history_path]
+        output += [(dataset_name, output_params, model_path, history_path)]
 
     return output
