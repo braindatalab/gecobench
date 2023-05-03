@@ -1,4 +1,4 @@
 {
-  "data_dir_cluster": "data",
-  "base_dir_cluster": "/home/space/uniml/rick"
+  "data_dir": "data",
+  "base_dir": "/home/space/uniml/rick"
 }

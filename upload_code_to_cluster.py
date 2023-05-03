@@ -61,7 +61,7 @@ def main() -> None:
     create_tarfile(source_dir=current_dir, output_filename=filename_compressed_code)
 
     print('Copy code to cluster.')
-    target_path_compressed_code = join(config_cluster['base_dir_cluster'], filename_compressed_code)
+    target_path_compressed_code = join(config_cluster['base_dir'], filename_compressed_code)
     copy_file_to_cluster(source_path=filename_compressed_code, target_path=target_path_compressed_code)
 
     print('Extract tar file on cluster.')
