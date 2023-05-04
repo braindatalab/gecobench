@@ -9,9 +9,9 @@
 ##$ -m abe
 ##$ -M rick.wilming@tu-berlin.de
 
-export DATADIR=/home/space/uniml/rick/data/nlp-benchmark
+export DATADIR=/home/space/uniml/rick/data
 export WORKDIR=/home/space/uniml/rick/$1
 cd $WORKDIR
 ls -l
-apptainer build --fakeroot --force /home/rick/nlp-apptainerfile-training.sif nlp-apptainerfile-training.def
-apptainer run --nv --bind $DATADIR:/mnt --bind $WORKDIR:/workdir /home/rick/nlp-apptainerfile-training.sif "$2" "$3"
+apptainer build --fakeroot --force /home/rick/nlp-apptainerfile.sif nlp-apptainerfile.def
+apptainer run --nv --bind $DATADIR:/mnt --bind $WORKDIR:/workdir /home/rick/nlp-apptainerfile.sif "$2" "$3"
