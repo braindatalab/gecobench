@@ -58,7 +58,6 @@ def generate_data_dir(config: Dict) -> str:
 
 def generate_training_dir(config: Dict) -> str:
     return join(
-        get_root_dir_based_on_platform(),
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['training']['output_dir']
@@ -67,7 +66,6 @@ def generate_training_dir(config: Dict) -> str:
 
 def generate_xai_dir(config: Dict) -> str:
     return join(
-        get_root_dir_based_on_platform(),
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['xai']['output_dir']
@@ -76,7 +74,6 @@ def generate_xai_dir(config: Dict) -> str:
 
 def generate_evaluation_dir(config: Dict) -> str:
     return join(
-        get_root_dir_based_on_platform(),
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['evaluation']['output_dir']
