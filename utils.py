@@ -43,9 +43,13 @@ def append_date(s: str) -> str:
     return f'{s}-{date}'
 
 
+def get_root_dir_based_on_platform() -> str:
+    return '' if LOCAL_PLATFORM_NAME in platform.version() else CLUSTER_DATA_DIR
+
+
 def generate_data_dir(config: Dict) -> str:
     return join(
-        '' if LOCAL_PLATFORM_NAME in platform.version() else CLUSTER_DATA_DIR,
+        get_root_dir_based_on_platform(),
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['data']['output_dir']
@@ -54,6 +58,7 @@ def generate_data_dir(config: Dict) -> str:
 
 def generate_training_dir(config: Dict) -> str:
     return join(
+        get_root_dir_based_on_platform(),
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['training']['output_dir']
@@ -62,6 +67,7 @@ def generate_training_dir(config: Dict) -> str:
 
 def generate_xai_dir(config: Dict) -> str:
     return join(
+        get_root_dir_based_on_platform(),
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['xai']['output_dir']
@@ -70,6 +76,7 @@ def generate_xai_dir(config: Dict) -> str:
 
 def generate_evaluation_dir(config: Dict) -> str:
     return join(
+        get_root_dir_based_on_platform(),
         config['general']['base_dir'],
         config['general']['data_scenario'],
         config['evaluation']['output_dir']
