@@ -1,15 +1,16 @@
 BootStrap: docker
-From: python:3.10-slim-bullseye
+From: python:3.10-slim
 
 %files
-    . /installdir
+    poetry.lock /installdir/poetry.lock
+    pyproject.toml /installdir/pyproject.toml
 
 %post
     apt-get update && apt-get install -y --no-install-recommends gcc
     /usr/local/bin/python -m pip install --upgrade pip
     pip install poetry
     mkdir /workdir
-    cd /installdir
+    cd installdir
     poetry config virtualenvs.in-project true
     poetry install --only main
 
