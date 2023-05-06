@@ -12,7 +12,7 @@ import torch
 from numpy.random import Generator
 from torch.utils.data import TensorDataset, random_split
 
-LOCAL_PLATFORM_NAME = 'PREEMPT_DYNAMIC'
+CLUSTER_PLATFORM_NAME = '#102-Ubuntu'
 CLUSTER_DATA_DIR = '/mnt'
 
 
@@ -44,7 +44,7 @@ def append_date(s: str) -> str:
 
 
 def get_root_dir_based_on_platform() -> str:
-    return '' if LOCAL_PLATFORM_NAME in platform.version() else CLUSTER_DATA_DIR
+    return CLUSTER_DATA_DIR if CLUSTER_PLATFORM_NAME in platform.version() else ''
 
 
 def generate_data_dir(config: Dict) -> str:
