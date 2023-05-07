@@ -12,8 +12,6 @@ import torch
 from numpy.random import Generator
 from torch.utils.data import TensorDataset, random_split
 
-CLUSTER_PLATFORM_NAME = '#102-Ubuntu'
-CLUSTER_DATA_DIR = '/mnt'
 
 
 def load_pickle(file_path: str) -> Any:
