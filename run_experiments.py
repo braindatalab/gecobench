@@ -1,7 +1,8 @@
 import argparse
 
-from data.main import main as main_data
-from training.main import main as main_training
+from data.main import main as data_main
+from training.main import main as training_main
+from xai.main import main as xai_main
 from utils import load_json_file
 
 
@@ -24,8 +25,9 @@ def main(config_path: str, mode: str):
 
 
 Modes = {
-    'data': main_data,
-    'training': main_training,
+    'data': data_main,
+    'training': training_main,
+    'xai': xai_main
 
 }
 
