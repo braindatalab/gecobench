@@ -97,7 +97,7 @@ def create_bert_ids_from_sentence(tokenizer: BertTokenizer, sentence: List[str])
         tokens = torch.cat((tokens, word_id), dim=0)
 
     tokens = torch.cat((tokens, separation_id), dim=0)
-    return tokens
+    return tokens.type(torch.long)
 
 
 def add_padding_if_necessary(
@@ -136,7 +136,7 @@ def create_tensor_dataset(data: List, target: List, tokenizer: BertTokenizer) ->
             tokenizer=tokenizer, ids=tokens[k, :],
         )
 
-    return TensorDataset(tokens, attention_mask, torch.tensor(target))
+    return TensorDataset(tokens.type(torch.long), attention_mask, torch.tensor(target))
 
 
 def save_model(model: Any, model_name: str, output_dir: str) -> str:
