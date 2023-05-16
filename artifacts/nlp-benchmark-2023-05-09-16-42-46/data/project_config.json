@@ -39,8 +39,8 @@
                 "batch_size": 32,
                 "epochs": 1,
                 "learning_rate": 0.001,
-                "model_name": "bert_model",
-                "model_performance": "bert_history"
+                "model_name": "bert_only_classification",
+                "model_performance": "bert_only_classification_history"
             },
             "bert_only_embedding_classification":{
                 "batch_size": 32,
@@ -48,6 +48,13 @@
                 "learning_rate": 0.001,
                 "model_name": "bert_only_embedding_classification",
                 "model_performance": "bert_only_embedding_classification_history"
+            },
+            "bert_all":{
+                "batch_size": 32,
+                "epochs": 1,
+                "learning_rate": 0.001,
+                "model_name": "bert_all",
+                "model_performance": "bert_all_history"
             }
         }
     },
