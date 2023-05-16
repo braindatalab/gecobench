@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from common import DataSet
-from training.bert import train_bert
+from training.bert import train_bert, train_bert_only_embedding_classification
 from utils import dump_as_pickle, load_pickle, generate_data_dir, generate_training_dir
 
 
@@ -53,7 +53,8 @@ def generate_data_paths(config: Dict) -> List:
 
 
 TrainModel = {
-    'bert': train_bert
+    'bert': train_bert,
+    'bert_only_embedding_classification': train_bert_only_embedding_classification
 }
 
 

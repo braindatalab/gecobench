@@ -249,3 +249,97 @@ def train_bert(
         output += [(dataset_name, output_params, model_path, history_path)]
 
     return output
+
+
+def train_bert_only_embedding_classification(
+        dataset: DataSet,
+        dataset_name: str,
+        params: Dict,
+        config: Dict
+) -> List[Tuple]:
+    output = list()
+    bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    bert_ids_train = create_bert_ids(data=dataset.x_train, tokenizer=bert_tokenizer)
+    bert_ids_val = create_bert_ids(data=dataset.x_test, tokenizer=bert_tokenizer)
+    train_data = create_tensor_dataset(
+        data=bert_ids_train, target=dataset.y_train, tokenizer=bert_tokenizer
+    )
+    val_data = create_tensor_dataset(
+        data=bert_ids_val, target=dataset.y_test, tokenizer=bert_tokenizer
+    )
+
+    train_loader = DataLoader(train_data, shuffle=True, batch_size=params['batch_size'])
+    val_loader = DataLoader(val_data, shuffle=True, batch_size=params['batch_size'])
+    for k in range(config['training']['num_training_repetitions']):
+        set_random_states(seed=config['general']['seed'] + k)
+        logger.info(f"BERT Training, repetition {k + 1} of "
+                    f"{config['training']['num_training_repetitions']}, and"
+                    f"dataset: {dataset_name}")
+
+        history = {
+            'train_loss': list(), 'val_loss': list(),
+            'train_acc': list(), 'val_acc': list()
+        }
+
+        num_epochs = params['epochs']
+        learning_rate = params['learning_rate']
+
+        model = BertForSequenceClassification.from_pretrained(
+            "bert-base-uncased",
+            num_labels=2,  # binary classification
+            output_attentions=False,
+            output_hidden_states=False
+        )
+
+        model.to(config['training']['device'])
+        optimizer = Adam(model.parameters(), lr=learning_rate)
+        loss = CrossEntropyLoss()
+
+        layers_to_train = ["bert.embeddings","classifier"]
+
+        for name, param in model.named_parameters():
+            if name.startswith(tuple(layers_to_train)):
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+
+        for epoch in range(num_epochs):
+            train_loss, train_acc = train_epoch(
+                model=model,
+                data_loader=train_loader,
+                loss=loss,
+                optimizer=optimizer,
+                device=config['training']['device']
+            )
+            val_loss, val_acc = validate_epoch(
+                model=model,
+                data_loader=val_loader,
+                loss=loss,
+                device=config['training']['device']
+            )
+            history['train_loss'] += [train_loss / float(len(train_loader))]
+            history['train_acc'] += [train_acc / float(len(train_loader))]
+            history['val_loss'] += [val_loss / float(len(val_loader))]
+            history['val_acc'] += [val_acc / float(len(val_loader))]
+
+            logger.info(
+                f"Epoch:{epoch}/{num_epochs},"
+                f"AVG Training Loss:{history['train_loss'][-1]:.2f}, "
+                f"AVG Val Loss:{history['val_loss'][-1]:.2f}, "
+                f"AVG Training Acc {history['train_acc'][-1]:.2f}, "
+                f"AVG Val Acc {history['val_acc'][-1]:.2f}"
+            )
+
+        model_path = save_model(
+            model=model, output_dir=generate_training_dir(config=config),
+            model_name=f'{dataset_name}_{params["model_name"]}_{k}.pt'
+        )
+        history_path = dump_history(
+            history=history, output_dir=generate_training_dir(config=config),
+            history_name=f'{dataset_name}_{params["model_performance"]}_{k}.pkl'
+        )
+        output_params = deepcopy(params)
+        output_params['repetition'] = k
+        output += [(dataset_name, output_params, model_path, history_path)]
+
+    return output
