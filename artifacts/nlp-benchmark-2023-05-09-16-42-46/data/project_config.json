@@ -35,7 +35,7 @@
         "device": "cpu",
         "training_records": "training_records.pkl",
         "models": {
-            "bert": {
+            "bert_only_classification": {
                 "batch_size": 32,
                 "epochs": 1,
                 "learning_rate": 0.001,

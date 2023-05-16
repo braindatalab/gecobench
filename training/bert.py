@@ -161,7 +161,7 @@ def create_bert_ids(data: List, tokenizer: BertTokenizer) -> List:
     return bert_ids
 
 
-def train_bert(
+def train_bert_only_classification(
         dataset: DataSet,
         dataset_name: str,
         params: Dict,
