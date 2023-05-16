@@ -55,7 +55,15 @@
                 "learning_rate": 0.001,
                 "model_name": "bert_all",
                 "model_performance": "bert_all_history"
+            },
+            "bert_only_embedding":{
+                "batch_size": 32,
+                "epochs": 1,
+                "learning_rate": 0.001,
+                "model_name": "bert_only_embedding",
+                "model_performance": "bert_only_embedding_history"
             }
+
         }
     },
     "xai": {
