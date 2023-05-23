@@ -23,8 +23,8 @@
       "test_female_subject": "test_female_subject.pkl",
       "test_male_all": "test_male_all.pkl",
       "test_male_subject": "test_male_subject.pkl",
-      "ground_truth_all": "ground_truth_all.pkl",
-      "ground_truth_subject": "ground_truth_subject.pkl"
+      "test_all": "test_all.pkl",
+      "test_subject": "test_subject.pkl"
     }
   },
   "training": {
@@ -32,12 +32,12 @@
     "num_workers": 4,
     "val_size": 0.2,
     "num_training_repetitions": 1,
-    "device": "cpu",
+    "device": "cuda",
     "training_records": "training_records.pkl",
     "models": {
       "bert": {
         "batch_size": 32,
-        "epochs": 20,
+        "epochs": 100,
         "learning_rate": 0.001,
         "model_name": "bert_model",
         "model_performance": "bert_history"
@@ -49,17 +49,7 @@
     "xai_records": "xai_records.pkl",
     "class_of_interest": 1,
     "methods": [
-      "Integrated Gradients",
-      "Saliency",
-      "Gradient SHAP",
-      "Guided Backprop",
-      "Shapley Value Sampling",
-      "LIME",
-      "Kernel SHAP",
-      "LRP",
-      "PFI",
-      "PFI Scikit-learn",
-      "Uniform random"
+      "Integrated Gradients"
     ],
     "innvestigate_methods": [
       "pattern.net",
@@ -70,7 +60,7 @@
   "evaluation": {
     "output_dir": "evaluation",
     "num_workers": 4,
-    "evaluation_records": "evaluation_results.pkl"
+    "evaluation_records": "evaluation_records.pkl"
   },
   "visualization": {
     "output_dir": "visualization",
