@@ -14,7 +14,7 @@ from transformers import BertTokenizer
 from common import DATASET_ALL, DATASET_SUBJECT, XAIResult
 from training.bert import create_tensor_dataset, create_bert_ids, get_bert_ids, BERT_CLASSIFICATION, \
     BERT_SEPARATION
-from utils import generate_training_dir, load_pickle, generate_data_dir, dump_as_pickle, generate_xai_dir
+from utils import generate_training_dir, load_pickle, generate_data_dir, dump_as_pickle, generate_xai_dir, append_date
 from xai.methods import get_captum_attributions
 
 DEVICE = 'cpu'
@@ -80,7 +80,8 @@ def summarize_attributions(attributions):
 def highlight_words(gt, model, tokenizer, validation_set, n, show_highlight=True):
     # encode text: from a dataset of phrase and target, we locate the text, target and associate a ground-truth.
     # Then the text is tokenized.
-    validation_set = pd.DataFrame(validation_set, columns=['phrases', 'target'])
+    validation_set = pd.DataFrame(
+        validation_set, columns=['phrases', 'target'])
 
     text = validation_set['phrases'].loc[n]
     print(text)
@@ -93,13 +94,16 @@ def highlight_words(gt, model, tokenizer, validation_set, n, show_highlight=True
     score_list = [round(x, 4) for x in score.detach().tolist()[0]]
     pred_label = score_list.index(max(score_list))
 
-    ref_token_id = tokenizer.pad_token_id  # A token used for generating token reference
-    sep_token_id = tokenizer.sep_token_id  # A token used as a separator between question and text and it is also added to the end of the text.
-    cls_token_id = tokenizer.cls_token_id  # A token used for prepending to the concatenated question-text word sequence
+    # A token used for generating token reference
+    ref_token_id = tokenizer.pad_token_id
+    # A token used as a separator between question and text and it is also added to the end of the text.
+    sep_token_id = tokenizer.sep_token_id
+    # A token used for prepending to the concatenated question-text word sequence
+    cls_token_id = tokenizer.cls_token_id
 
     ref_input_ids = [tokenizer.cls_token_id] + [tokenizer.pad_token_id] * (
-            len([i for i in tokenized if i != 0]) - 2) + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (
-                        len([i for i in tokenized if i == 0]))
+        len([i for i in tokenized if i != 0]) - 2) + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (
+        len([i for i in tokenized if i == 0]))
     ref_input_ids = torch.tensor([ref_input_ids])
 
     lig = LayerIntegratedGradients(custom_forward_grad, model.bert.embeddings)
@@ -132,7 +136,8 @@ def load_test_data(config: dict) -> dict:
     filename_all = config['data']['output_filenames']['test_all']
     filename_subject = config['data']['output_filenames']['test_subject']
     data[DATASET_ALL] = load_pickle(file_path=join(data_dir, filename_all))
-    data[DATASET_SUBJECT] = load_pickle(file_path=join(data_dir, filename_subject))
+    data[DATASET_SUBJECT] = load_pickle(
+        file_path=join(data_dir, filename_subject))
     return data
 
 
@@ -162,7 +167,8 @@ def create_bert_tensor_data(data: dict) -> dict:
     output = dict()
     for name, dataset in data.items():
         bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
+        sentences, target = dataset['sentence'].tolist(
+        ), dataset['target'].tolist()
         bert_ids = create_bert_ids(data=sentences, tokenizer=bert_tokenizer)
         tensor_data = create_tensor_dataset(
             data=bert_ids, target=target, tokenizer=bert_tokenizer
@@ -212,7 +218,8 @@ def determine_model_type(s: str) -> str:
 
 
 def create_bert_reference_tokens(bert_tokenizer: BertTokenizer, sequence_length: int) -> Tensor:
-    reference_tokens_pad = TokenReferenceBase(reference_token_idx=bert_tokenizer.pad_token_id)
+    reference_tokens_pad = TokenReferenceBase(
+        reference_token_idx=bert_tokenizer.pad_token_id)
     reference_indices = reference_tokens_pad.generate_reference(
         sequence_length=sequence_length, device=DEVICE
     ).unsqueeze(0)
@@ -231,12 +238,14 @@ def apply_xai_methods(
     results = list()
     num_samples = dataset.shape[0]
     for k, (_, row) in enumerate(dataset.iterrows()):
-        logger.info(f'Dataset type: {dataset_type}, sentence: {k} of {num_samples}')
+        logger.info(
+            f'Dataset type: {dataset_type}, sentence: {k} of {num_samples}')
         model_type = determine_model_type(s=model_params['model_name'])
         tokenizer = get_tokenizer[model_type]()
         token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
         num_ids = token_ids[0].shape[0]
-        reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
+        reference_tokens = create_reference_tokens[model_type](
+            tokenizer, num_ids)
         attributions = get_captum_attributions(
             model=model,
             model_type=model_type,
@@ -256,9 +265,10 @@ def apply_xai_methods(
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth']
             )]
+            print(attribution, attribution.shape)
 
-        # if 0 < k:
-        #     break
+        #if 1 < k:
+        #    break
 
     return results
 
@@ -306,7 +316,8 @@ def get_bert_tokenizer(path: str = None) -> BertTokenizer:
 
 def map_bert_attributions_to_original_tokens(model_type: str, result: XAIResult) -> list:
     tokenizer = get_tokenizer[model_type]()
-    token_mapping = create_model_token_to_original_token_mapping[model_type]([result.sentence], tokenizer)
+    token_mapping = create_model_token_to_original_token_mapping[model_type](
+        [result.sentence], tokenizer)
     original_token_to_attribution_mapping = dict()
     for k, word in enumerate(result.sentence):
         original_token_to_attribution_mapping[word + str(k)] = 0
@@ -321,14 +332,21 @@ def map_bert_attributions_to_original_tokens(model_type: str, result: XAIResult)
     return list(original_token_to_attribution_mapping.values())
 
 
-def map_raw_attributions_to_original_tokens(data: list[XAIResult]) -> list[XAIResult]:
+def map_raw_attributions_to_original_tokens(xai_results_paths: list[str], config: dict) -> list[XAIResult]:
     output = list()
-    for result in data:
-        model_type = determine_model_type(s=result.model_name)
-        result.attribution = raw_attributions_to_original_tokens_mapping[model_type](
-            model_type, result
-        )
-        output += [result]
+    for path in xai_results_paths:
+        results = load_pickle(file_path=path)
+        for result in results:
+            model_type = determine_model_type(s=result.model_name)
+            result.attribution = raw_attributions_to_original_tokens_mapping[model_type](
+                model_type, result
+            )
+
+        output_dir = generate_xai_dir(config=config)
+        filename = append_date(
+            s=config['xai']['intermediate_xai_result_prefix'])
+        dump_as_pickle(data=results, output_dir=output_dir, filename=filename)
+        output += [join(output_dir, filename)]
 
     return output
 
@@ -346,13 +364,20 @@ def loop_over_training_records(training_records: list, data: dict, config: dict)
         #     ) for k, row in dataset.iterrows()
         # )
 
-        output += apply_xai_methods(
+        result = apply_xai_methods(
             model=model,
             dataset=dataset,
             config=config,
             dataset_type=dataset_type,
             model_params=model_params
         )
+
+        output_dir = generate_xai_dir(config=config)
+        filename = append_date(
+            s=config['xai']['intermediate_raw_xai_result_prefix'])
+        dump_as_pickle(data=result, output_dir=output_dir, filename=filename)
+        output += [join(output_dir, filename)]
+
     return output
 
 
@@ -393,11 +418,14 @@ def main(config: Dict) -> None:
     test_data['all']['correctly_classified_intersection'] = correctly_classified_mask['all']
     test_data['subject']['correctly_classified_intersection'] = correctly_classified_mask['subject']
 
-    raw_results = loop_over_training_records(training_records=training_records, data=test_data, config=config)
-    results = map_raw_attributions_to_original_tokens(data=raw_results)
+    intermediate_results_paths = loop_over_training_records(
+        training_records=training_records, data=test_data, config=config)
+    results = map_raw_attributions_to_original_tokens(
+        xai_results_paths=intermediate_results_paths, config=config)
 
     output_dir = generate_xai_dir(config=config)
-    dump_as_pickle(data=results, output_dir=output_dir, filename=config['xai']['xai_records'])
+    dump_as_pickle(data=results, output_dir=output_dir,
+                   filename=config['xai']['xai_records'])
 
 
 if __name__ == '__main__':

@@ -74,6 +74,8 @@
   },
   "xai": {
     "output_dir": "xai",
+    "intermediate_xai_result_prefix":"intermediate_xai_result",
+    "intermediate_raw_xai_result_prefix":"intermediate_raw_xai_result",
     "xai_records": "xai_records.pkl",
     "class_of_interest": 1,
     "methods": [
