@@ -35,12 +35,40 @@
     "device": "cuda",
     "training_records": "training_records.pkl",
     "models": {
-      "bert": {
-        "batch_size": 32,
-        "epochs": 100,
-        "learning_rate": 0.001,
-        "model_name": "bert_model",
-        "model_performance": "bert_history"
+      "bert_only_classification": {
+          "batch_size": 32,
+          "epochs": 1,
+          "learning_rate": 0.001,
+          "model_name": "bert_only_classification",
+          "model_performance": "bert_only_classification_history"
+      },
+      "bert_only_embedding_classification":{
+          "batch_size": 32,
+          "epochs": 1,
+          "learning_rate": 0.001,
+          "model_name": "bert_only_embedding_classification",
+          "model_performance": "bert_only_embedding_classification_history"
+      },
+      "bert_all":{
+          "batch_size": 32,
+          "epochs": 1,
+          "learning_rate": 0.001,
+          "model_name": "bert_all",
+          "model_performance": "bert_all_history"
+      },
+      "bert_only_embedding":{
+          "batch_size": 32,
+          "epochs": 1,
+          "learning_rate": 0.001,
+          "model_name": "bert_only_embedding",
+          "model_performance": "bert_only_embedding_history"
+      },
+      "simple_model":{
+          "batch_size": 32,
+          "epochs": 1,
+          "learning_rate": 0.001,
+          "model_name": "simple_model",
+          "model_performance": "simple_model_history"
       }
     }
   },
