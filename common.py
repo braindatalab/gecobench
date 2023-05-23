@@ -20,7 +20,7 @@ DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
 @dataclass
 class XAIResult:
     model_name: str = None
-    dataset_name: str = None
+    dataset_type: str = None
     target: float = None
     correct_classified_intersection: float = None
     attribution_method: str = None
