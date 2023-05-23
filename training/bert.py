@@ -250,7 +250,6 @@ def train_bert_only_classification(
 
     return output
 
-
 def train_bert_only_embedding_classification(
         dataset: DataSet,
         dataset_name: str,
@@ -483,7 +482,7 @@ def train_bert_only_embedding(
         for name, param in model.named_parameters():
             if name.startswith(tuple(layers_to_train)):
                 param.requires_grad = True
-                print(name)
+                #print(name)
             else:
                 param.requires_grad = False
 
