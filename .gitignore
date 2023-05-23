@@ -136,4 +136,4 @@ dmypy.json
 *.pkl
 
 # Artifacts
-/artifacts
+artifacts/
