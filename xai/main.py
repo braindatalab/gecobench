@@ -197,6 +197,8 @@ def get_intersection_of_correctly_classified_samples(
         prediction = torch.argmax(model(x).logits, dim=1)
         output[dataset_type] *= (target == prediction)
 
+        break
+
     return output
 
 
@@ -377,6 +379,8 @@ def loop_over_training_records(training_records: list, data: dict, config: dict)
             s=config['xai']['intermediate_raw_xai_result_prefix'])
         dump_as_pickle(data=result, output_dir=output_dir, filename=filename)
         output += [join(output_dir, filename)]
+
+        break
 
     return output
 

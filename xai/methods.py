@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from captum.attr import (
     IntegratedGradients, Saliency, DeepLift, DeepLiftShap, GradientShap, GuidedBackprop,
-    Deconvolution, ShapleyValueSampling, Lime, KernelShap, LRP, FeaturePermutation, LayerIntegratedGradients
+    Deconvolution, ShapleyValueSampling, Lime, KernelShap, LayerLRP, FeaturePermutation, LayerIntegratedGradients
 )
 from loguru import logger
 from torch import Tensor
@@ -27,19 +27,36 @@ def get_captum_attributions(
 ) -> Dict:
     attributions = dict()
     check_availability_of_xai_methods(methods=methods)
+    print(methods)
     if BERT in model_type:
         def forward_function(inputs: Tensor) -> Tensor:
+            print("forward_function")
+            print(inputs, type(inputs))
+            #for name, param in model.named_parameters():
+            #    print(name)
             output = model(inputs)
+            print("forward_function after output = model(inputs)")
             return torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
 
         input_model = model.base_model.embeddings
+        #input_model:
+        #word_embeddings.weight
+        #position_embeddings.weight
+        #token_type_embeddings.weight
+        #LayerNorm.weight
+        #LayerNorm.bias
+
+        #print(model.base_model)
+        #for name, param in input_model.named_parameters():
+        #    print(name)
 
     else:
+        print("BERT NOT in model_type")
         forward_function = None
         input_model = model
 
     for method_name in methods:
-        # logger.info(method_name)
+        logger.info(method_name)
         a = methods_dict.get(method_name)(
             forward_function=forward_function,
             baseline=baseline,
@@ -62,7 +79,8 @@ def get_integrated_gradients_attributions(
         model: torch.nn.Module,
         forward_function: Callable
 ) -> torch.tensor:
-    explainer = LayerIntegratedGradients(forward_function, model)
+    #why is the layer attribute = model?
+    explainer = LayerIntegratedGradients(forward_function, model) 
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
@@ -83,8 +101,25 @@ def get_deepshap_attributions(data: torch.Tensor, target: torch.Tensor, model: t
     return DeepLiftShap(model).attribute(data, target=target, baselines=torch.zeros(data.shape))
 
 
-def get_gradient_shap_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return GradientShap(model).attribute(data, target=target, baselines=torch.zeros(data.shape))
+def get_gradient_shap_attributions(
+        data: torch.Tensor, 
+        baseline: Tensor,
+        model: torch.nn.Module,
+        forward_function: Callable
+) -> torch.tensor:
+    print("get_gradient_shap_attributions")
+    print("data:", data.shape, type(data))
+    explainer = GradientShap(forward_function, model)
+    print("After explainer = ...")
+    #print(explainer.has_convergence_delta())
+    return explainer.attribute(
+        inputs=data,
+        baselines=baseline,
+        n_samples=5, #default
+        stdevs=0.0, #default
+        return_convergence_delta=True
+    )
+    # return GradientShap(model).attribute(data, target=target, baselines=torch.zeros(data.shape))
 
 
 def get_guided_backprop_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
@@ -107,8 +142,27 @@ def get_kernel_shap_attributions(data: torch.Tensor, target: torch.Tensor, model
     return KernelShap(model).attribute(data, target=target)
 
 
-def get_lrp_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return LRP(model).attribute(data, target=target)
+def get_lrp_attributions(
+        data: torch.Tensor, 
+        baseline: Tensor,
+        model: torch.nn.Module,
+        forward_function: Callable
+) -> torch.tensor:
+    print("get_lrp_attributions")
+    # No LRP rule for 'torch.nn.modules.sparse.Embedding'
+    input_model_layers = []
+    for name, param in model.named_parameters():
+        input_model_layers.append(name)
+        print(name)
+
+    layers_to_explain = [model.word_embeddings]
+    print("layers_to_explain:",layers_to_explain)
+
+    explainer =  LayerLRP(model,layers_to_explain)
+    return explainer.attribute(
+        inputs = data
+    )
+    # return LRP(model).attribute(data, target=target)
 
 
 def get_pfi_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
