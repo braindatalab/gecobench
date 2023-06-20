@@ -80,6 +80,7 @@ def get_captum_attributions(
             a = a.sum(dim=2).squeeze(0)
             a = a / torch.norm(a)
             a = a.cpu().detach().numpy()
+            #a = a.flatten()
 
         print("a after summation:")
         print(a.shape)
@@ -97,12 +98,14 @@ def get_integrated_gradients_attributions(
 ) -> torch.tensor:
     #layer attribute = model
     explainer = LayerIntegratedGradients(forward_function, model) 
-    return explainer.attribute(
+    explanations = explainer.attribute(
         inputs=data,
         baselines=baseline,
         n_steps=200,
         return_convergence_delta=False,
-    )
+        )
+    #return explanations.sum(dim=2).squeeze(0)
+    return explanations
 
 
 def get_saliency_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
@@ -148,9 +151,26 @@ def get_shapley_sampling_attributions(data: torch.Tensor, target: torch.Tensor, 
     return ShapleyValueSampling(model).attribute(data, target=target)
 
 
-def get_lime_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return Lime(model).attribute(data, target=target)
-
+def get_lime_attributions(data: torch.Tensor,
+                          baseline: Tensor,
+                          model: torch.nn.Module,
+                          forward_function: Callable
+) -> torch.tensor:
+    # Difference between captum.attr.Lime and captum.attr.LimeBase?
+    # Default interpretable_model = SkLearnLasso(alpha=0.01)
+    print("get_lime_attributions")
+    explainer = Lime(forward_function)
+    return explainer.attribute(
+        inputs=data,
+        baselines=baseline,
+        target=None,
+        additional_forward_args=None,
+        feature_mask=None,
+        n_samples=50,
+        perturbations_per_eval=1,
+        return_input_shape=True,
+        show_progress=True
+    )
 
 def get_kernel_shap_attributions(data: torch.Tensor,
                                  baseline: Tensor,
@@ -163,15 +183,14 @@ def get_kernel_shap_attributions(data: torch.Tensor,
         inputs=data,
          baselines=baseline,
          target=None,
+         additional_forward_args=None,
          feature_mask=None,
          n_samples=25,
          perturbations_per_eval=1,
          return_input_shape=True,
          show_progress=True
     )
-# returns attributsion of shape = (1,#words) as compared to IG returning shape = (1,#words,embedding_size)
-# return KernelShap(model).attribute(data, target=target)
-
+    # returns attributsion of shape = (1,#words) as compared to IG returning shape = (1,#words,embedding_size)
 
 def get_lrp_attributions(
         data: torch.Tensor, 
