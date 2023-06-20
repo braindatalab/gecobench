@@ -169,6 +169,7 @@ def get_kernel_shap_attributions(data: torch.Tensor,
          return_input_shape=True,
          show_progress=True
     )
+# returns attributsion of shape = (1,#words) as compared to IG returning shape = (1,#words,embedding_size)
 # return KernelShap(model).attribute(data, target=target)
 
 
