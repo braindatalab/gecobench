@@ -30,12 +30,19 @@ def get_captum_attributions(
     print(methods)
     if BERT in model_type:
         def forward_function(inputs: Tensor) -> Tensor:
-            print("forward_function")
-            print(inputs, type(inputs))
+            #print("forward_function")
+            #print(inputs, type(inputs))
             #for name, param in model.named_parameters():
             #    print(name)
+            
+            # Output:
+            # SequenceClassifierOutput(loss=None, logits=tensor([[-0.4450, -0.5829]]), hidden_states=None, attentions=None)
             output = model(inputs)
-            print("forward_function after output = model(inputs)")
+            #print("forward_function after output = model(inputs)")
+            #print(output[0].shape)
+            #print("after classification layer")
+            #last_layer = torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
+            #print(last_layer.shape)
             return torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
 
         input_model = model.base_model.embeddings
@@ -63,10 +70,19 @@ def get_captum_attributions(
             data=x, model=input_model
         )
 
-        if BERT in model_type:
+        print("a:")
+        print(a.shape)
+        print(a)
+
+        methods_no_embedding_expl = ["Kernel SHAP"]
+
+        if BERT in model_type and method_name not in methods_no_embedding_expl:
             a = a.sum(dim=2).squeeze(0)
             a = a / torch.norm(a)
             a = a.cpu().detach().numpy()
+
+        print("a after summation:")
+        print(a.shape)
 
         attributions[method_name] = a
 
@@ -79,7 +95,7 @@ def get_integrated_gradients_attributions(
         model: torch.nn.Module,
         forward_function: Callable
 ) -> torch.tensor:
-    #why is the layer attribute = model?
+    #layer attribute = model
     explainer = LayerIntegratedGradients(forward_function, model) 
     return explainer.attribute(
         inputs=data,
@@ -119,8 +135,6 @@ def get_gradient_shap_attributions(
         stdevs=0.0, #default
         return_convergence_delta=True
     )
-    # return GradientShap(model).attribute(data, target=target, baselines=torch.zeros(data.shape))
-
 
 def get_guided_backprop_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
     return GuidedBackprop(model).attribute(data, target=target)
@@ -138,8 +152,24 @@ def get_lime_attributions(data: torch.Tensor, target: torch.Tensor, model: torch
     return Lime(model).attribute(data, target=target)
 
 
-def get_kernel_shap_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return KernelShap(model).attribute(data, target=target)
+def get_kernel_shap_attributions(data: torch.Tensor,
+                                 baseline: Tensor,
+                                 model: torch.nn.Module,
+                                 forward_function: Callable
+) -> torch.tensor:
+    print("get_kernel_shap_attributions")
+    explainer = KernelShap(forward_function)
+    return explainer.attribute(
+        inputs=data,
+         baselines=baseline,
+         target=None,
+         feature_mask=None,
+         n_samples=25,
+         perturbations_per_eval=1,
+         return_input_shape=True,
+         show_progress=True
+    )
+# return KernelShap(model).attribute(data, target=target)
 
 
 def get_lrp_attributions(
@@ -158,11 +188,17 @@ def get_lrp_attributions(
     layers_to_explain = [model.word_embeddings]
     print("layers_to_explain:",layers_to_explain)
 
-    explainer =  LayerLRP(model,layers_to_explain)
+    explainer =  LayerLRP(forward_function,model)
     return explainer.attribute(
         inputs = data
     )
     # return LRP(model).attribute(data, target=target)
+    # return GradientShap(model).attribute(data, target=target, baselines=torch.zeros(data.shape))
+    # https://arxiv.org/pdf/2101.00196.pdf
+    # https://github.com/frankaging/BERT-LRP
+    # https://proceedings.mlr.press/v162/ali22a/ali22a.pdf
+    # https://github.com/ameenali/xai_transformers
+
 
 
 def get_pfi_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
