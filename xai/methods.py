@@ -47,7 +47,7 @@ def get_captum_attributions(
             return torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
 
         input_model = model.base_model.embeddings
-        
+
         # input_model:
         # word_embeddings.weight
         # position_embeddings.weight
@@ -66,7 +66,7 @@ def get_captum_attributions(
     for method_name in methods:
         logger.info(method_name)
 
-        if method_name == "Guided Backprop":
+        if method_name == "Guided Backprop" or method_name == "Deconvolution":
             input_model = model
 
         a = methods_dict.get(method_name)(
@@ -179,13 +179,35 @@ def get_guided_backprop_attributions(data: torch.Tensor,
         additional_forward_args=None
     )
 
-def get_deconvolution_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return Deconvolution(model).attribute(data, target=target)
+def get_deconvolution_attributions(data: torch.Tensor, 
+                                   baseline: Tensor,
+                                   model: torch.nn.Module,
+                                   forward_function: Callable
+) -> torch.tensor:
+    explainer = Deconvolution(model)
+    # Same issue with output of Bert model as with guided_backprop
+    return explainer.attribute(
+        inputs=data,
+        target=[0,1],
+        additional_forward_args=None
+    )
 
-
-def get_shapley_sampling_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return ShapleyValueSampling(model).attribute(data, target=target)
-
+def get_shapley_sampling_attributions(data: torch.Tensor, 
+                                      baseline: Tensor,
+                                      model: torch.nn.Module,
+                                      forward_function: Callable
+) -> torch.tensor:
+    explainer = ShapleyValueSampling(forward_function)
+    return explainer.attribute(
+        inputs=data,
+        baselines=baseline,
+        target=None,
+        additional_forward_args=None,
+        feature_mask=None,
+        n_samples=25,
+        perturbations_per_eval=1,
+        show_progress=True
+    )
 
 def get_lime_attributions(data: torch.Tensor,
                           baseline: Tensor,
