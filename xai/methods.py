@@ -58,7 +58,6 @@ def get_captum_attributions(
         #    print(name)
 
     else:
-        print("BERT NOT in model_type")
         forward_function = None
         input_model = model
 
@@ -70,20 +69,17 @@ def get_captum_attributions(
             data=x, model=input_model
         )
 
-        print("a:")
-        print(a.shape)
-        print(a)
+        #print("a:")
+        #print(a.shape)
+        #print(a)
 
-        methods_no_embedding_expl = ["Kernel SHAP"]
-
-        if BERT in model_type and method_name not in methods_no_embedding_expl:
-            a = a.sum(dim=2).squeeze(0)
+        if BERT in model_type and method_name:
+            a = a.squeeze(0)
             a = a / torch.norm(a)
             a = a.cpu().detach().numpy()
-            #a = a.flatten()
 
-        print("a after summation:")
-        print(a.shape)
+        #print("a after summation:")
+        #print(a.shape)
 
         attributions[method_name] = a
 
@@ -104,8 +100,7 @@ def get_integrated_gradients_attributions(
         n_steps=200,
         return_convergence_delta=False,
         )
-    #return explanations.sum(dim=2).squeeze(0)
-    return explanations
+    return explanations.sum(dim=2)
 
 
 def get_saliency_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
@@ -126,11 +121,7 @@ def get_gradient_shap_attributions(
         model: torch.nn.Module,
         forward_function: Callable
 ) -> torch.tensor:
-    print("get_gradient_shap_attributions")
-    print("data:", data.shape, type(data))
     explainer = GradientShap(forward_function, model)
-    print("After explainer = ...")
-    #print(explainer.has_convergence_delta())
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
@@ -158,7 +149,6 @@ def get_lime_attributions(data: torch.Tensor,
 ) -> torch.tensor:
     # Difference between captum.attr.Lime and captum.attr.LimeBase?
     # Default interpretable_model = SkLearnLasso(alpha=0.01)
-    print("get_lime_attributions")
     explainer = Lime(forward_function)
     return explainer.attribute(
         inputs=data,
@@ -177,7 +167,6 @@ def get_kernel_shap_attributions(data: torch.Tensor,
                                  model: torch.nn.Module,
                                  forward_function: Callable
 ) -> torch.tensor:
-    print("get_kernel_shap_attributions")
     explainer = KernelShap(forward_function)
     return explainer.attribute(
         inputs=data,
@@ -190,7 +179,6 @@ def get_kernel_shap_attributions(data: torch.Tensor,
          return_input_shape=True,
          show_progress=True
     )
-    # returns attributsion of shape = (1,#words) as compared to IG returning shape = (1,#words,embedding_size)
 
 def get_lrp_attributions(
         data: torch.Tensor, 
@@ -198,15 +186,13 @@ def get_lrp_attributions(
         model: torch.nn.Module,
         forward_function: Callable
 ) -> torch.tensor:
-    print("get_lrp_attributions")
     # No LRP rule for 'torch.nn.modules.sparse.Embedding'
-    input_model_layers = []
-    for name, param in model.named_parameters():
-        input_model_layers.append(name)
-        print(name)
-
-    layers_to_explain = [model.word_embeddings]
-    print("layers_to_explain:",layers_to_explain)
+    # input_model_layers = []
+    #for name, param in model.named_parameters():
+    #    input_model_layers.append(name)
+    #    print(name)
+    #layers_to_explain = [model.word_embeddings]
+    #print("layers_to_explain:",layers_to_explain)'
 
     explainer =  LayerLRP(forward_function,model)
     return explainer.attribute(
