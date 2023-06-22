@@ -242,6 +242,8 @@ def apply_xai_methods(
     for k, (_, row) in enumerate(dataset.iterrows()):
         logger.info(
             f'Dataset type: {dataset_type}, sentence: {k} of {num_samples}')
+        print("target")
+        print(row['target'])
         model_type = determine_model_type(s=model_params['model_name'])
         tokenizer = get_tokenizer[model_type]()
         token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
@@ -253,7 +255,8 @@ def apply_xai_methods(
             model_type=model_type,
             x=token_ids[0].unsqueeze(0),
             baseline=reference_tokens,
-            methods=config['xai']['methods']
+            methods=config['xai']['methods'],
+            target=row['target']
         )
 
         for xai_method, attribution in attributions.items():

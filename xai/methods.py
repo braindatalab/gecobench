@@ -11,6 +11,18 @@ from torch import Tensor
 
 BERT = 'bert'
 
+# class BertLogits(torch.nn.module)
+# init function: our bert model
+# forward function: return model.logits
+
+class BertLogits(torch.nn.Module):
+    def __init__(self,bertmodel) -> None:
+        super(BertLogits, self).__init__()
+        print("BertLogits initalized")
+        self.model = bertmodel
+
+    def forward(self, input: torch.tensor) -> torch.tensor:
+        return self.model(input)[0]
 
 def check_availability_of_xai_methods(methods: list) -> None:
     for method_name in methods:
@@ -25,6 +37,7 @@ def get_captum_attributions(
         x: Tensor,
         baseline: Tensor,
         methods: list,
+        target: list
 ) -> Dict:
     attributions = dict()
     check_availability_of_xai_methods(methods=methods)
@@ -38,13 +51,23 @@ def get_captum_attributions(
 
             # Output:
             # SequenceClassifierOutput(loss=None, logits=tensor([[-0.4450, -0.5829]]), hidden_states=None, attentions=None)
+
+            # ToDo 22.06.:
+            # Cut off embedding layer from Bert model
+            # Use this model and provide embeddings which we have
+            # Probably create a Wrapper
+            # Probably create a new forward function
+
             output = model(inputs)
             # print("forward_function after output = model(inputs)")
             # print(output[0].shape)
             # print("after classification layer")
             # last_layer = torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
             # print(last_layer.shape)
-            return torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
+            #return torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
+            forward_function_output = torch.softmax(output.logits, dim=1)
+            print(forward_function_output)
+            return forward_function_output
 
         input_model = model.base_model.embeddings
 
@@ -66,13 +89,15 @@ def get_captum_attributions(
     for method_name in methods:
         logger.info(method_name)
 
-        if method_name == "Guided Backprop" or method_name == "Deconvolution":
-            input_model = model
-
+        if method_name == "Saliency":
+            print(input_model)
+            x = input_model(x)
+            print("EMEBDINNGS:",x, x.shape)
+            
         a = methods_dict.get(method_name)(
             forward_function=forward_function,
             baseline=baseline,
-            data=x, model=input_model
+            data=x, model=input_model, target=target
         )
 
         # print("a:")
@@ -98,6 +123,8 @@ def get_integrated_gradients_attributions(
         model: torch.nn.Module,
         forward_function: Callable
 ) -> torch.tensor:
+    # Model = embedding layers of bert
+    # Works because compute IG only up to the embedding layer
     explainer = LayerIntegratedGradients(forward_function, model)
     explanations = explainer.attribute(
         inputs=data,
@@ -111,23 +138,20 @@ def get_integrated_gradients_attributions(
 def get_saliency_attributions(data: torch.Tensor,
                               baseline: Tensor,
                               model: torch.nn.Module,
-                              forward_function: Callable
+                              forward_function: Callable,
+                              target: list
 ) -> torch.tensor:
-    # method not working yet
-    explainer = Saliency(forward_function)
-    # print("forward_function:")
-    # print(forward_function(data))
-    # print(data.shape, type(data), data.dtype)
-    # print(data)
-    # data = data.double()
-    # print(data.dtype)
-
+    print("data type:",data.dtype, data)  
+    print(model)
+      
+    explainer = Saliency(model)
     # UserWarning: Input Tensor 0 has a dtype of torch.int64. 
     # Gradients cannot be activated for these data types.
     # RuntimeError: One of the differentiated Tensors does not require grad
+    print(int(target))
     return explainer.attribute(
         inputs=data,
-        target=None,
+        target=int(target),
         abs=True,
         additional_forward_args=None
     )
@@ -149,6 +173,7 @@ def get_deeplift_attributions(data: torch.Tensor,
         custom_attribution_func=None
     )
 
+
 def get_deepshap_attributions(data: torch.Tensor,
                               baseline: Tensor,
                               model: torch.nn.Module,
@@ -164,19 +189,24 @@ def get_deepshap_attributions(data: torch.Tensor,
         custom_attribution_func=None
     )
 
+
 def get_gradient_shap_attributions(
         data: torch.Tensor,
         baseline: Tensor,
         model: torch.nn.Module,
-        forward_function: Callable
+        forward_function: Callable,
+        target: list
 ) -> torch.tensor:
-    # method not working ydt
-    explainer = GradientShap(forward_function, model)
+    # RuntimeError: Expected tensor for argument #1 'indices' to have one of the following scalar types: 
+    # Long, Int; but got torch.FloatTensor instead (while checking arguments for embedding)
+    # print(data.dtype)
+    explainer = GradientShap(model)
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
-        n_samples=5,  # default
-        stdevs=0.0,  # default
+        n_samples=5,  
+        stdevs=0.0,
+        target=target,  
         return_convergence_delta=True
     )
 
@@ -184,23 +214,22 @@ def get_gradient_shap_attributions(
 def get_guided_backprop_attributions(data: torch.Tensor, 
                                      baseline: Tensor,
                                      model: torch.nn.Module,
-                                     forward_function: Callable
-) -> torch.tensor:
+                                     forward_function: Callable,
+                                     target: list
+) -> torch.tensor:    
     print("get_guided_backprop_attributions")
-    #for name, param in model.named_parameters():
-    #     print(name)
+    print(model)
     explainer = GuidedBackprop(model)
-
-    print("model(data):")
-    print(model(data)[0])
-
-    # Output of model is a SequenceClassifierOutput where we need to access the logits
-    # 'SequenceClassifierOutput' object has no attribute 'shape'
+    # Input Tensor 0 has a dtype of torch.int64. Gradients cannot be activated for these data types.
+    # RuntimeError: One of the differentiated Tensors does not require grad
+    this_is_target = int(target)
+    print(this_is_target)
     return explainer.attribute(
         inputs=data,
-        target=[0,1],
+        target=this_is_target,
         additional_forward_args=None
     )
+
 
 def get_deconvolution_attributions(data: torch.Tensor, 
                                    baseline: Tensor,
@@ -214,6 +243,7 @@ def get_deconvolution_attributions(data: torch.Tensor,
         target=[0,1],
         additional_forward_args=None
     )
+
 
 def get_shapley_sampling_attributions(data: torch.Tensor, 
                                       baseline: Tensor,
@@ -231,6 +261,7 @@ def get_shapley_sampling_attributions(data: torch.Tensor,
         perturbations_per_eval=1,
         show_progress=True
     )
+
 
 def get_lime_attributions(data: torch.Tensor,
                           baseline: Tensor,
@@ -314,6 +345,7 @@ def get_pfi_scikit_learn_attribution(data: torch.Tensor, target: torch.Tensor, m
 
 def get_uniform_random_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
     return torch.rand(data.shape)
+
 
 def get_input_x_gradient(
         data: torch.Tensor,
