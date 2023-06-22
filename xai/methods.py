@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from captum.attr import (
     IntegratedGradients, Saliency, DeepLift, DeepLiftShap, GradientShap, GuidedBackprop,
-    Deconvolution, ShapleyValueSampling, Lime, KernelShap, LayerLRP, FeaturePermutation, LayerIntegratedGradients
+    Deconvolution, ShapleyValueSampling, Lime, KernelShap, LayerLRP, FeaturePermutation, LayerIntegratedGradients, InputXGradient
 )
 from loguru import logger
 from torch import Tensor
@@ -133,13 +133,36 @@ def get_saliency_attributions(data: torch.Tensor,
     )
 
 
-def get_deeplift_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return DeepLift(model).attribute(data, target=target)
+def get_deeplift_attributions(data: torch.Tensor,
+                              baseline: Tensor,
+                              model: torch.nn.Module,
+                              forward_function: Callable
+) -> torch.tensor:
+    explainer = DeepLift(model, multiply_by_inputs=None, eps=1e-10)
+    # AssertionError: Target list length does not match output!
+    return explainer.attribute(
+        inputs=data,
+        baselines=baseline,
+        target=[0,1],
+        additional_forward_args=None,
+        return_convergence_delta=False,
+        custom_attribution_func=None
+    )
 
-
-def get_deepshap_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
-    return DeepLiftShap(model).attribute(data, target=target, baselines=torch.zeros(data.shape))
-
+def get_deepshap_attributions(data: torch.Tensor,
+                              baseline: Tensor,
+                              model: torch.nn.Module,
+                              forward_function: Callable
+) -> torch.tensor:
+    explainer = DeepLiftShap(model, multiply_by_inputs=None)
+    return explainer.attribute(
+        inputs=data,
+        baselines=baseline,
+        target=[0,1],
+        additional_forward_args=None,
+        return_convergence_delta=None,
+        custom_attribution_func=None
+    )
 
 def get_gradient_shap_attributions(
         data: torch.Tensor,
@@ -292,6 +315,21 @@ def get_pfi_scikit_learn_attribution(data: torch.Tensor, target: torch.Tensor, m
 def get_uniform_random_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
     return torch.rand(data.shape)
 
+def get_input_x_gradient(
+        data: torch.Tensor,
+        baseline: Tensor,
+        model: torch.nn.Module,
+        forward_function: Callable
+) -> torch.tensor:
+    explainer = InputXGradient(forward_function)
+    # RuntimeError: One of the differentiated Tensors does not require grad
+    # UserWarning: Input Tensor 0 has a dtype of torch.int64. Gradients cannot be activated for these data types.
+    # If traget = int then AssertionError: Cannot choose target column with output shape torch.Size([1]).
+    return explainer.attribute(
+        inputs=data,
+        target=0,
+        additional_forward_args=None
+    )
 
 # https://captum.ai/api/
 methods_dict = {
@@ -308,5 +346,6 @@ methods_dict = {
     'LRP': get_lrp_attributions,
     'PFI': get_pfi_attributions,
     'PFI Scikit-learn': get_pfi_scikit_learn_attribution,
-    'Uniform random': get_uniform_random_attributions
+    'Uniform random': get_uniform_random_attributions,
+    'InputXGradient': get_input_x_gradient
 }
