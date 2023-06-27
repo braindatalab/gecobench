@@ -8,6 +8,7 @@ from captum.attr import (
 )
 from loguru import logger
 from torch import Tensor
+import copy
 
 BERT = 'bert'
 
@@ -58,6 +59,80 @@ def get_captum_attributions(
             # Probably create a Wrapper
             # Probably create a new forward function
 
+            #print("model:")
+            #print(type(model))
+            #print(model)
+            #print(model.layer[0])
+
+            #print(model.bert.encoder)
+
+            #print("model.bert.encoder[0]")
+            #layer_list = model.bert.encoder.layer
+            #print(layer_list[0])
+
+            #print("####################################")
+            #print("Iterate over model children:")
+            #for idx,module in enumerate(model.children()):
+            #    print(idx,module)
+
+            #print("####################################")
+
+            #input_model = model.base_model.embeddings
+            #print(input_model)
+            #embeddings = input_model(x)
+
+
+            #print(model.bert.encoder)
+            #print(model.bert.encoder(embeddings))
+            
+            #print(model.bert.pooler(inputs))
+            
+            #print("####################################")
+            model_children = list(model.children())
+            #print(model_children[0].encoder)
+            #print(model_children[0].pooler) 
+
+            print("####################################")
+            
+            model_without_embedding_layer = []
+            model_without_embedding_layer.append(model_children[0].encoder)
+            model_without_embedding_layer.append(model_children[0].pooler)
+            model_without_embedding_layer.append(model_children[1])
+            model_without_embedding_layer.append(model_children[2])
+
+            new_model = torch.nn.Sequential(*model_without_embedding_layer)
+            #print(new_model)
+
+            #input_model = model.base_model.embeddings
+            #print(input_model)
+            #embeddings = input_model(x)
+
+            #print(new_model(embeddings))
+            
+            #print("####################################")
+            #model_without_embedding_layer = torch.nn.ModuleList()
+            #model_without_embedding_layer.append(model_children[0].encoder)
+            #model_without_embedding_layer.append(model_children[0].pooler)
+            #model_without_embedding_layer.append(model_children[1])
+            #model_without_embedding_layer.append(model_children[2])
+            #print(model_without_embedding_layer)
+
+            #copyOfModel = copy(model)
+            #print("copyOfModel", copyOfModel)
+            
+
+
+            # copyOfModel.bert.encoder.layer = model_without_embedding_layer
+            # print(copyOfModel)
+
+            # print("####################################")
+            # print(copyOfModel(inputs))
+
+            #print("Iterate over model modules:")
+            #for idx,module in enumerate(model.modules()):
+            #    print(idx,module)
+            
+
             output = model(inputs)
             # print("forward_function after output = model(inputs)")
             # print(output[0].shape)
@@ -82,9 +157,26 @@ def get_captum_attributions(
         # for name, param in input_model.named_parameters():
         #    print(name)
 
+        def forward_function_saliency(inputs: Tensor) -> Tensor:
+            print("forward_function_saliency")
+            
+            model_children = list(model.children())
+            model_without_embedding_layer = []
+            model_without_embedding_layer.append(model_children[0].encoder)
+            model_without_embedding_layer.append(model_children[0].pooler)
+            model_without_embedding_layer.append(model_children[1])
+            model_without_embedding_layer.append(model_children[2])
+            model = torch.nn.Sequential(*model_without_embedding_layer)
+
+            return model
+
     else:
         forward_function = None
         input_model = model
+    
+
+
+
 
     for method_name in methods:
         logger.info(method_name)
@@ -93,6 +185,7 @@ def get_captum_attributions(
             print(input_model)
             x = input_model(x)
             print("EMEBDINNGS:",x, x.shape)
+            #forward_function = forward_function_saliency
             
         a = methods_dict.get(method_name)(
             forward_function=forward_function,
@@ -121,7 +214,8 @@ def get_integrated_gradients_attributions(
         data: torch.Tensor,
         baseline: Tensor,
         model: torch.nn.Module,
-        forward_function: Callable
+        forward_function: Callable,
+        target: list
 ) -> torch.tensor:
     # Model = embedding layers of bert
     # Works because compute IG only up to the embedding layer
@@ -144,7 +238,7 @@ def get_saliency_attributions(data: torch.Tensor,
     print("data type:",data.dtype, data)  
     print(model)
       
-    explainer = Saliency(model)
+    explainer = Saliency(forward_function)
     # UserWarning: Input Tensor 0 has a dtype of torch.int64. 
     # Gradients cannot be activated for these data types.
     # RuntimeError: One of the differentiated Tensors does not require grad
