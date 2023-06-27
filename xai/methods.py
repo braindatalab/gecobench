@@ -45,139 +45,16 @@ def get_captum_attributions(
     print(methods)
     if BERT in model_type:
         def forward_function(inputs: Tensor) -> Tensor:
-            # print("forward_function")
-            # print(inputs, type(inputs))
-            # for name, param in model.named_parameters():
-            #    print(name)
-
-            # Output:
-            # SequenceClassifierOutput(loss=None, logits=tensor([[-0.4450, -0.5829]]), hidden_states=None, attentions=None)
-
-            # ToDo 22.06.:
-            # Cut off embedding layer from Bert model
-            # Use this model and provide embeddings which we have
-            # Probably create a Wrapper
-            # Probably create a new forward function
-
-            #print("model:")
-            #print(type(model))
-            #print(model)
-            #print(model.layer[0])
-
-            #print(model.bert.encoder)
-
-            #print("model.bert.encoder[0]")
-            #layer_list = model.bert.encoder.layer
-            #print(layer_list[0])
-
-            #print("####################################")
-            #print("Iterate over model children:")
-            #for idx,module in enumerate(model.children()):
-            #    print(idx,module)
-
-            #print("####################################")
-
-            #input_model = model.base_model.embeddings
-            #print(input_model)
-            #embeddings = input_model(x)
-
-
-            #print(model.bert.encoder)
-            #print(model.bert.encoder(embeddings))
-            
-            #print(model.bert.pooler(inputs))
-            
-            #print("####################################")
-            model_children = list(model.children())
-            #print(model_children[0].encoder)
-            #print(model_children[0].pooler) 
-
-            print("####################################")
-            
-            model_without_embedding_layer = []
-            model_without_embedding_layer.append(model_children[0].encoder)
-            model_without_embedding_layer.append(model_children[0].pooler)
-            model_without_embedding_layer.append(model_children[1])
-            model_without_embedding_layer.append(model_children[2])
-
-            new_model = torch.nn.Sequential(*model_without_embedding_layer)
-            #print(new_model)
-
-            #input_model = model.base_model.embeddings
-            #print(input_model)
-            #embeddings = input_model(x)
-
-            #print(new_model(embeddings))
-            
-            #print("####################################")
-            #model_without_embedding_layer = torch.nn.ModuleList()
-            #model_without_embedding_layer.append(model_children[0].encoder)
-            #model_without_embedding_layer.append(model_children[0].pooler)
-            #model_without_embedding_layer.append(model_children[1])
-            #model_without_embedding_layer.append(model_children[2])
-            #print(model_without_embedding_layer)
-
-            #copyOfModel = copy(model)
-            #print("copyOfModel", copyOfModel)
-            
-
-
-            # copyOfModel.bert.encoder.layer = model_without_embedding_layer
-            # print(copyOfModel)
-
-            # print("####################################")
-            # print(copyOfModel(inputs))
-
-            #print("Iterate over model modules:")
-            #for idx,module in enumerate(model.modules()):
-            #    print(idx,module)
-            
-
             output = model(inputs)
-            # print("forward_function after output = model(inputs)")
-            # print(output[0].shape)
-            # print("after classification layer")
-            # last_layer = torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
-            # print(last_layer.shape)
-            #return torch.max(torch.softmax(output.logits, dim=1)).unsqueeze(-1)
             forward_function_output = torch.softmax(output.logits, dim=1)
-            print(forward_function_output)
             return forward_function_output
 
         input_model = model.base_model.embeddings
 
-        # input_model:
-        # word_embeddings.weight
-        # position_embeddings.weight
-        # token_type_embeddings.weight
-        # LayerNorm.weight
-        # LayerNorm.bias
-
-        # print(model.base_model)
-        # for name, param in input_model.named_parameters():
-        #    print(name)
-
-        def forward_function_saliency(inputs: Tensor) -> Tensor:
-            print("forward_function_saliency")
-            
-            model_children = list(model.children())
-            model_without_embedding_layer = []
-            model_without_embedding_layer.append(model_children[0].encoder)
-            model_without_embedding_layer.append(model_children[0].pooler)
-            model_without_embedding_layer.append(model_children[1])
-            model_without_embedding_layer.append(model_children[2])
-            model = torch.nn.Sequential(*model_without_embedding_layer)
-
-            return model
-
     else:
         forward_function = None
         input_model = model
-    
-
-
-
-
+ 
     for method_name in methods:
         logger.info(method_name)
 
@@ -185,7 +62,6 @@ def get_captum_attributions(
             print(input_model)
             x = input_model(x)
             print("EMEBDINNGS:",x, x.shape)
-            #forward_function = forward_function_saliency
             
         a = methods_dict.get(method_name)(
             forward_function=forward_function,
@@ -223,6 +99,7 @@ def get_integrated_gradients_attributions(
     explanations = explainer.attribute(
         inputs=data,
         baselines=baseline,
+        target=int(target),
         n_steps=200,
         return_convergence_delta=False,
     )
@@ -342,13 +219,14 @@ def get_deconvolution_attributions(data: torch.Tensor,
 def get_shapley_sampling_attributions(data: torch.Tensor, 
                                       baseline: Tensor,
                                       model: torch.nn.Module,
-                                      forward_function: Callable
+                                      forward_function: Callable,
+                                      target: list
 ) -> torch.tensor:
     explainer = ShapleyValueSampling(forward_function)
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
-        target=None,
+        target=int(target),
         additional_forward_args=None,
         feature_mask=None,
         n_samples=25,
@@ -360,7 +238,8 @@ def get_shapley_sampling_attributions(data: torch.Tensor,
 def get_lime_attributions(data: torch.Tensor,
                           baseline: Tensor,
                           model: torch.nn.Module,
-                          forward_function: Callable
+                          forward_function: Callable,
+                          target: list
                           ) -> torch.tensor:
     # Difference between captum.attr.Lime and captum.attr.LimeBase?
     # Default interpretable_model = SkLearnLasso(alpha=0.01)
@@ -368,7 +247,7 @@ def get_lime_attributions(data: torch.Tensor,
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
-        target=None,
+        target=int(target),
         additional_forward_args=None,
         feature_mask=None,
         n_samples=50,
@@ -381,13 +260,14 @@ def get_lime_attributions(data: torch.Tensor,
 def get_kernel_shap_attributions(data: torch.Tensor,
                                  baseline: Tensor,
                                  model: torch.nn.Module,
-                                 forward_function: Callable
+                                 forward_function: Callable,
+                                 target: list
                                  ) -> torch.tensor:
     explainer = KernelShap(forward_function)
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
-        target=None,
+        target=int(target),
         additional_forward_args=None,
         feature_mask=None,
         n_samples=25,
