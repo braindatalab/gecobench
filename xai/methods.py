@@ -45,11 +45,7 @@ def get_captum_attributions(
             forward_function_output = torch.softmax(output.logits, dim=1)
             return forward_function_output
 
-        input_model = model.base_model.embeddings
-
-    else:
-        forward_function = None
-        input_model = model
+        embedding_model = model.base_model.embeddings
  
     for method_name in methods:
         logger.info(method_name)
@@ -58,8 +54,8 @@ def get_captum_attributions(
             a = methods_dict.get(method_name)(
                 forward_function=SkippingEmbedding(model),
                 baseline=baseline,
-                data=input_model(x), 
-                model=input_model, 
+                data=embedding_model(x), 
+                model=embedding_model, 
                 target=target
             )
         else:
@@ -67,7 +63,7 @@ def get_captum_attributions(
                 forward_function=forward_function,
                 baseline=baseline,
                 data=x, 
-                model=input_model, 
+                model=embedding_model, 
                 target=target
             )
 
