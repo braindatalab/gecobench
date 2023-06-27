@@ -50,7 +50,7 @@ def get_captum_attributions(
     for method_name in methods:
         logger.info(method_name)
 
-        if method_name == "Saliency":
+        if method_name == "Saliency" or method_name == "Gradient SHAP" or method_name == "InputXGradient":
             a = methods_dict.get(method_name)(
                 forward_function=SkippingEmbedding(model),
                 baseline=baseline,
@@ -114,14 +114,15 @@ def get_saliency_attributions(data: torch.Tensor,
 def get_deeplift_attributions(data: torch.Tensor,
                               baseline: Tensor,
                               model: torch.nn.Module,
-                              forward_function: Callable
+                              forward_function: Callable,
+                              target: list
 ) -> torch.tensor:
     explainer = DeepLift(model, multiply_by_inputs=None, eps=1e-10)
-    # AssertionError: Target list length does not match output!
+    # AssertionError: Target not provided when necessary, cannot take gradient with respect to multiple outputs.
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
-        target=[0,1],
+        target=int(target),
         additional_forward_args=None,
         return_convergence_delta=False,
         custom_attribution_func=None
@@ -144,23 +145,22 @@ def get_deepshap_attributions(data: torch.Tensor,
     )
 
 
-def get_gradient_shap_attributions(
-        data: torch.Tensor,
-        baseline: Tensor,
-        model: torch.nn.Module,
-        forward_function: Callable,
-        target: list
+def get_gradient_shap_attributions(data: torch.Tensor,
+                                   baseline: Tensor,
+                                   model: torch.nn.Module,
+                                   forward_function: Callable,
+                                   target: list
 ) -> torch.tensor:
-    # RuntimeError: Expected tensor for argument #1 'indices' to have one of the following scalar types: 
-    # Long, Int; but got torch.FloatTensor instead (while checking arguments for embedding)
-    # print(data.dtype)
-    explainer = GradientShap(model)
+    # AssertionError: The samples in input and baseline batches must have the same shape or the baseline corresponding to the input tensor must be a scalar.
+    explainer = GradientShap(forward_function)
+    print("data",data.shape)
+    print("baselines",baseline.shape)
     return explainer.attribute(
         inputs=data,
         baselines=baseline,
         n_samples=5,  
         stdevs=0.0,
-        target=target,  
+        target=int(target),  
         return_convergence_delta=True
     )
 
@@ -304,21 +304,19 @@ def get_uniform_random_attributions(data: torch.Tensor, target: torch.Tensor, mo
     return torch.rand(data.shape)
 
 
-def get_input_x_gradient(
-        data: torch.Tensor,
-        baseline: Tensor,
-        model: torch.nn.Module,
-        forward_function: Callable
-) -> torch.tensor:
+def get_input_x_gradient(data: torch.Tensor,
+                         baseline: Tensor,
+                         model: torch.nn.Module,
+                         forward_function: Callable,
+                         target: list
+                         ) -> torch.tensor:
     explainer = InputXGradient(forward_function)
-    # RuntimeError: One of the differentiated Tensors does not require grad
-    # UserWarning: Input Tensor 0 has a dtype of torch.int64. Gradients cannot be activated for these data types.
-    # If traget = int then AssertionError: Cannot choose target column with output shape torch.Size([1]).
-    return explainer.attribute(
+    explanations = explainer.attribute(
         inputs=data,
-        target=0,
+        target=int(target),
         additional_forward_args=None
     )
+    return explanations.sum(dim=2)
 
 # https://captum.ai/api/
 methods_dict = {
