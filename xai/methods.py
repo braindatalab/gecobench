@@ -50,7 +50,7 @@ def get_captum_attributions(
     for method_name in methods:
         logger.info(method_name)
 
-        if method_name == "Saliency" or method_name == "Gradient SHAP" or method_name == "InputXGradient":
+        if method_name == "Saliency" or method_name == "Gradient SHAP" or method_name == "InputXGradient" or method_name == "Guided Backprop":
             a = methods_dict.get(method_name)(
                 forward_function=SkippingEmbedding(model),
                 baseline=baseline,
@@ -170,19 +170,15 @@ def get_guided_backprop_attributions(data: torch.Tensor,
                                      model: torch.nn.Module,
                                      forward_function: Callable,
                                      target: list
-) -> torch.tensor:    
-    print("get_guided_backprop_attributions")
-    print(model)
-    explainer = GuidedBackprop(model)
-    # Input Tensor 0 has a dtype of torch.int64. Gradients cannot be activated for these data types.
-    # RuntimeError: One of the differentiated Tensors does not require grad
-    this_is_target = int(target)
-    print(this_is_target)
-    return explainer.attribute(
+) -> torch.tensor:
+    # UserWarning: Setting backward hooks on ReLU activations.The hooks will be removed after the attribution is finished
+    explainer = GuidedBackprop(forward_function)
+    explanations = explainer.attribute(
         inputs=data,
-        target=this_is_target,
+        target=int(target),
         additional_forward_args=None
     )
+    return explanations.sum(dim=2)
 
 
 def get_deconvolution_attributions(data: torch.Tensor, 
