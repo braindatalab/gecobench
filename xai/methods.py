@@ -50,7 +50,7 @@ def get_captum_attributions(
     for method_name in methods:
         logger.info(method_name)
 
-        gradient_based_methods = ["Saliency", "Gradient SHAP", "InputXGradient", "Guided Backprop", "Deconvolution"]
+        gradient_based_methods = ["Saliency", "Gradient SHAP", "InputXGradient", "Guided Backprop", "Deconvolution", "DeepLift"]
         if method_name in gradient_based_methods:
             a = methods_dict.get(method_name)(
                 forward_function=SkippingEmbedding(model),
@@ -118,16 +118,18 @@ def get_deeplift_attributions(data: torch.Tensor,
                               forward_function: Callable,
                               target: list
 ) -> torch.tensor:
-    explainer = DeepLift(model, multiply_by_inputs=None, eps=1e-10)
-    # AssertionError: Target not provided when necessary, cannot take gradient with respect to multiple outputs.
-    return explainer.attribute(
+    explainer = DeepLift(forward_function, multiply_by_inputs=None, eps=1e-10)
+    # : UserWarning: Setting forward, backward hooks and attributes on non-linear activations. 
+    # The hooks and attributes will be removed after the attribution is finished
+    explanations = explainer.attribute(
         inputs=data,
-        baselines=baseline,
+       # baselines=baseline,
         target=int(target),
         additional_forward_args=None,
         return_convergence_delta=False,
         custom_attribution_func=None
     )
+    return explanations.sum(dim=2)
 
 
 def get_deepshap_attributions(data: torch.Tensor,
@@ -135,6 +137,7 @@ def get_deepshap_attributions(data: torch.Tensor,
                               model: torch.nn.Module,
                               forward_function: Callable
 ) -> torch.tensor:
+    # Will throw the same error w.r.t. shape of baseline vs input as with gradient shap
     explainer = DeepLiftShap(model, multiply_by_inputs=None)
     return explainer.attribute(
         inputs=data,
