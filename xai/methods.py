@@ -50,7 +50,8 @@ def get_captum_attributions(
     for method_name in methods:
         logger.info(method_name)
 
-        if method_name == "Saliency" or method_name == "Gradient SHAP" or method_name == "InputXGradient" or method_name == "Guided Backprop":
+        gradient_based_methods = ["Saliency", "Gradient SHAP", "InputXGradient", "Guided Backprop", "Deconvolution"]
+        if method_name in gradient_based_methods:
             a = methods_dict.get(method_name)(
                 forward_function=SkippingEmbedding(model),
                 baseline=baseline,
@@ -184,15 +185,16 @@ def get_guided_backprop_attributions(data: torch.Tensor,
 def get_deconvolution_attributions(data: torch.Tensor, 
                                    baseline: Tensor,
                                    model: torch.nn.Module,
-                                   forward_function: Callable
+                                   forward_function: Callable,
+                                   target: list
 ) -> torch.tensor:
-    explainer = Deconvolution(model)
-    # Same issue with output of Bert model as with guided_backprop
-    return explainer.attribute(
+    explainer = Deconvolution(forward_function)
+    explanations = explainer.attribute(
         inputs=data,
-        target=[0,1],
+        target=int(target),
         additional_forward_args=None
     )
+    return explanations.sum(dim=2)
 
 
 def get_shapley_sampling_attributions(data: torch.Tensor, 
