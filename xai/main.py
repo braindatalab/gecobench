@@ -270,7 +270,10 @@ def apply_xai_methods(
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth']
             )]
-            print(attribution, attribution.shape)
+            print("")
+            print(xai_method)
+            print(attribution)
+            print(attribution.shape)
 
         #if 1 < k:
         #    break

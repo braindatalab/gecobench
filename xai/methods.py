@@ -12,18 +12,14 @@ import copy
 
 BERT = 'bert'
 
-# class BertLogits(torch.nn.module)
-# init function: our bert model
-# forward function: return model.logits
 
-class BertLogits(torch.nn.Module):
-    def __init__(self,bertmodel) -> None:
-        super(BertLogits, self).__init__()
-        print("BertLogits initalized")
-        self.model = bertmodel
+class SkippingEmbedding(torch.nn.Module):
+    def __init__(self,bertmodel):
+        super(SkippingEmbedding, self).__init__()
+        self.bertmodel = bertmodel
+    def forward(self,inputs: torch.tensor):
+        return self.bertmodel(input_ids=None,inputs_embeds=inputs)[0]
 
-    def forward(self, input: torch.tensor) -> torch.tensor:
-        return self.model(input)[0]
 
 def check_availability_of_xai_methods(methods: list) -> None:
     for method_name in methods:
@@ -59,27 +55,26 @@ def get_captum_attributions(
         logger.info(method_name)
 
         if method_name == "Saliency":
-            print(input_model)
-            x = input_model(x)
-            print("EMEBDINNGS:",x, x.shape)
-            
-        a = methods_dict.get(method_name)(
-            forward_function=forward_function,
-            baseline=baseline,
-            data=x, model=input_model, target=target
-        )
-
-        # print("a:")
-        # print(a.shape)
-        # print(a)
+            a = methods_dict.get(method_name)(
+                forward_function=SkippingEmbedding(model),
+                baseline=baseline,
+                data=input_model(x), 
+                model=input_model, 
+                target=target
+            )
+        else:
+            a = methods_dict.get(method_name)(
+                forward_function=forward_function,
+                baseline=baseline,
+                data=x, 
+                model=input_model, 
+                target=target
+            )
 
         if BERT in model_type and method_name:
             a = a.squeeze(0)
             a = a / torch.norm(a)
             a = a.cpu().detach().numpy()
-
-        # print("a after summation:")
-        # print(a.shape)
 
         attributions[method_name] = a
 
@@ -93,8 +88,6 @@ def get_integrated_gradients_attributions(
         forward_function: Callable,
         target: list
 ) -> torch.tensor:
-    # Model = embedding layers of bert
-    # Works because compute IG only up to the embedding layer
     explainer = LayerIntegratedGradients(forward_function, model)
     explanations = explainer.attribute(
         inputs=data,
@@ -112,20 +105,14 @@ def get_saliency_attributions(data: torch.Tensor,
                               forward_function: Callable,
                               target: list
 ) -> torch.tensor:
-    print("data type:",data.dtype, data)  
-    print(model)
-      
     explainer = Saliency(forward_function)
-    # UserWarning: Input Tensor 0 has a dtype of torch.int64. 
-    # Gradients cannot be activated for these data types.
-    # RuntimeError: One of the differentiated Tensors does not require grad
-    print(int(target))
-    return explainer.attribute(
+    explanations = explainer.attribute(
         inputs=data,
         target=int(target),
         abs=True,
         additional_forward_args=None
     )
+    return explanations.sum(dim=2)
 
 
 def get_deeplift_attributions(data: torch.Tensor,
