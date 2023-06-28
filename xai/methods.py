@@ -50,7 +50,7 @@ def get_captum_attributions(
     for method_name in methods:
         logger.info(method_name)
 
-        gradient_based_methods = ["Saliency", "Gradient SHAP", "InputXGradient", "Guided Backprop", "Deconvolution", "DeepLift"]
+        gradient_based_methods = ["Saliency", "InputXGradient", "Guided Backprop", "Deconvolution", "DeepLift"]
         if method_name in gradient_based_methods:
             a = methods_dict.get(method_name)(
                 forward_function=SkippingEmbedding(model),
@@ -132,41 +132,13 @@ def get_deeplift_attributions(data: torch.Tensor,
     return explanations.sum(dim=2)
 
 
-def get_deepshap_attributions(data: torch.Tensor,
-                              baseline: Tensor,
-                              model: torch.nn.Module,
-                              forward_function: Callable
-) -> torch.tensor:
-    # Will throw the same error w.r.t. shape of baseline vs input as with gradient shap
-    explainer = DeepLiftShap(model, multiply_by_inputs=None)
-    return explainer.attribute(
-        inputs=data,
-        baselines=baseline,
-        target=[0,1],
-        additional_forward_args=None,
-        return_convergence_delta=None,
-        custom_attribution_func=None
-    )
+def get_deepshap_attributions(data: torch.Tensor, baseline: Tensor, model: torch.nn.Module,forward_function: Callable) -> torch.tensor:
+     # Will throw the same error w.r.t. shape of baseline vs input as with gradient shap
+    return DeepLiftShap(model, multiply_by_inputs=None).attribute(inputs=data)
 
 
-def get_gradient_shap_attributions(data: torch.Tensor,
-                                   baseline: Tensor,
-                                   model: torch.nn.Module,
-                                   forward_function: Callable,
-                                   target: list
-) -> torch.tensor:
-    # AssertionError: The samples in input and baseline batches must have the same shape or the baseline corresponding to the input tensor must be a scalar.
-    explainer = GradientShap(forward_function)
-    print("data",data.shape)
-    print("baselines",baseline.shape)
-    return explainer.attribute(
-        inputs=data,
-        baselines=baseline,
-        n_samples=5,  
-        stdevs=0.0,
-        target=int(target),  
-        return_convergence_delta=True
-    )
+def get_gradient_shap_attributions(data: torch.Tensor, baseline: Tensor, model: torch.nn.Module, forward_function: Callable, target: list) -> torch.tensor:
+    return GradientShap(forward_function).attribute(inputs=data)
 
 
 def get_guided_backprop_attributions(data: torch.Tensor, 
@@ -261,31 +233,8 @@ def get_kernel_shap_attributions(data: torch.Tensor,
     )
 
 
-def get_lrp_attributions(
-        data: torch.Tensor,
-        baseline: Tensor,
-        model: torch.nn.Module,
-        forward_function: Callable
-) -> torch.tensor:
-    # method not working yet
-    # No LRP rule for 'torch.nn.modules.sparse.Embedding'
-    # input_model_layers = []
-    # for name, param in model.named_parameters():
-    #    input_model_layers.append(name)
-    #    print(name)
-    # layers_to_explain = [model.word_embeddings]
-    # print("layers_to_explain:",layers_to_explain)'
-
-    explainer = LayerLRP(forward_function, model)
-    return explainer.attribute(
-        inputs=data
-    )
-    # return LRP(model).attribute(data, target=target)
-    # return GradientShap(model).attribute(data, target=target, baselines=torch.zeros(data.shape))
-    # https://arxiv.org/pdf/2101.00196.pdf
-    # https://github.com/frankaging/BERT-LRP
-    # https://proceedings.mlr.press/v162/ali22a/ali22a.pdf
-    # https://github.com/ameenali/xai_transformers
+def get_lrp_attributions(data: torch.Tensor, baseline: Tensor, model: torch.nn.Module, forward_function: Callable) -> torch.tensor:
+    return LayerLRP(forward_function, model).attribute(inputs=data)
 
 
 def get_pfi_attributions(data: torch.Tensor, target: torch.Tensor, model: torch.nn.Module) -> torch.tensor:
