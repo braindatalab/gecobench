@@ -4,8 +4,9 @@ import numpy as np
 import torch
 from captum.attr import (
     IntegratedGradients, Saliency, DeepLift, DeepLiftShap, GradientShap, GuidedBackprop,
-    Deconvolution, ShapleyValueSampling, Lime, KernelShap, LayerLRP, FeaturePermutation, LayerIntegratedGradients, InputXGradient
+    Deconvolution, ShapleyValueSampling, LimeBase, KernelShap, LayerLRP, FeaturePermutation, LayerIntegratedGradients, InputXGradient
 )
+from sklearn import linear_model
 from loguru import logger
 from torch import Tensor
 import copy
@@ -197,20 +198,67 @@ def get_lime_attributions(data: torch.Tensor,
                           forward_function: Callable,
                           target: list
                           ) -> torch.tensor:
-    # Difference between captum.attr.Lime and captum.attr.LimeBase?
-    # Default interpretable_model = SkLearnLasso(alpha=0.01)
-    explainer = Lime(forward_function)
-    return explainer.attribute(
-        inputs=data,
-        baselines=baseline,
-        target=int(target),
-        additional_forward_args=None,
-        feature_mask=None,
-        n_samples=50,
-        perturbations_per_eval=1,
-        return_input_shape=True,
-        show_progress=True
+    
+    # encode text indices into latent representations & calculate cosine similarity
+    # Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
+    def exp_embedding_cosine_distance(original_inp, perturbed_inp, _, **kwargs):
+        print("")
+        print("exp_embedding_cosine_distance():")
+        print("original", original_inp, original_inp.shape)
+        print("perturbed", perturbed_inp, perturbed_inp.shape)
+        embedding_model = model
+        original_emb = embedding_model(original_inp)
+        perturbed_emb = embedding_model(perturbed_inp)
+        print("original_emb", original_emb.shape)
+        print("perturbed_emb", perturbed_emb.shape)
+
+        distance = 1 - torch.nn.functional.cosine_similarity(original_emb, perturbed_emb, dim=1)
+        return torch.exp(-1 * (distance ** 2) / 2)
+
+    # binary vector where each word is selected independently and uniformly at random
+    # Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
+    def bernoulli_perturb(text, **kwargs):
+        print("")
+        print("bernoulli_perturb():")
+        print("text:")
+        print(text, text.shape)
+        probs = torch.ones_like(text) * 0.5
+        output = torch.bernoulli(probs).long()
+        print("bernoulli", output, output.shape)
+
+        return torch.bernoulli(probs).long()
+    
+    # remove absenst token based on the intepretable representation sample
+    # Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
+    def interp_to_input(interp_sample, original_input, **kwargs):
+        print("")
+        print("interp_to_input()")
+        print("interp_sample", interp_sample, interp_sample.shape)
+        print("original_input", original_input, original_input.shape)
+        output = original_input[interp_sample.bool()].view(original_input.size(0), -1)
+        print("output", output, output.shape)
+        return original_input[interp_sample.bool()].view(original_input.size(0), -1)
+
+    lasso_lime_base = LimeBase(
+        forward_function, 
+        interpretable_model=linear_model.Lasso(alpha=0.08),
+        similarity_func=exp_embedding_cosine_distance,
+        perturb_func=bernoulli_perturb,
+        perturb_interpretable_space=False,
+        from_interp_rep_transform=interp_to_input,
+        to_interp_rep_transform=None
     )
+    print("data", data)
+    explanations = lasso_lime_base.attribute(
+        # test_text.unsqueeze(0), # add batch dimension for Captum
+        data,
+        target=int(target),
+        #additional_forward_args=(test_offsets,),
+        #n_samples=,
+        show_progress=True
+    ).squeeze(0)
+
+    return explanations
 
 
 def get_kernel_shap_attributions(data: torch.Tensor,
