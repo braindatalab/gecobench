@@ -102,8 +102,8 @@ def highlight_words(gt, model, tokenizer, validation_set, n, show_highlight=True
     cls_token_id = tokenizer.cls_token_id
 
     ref_input_ids = [tokenizer.cls_token_id] + [tokenizer.pad_token_id] * (
-        len([i for i in tokenized if i != 0]) - 2) + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (
-        len([i for i in tokenized if i == 0]))
+            len([i for i in tokenized if i != 0]) - 2) + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (
+                        len([i for i in tokenized if i == 0]))
     ref_input_ids = torch.tensor([ref_input_ids])
 
     lig = LayerIntegratedGradients(custom_forward_grad, model.bert.embeddings)
@@ -265,9 +265,8 @@ def apply_xai_methods(
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth']
             )]
-            print(attribution, attribution.shape)
 
-        #if 1 < k:
+        # if 1 < k:
         #    break
 
     return results
