@@ -22,7 +22,7 @@ def get_command_line_arguments() -> argparse.Namespace:
         '--mode',
         dest='mode',
         required=True,
-        help='Modes: filtering, training, xai, evaluation, visualization.',
+        help='Modes: data, training, xai, evaluation, visualization.',
         type=str,
         default=1,
     )
