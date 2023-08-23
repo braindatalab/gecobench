@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Tuple, Dict, List, Any
 
 import torch
-import torchtext
+# import torchtext
 
 from common import DataSet
 
