@@ -14,7 +14,7 @@ from sklearn.metrics import auc, roc_curve
 from sklearn.metrics._ranking import _binary_clf_curve, average_precision_score
 from tqdm import tqdm
 
-from common import EvaluationResult
+from common import EvaluationResult, XAIResult
 from utils import load_pickle, dump_as_pickle, generate_xai_dir, generate_evaluation_dir
 
 
@@ -29,7 +29,9 @@ def precision_curves(y_true, probas_pred, *, pos_label=None, sample_weight=None)
     Minor adaption of corresponding scikit-learn function:
     We added the calculation of the specificity.
     """
-    fps, tps, thresholds = _binary_clf_curve(y_true, probas_pred, pos_label=pos_label, sample_weight=sample_weight)
+    fps, tps, thresholds = _binary_clf_curve(
+        y_true, probas_pred, pos_label=pos_label, sample_weight=sample_weight
+    )
 
     ps = tps + fps
     precision = np.divide(tps, ps, where=(ps != 0))
@@ -47,10 +49,17 @@ def precision_curves(y_true, probas_pred, *, pos_label=None, sample_weight=None)
     specificity = 1 - np.divide(fps, fps[-1], where=(fps[-1] != 0))
     # reverse the outputs so recall is decreasing
     sl = slice(None, None, -1)
-    return np.hstack((precision[sl], 1)), np.hstack((recall[sl], 0)), thresholds[sl], np.hstack((specificity[sl], 1))
+    return (
+        np.hstack((precision[sl], 1)),
+        np.hstack((recall[sl], 0)),
+        thresholds[sl],
+        np.hstack((specificity[sl], 1)),
+    )
 
 
-def precision_specificity_score(precision: np.ndarray, specificity: np.ndarray, threshold: float = 0.9) -> float:
+def precision_specificity_score(
+    precision: np.ndarray, specificity: np.ndarray, threshold: float = 0.9
+) -> float:
     score = 0.0
     if any(threshold < specificity[:-1]):
         score = precision[:-1][threshold < specificity[:-1]][0]
@@ -66,23 +75,29 @@ def top_k_precision_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
 
 
 def compute_precision_based_scores(y_true: np.ndarray, y_score: np.ndarray) -> Dict:
-    precision, recall, thresholds, specificity = precision_curves(y_true=y_true, probas_pred=y_score)
+    precision, recall, thresholds, specificity = precision_curves(
+        y_true=y_true, probas_pred=y_score
+    )
     auc_value = auc(x=recall, y=precision)
     avg_precision = average_precision_score(y_true=y_true, y_score=y_score)
-    precision_specificity = precision_specificity_score(precision=precision, specificity=specificity, threshold=0.5)
+    precision_specificity = precision_specificity_score(
+        precision=precision, specificity=specificity, threshold=0.5
+    )
     top_k_precision = top_k_precision_score(y_true=y_true, y_score=y_score)
     return dict(
         precision_recall_auc=auc_value,
         avg_precision=avg_precision,
         precision_specificity=precision_specificity,
-        top_k_precision=top_k_precision
+        top_k_precision=top_k_precision,
     )
 
 
 def calculate_scores(attribution: np.ndarray, ground_truth: np.ndarray) -> Dict:
     roc_auc = roc_auc_scores(y_true=ground_truth, y_score=attribution)
     result = dict(roc_auc=roc_auc)
-    precision_based_scores = compute_precision_based_scores(y_true=ground_truth, y_score=attribution)
+    precision_based_scores = compute_precision_based_scores(
+        y_true=ground_truth, y_score=attribution
+    )
     result.update(precision_based_scores)
     return result
 
@@ -95,54 +110,58 @@ def rectify_attribution_values(a: np.ndarray, global_mode: bool) -> List[np.ndar
     return output
 
 
-
 def evaluate_explanations(
-        explanations: List,
-        ground_truth: np.ndarray,
-        global_mode: bool,
-        num_workers: int
+    explanations: List, ground_truth: np.ndarray, global_mode: bool, num_workers: int
 ) -> List:
     return Parallel(n_jobs=num_workers)(
         delayed(assemble_scores)(
-            attributions,
-            ground_truth,
-            method_name,
-            global_mode,
-            json.loads(meta_data)
-        ) for meta_data, method_name, attributions in explanations
+            attributions, ground_truth, method_name, global_mode, json.loads(meta_data)
+        )
+        for meta_data, method_name, attributions in explanations
     )
 
 
-def evaluate(xai_records: list) -> list[dict]:
-    results = list()
-    for xai_result in tqdm(xai_records):
-        attribution_absolute = np.abs(np.array(xai_result.attribution))
-        scores = calculate_scores(
-            attribution=attribution_absolute,
-            ground_truth=np.array(xai_result.ground_truth),
-        )
-        result = asdict(EvaluationResult(
+def bundle_evaluation_results(xai_result: XAIResult, scores: dict) -> dict:
+    output = asdict(
+        EvaluationResult(
             model_name=xai_result.model_name,
             dataset_type=xai_result.dataset_type,
-            attribution_method=xai_result.attribution_method
-        ))
-        result.update(scores)
-        results += [result]
+            attribution_method=xai_result.attribution_method,
+        )
+    )
+    output.update(scores)
+    return output
+
+
+def evaluate(xai_records_paths: list) -> list[dict]:
+    results = list()
+    for result_path in tqdm(xai_records_paths):
+        xai_results = load_pickle(file_path=result_path)
+        for xai_result in xai_results:
+            attribution_absolute = np.abs(np.array(xai_result.attribution))
+            scores = calculate_scores(
+                attribution=attribution_absolute,
+                ground_truth=np.array(xai_result.ground_truth),
+            )
+            result = bundle_evaluation_results(xai_result=xai_result, scores=scores)
+            results += [result]
 
     return results
 
 
 def main(config: Dict) -> None:
     xai_dir = generate_xai_dir(config=config)
-    xai_records = load_pickle(file_path=join(xai_dir, config['xai']['xai_records']))
+    xai_result_paths = load_pickle(
+        file_path=join(xai_dir, config["xai"]["xai_records"])
+    )
 
-    logger.info(f'Calculate evaluation scores.')
-    evaluation_results = evaluate(xai_records=xai_records)
+    logger.info(f"Calculate evaluation scores.")
+    evaluation_results = evaluate(xai_records_paths=xai_result_paths)
     output_dir = generate_evaluation_dir(config=config)
-    filename = config['evaluation']['evaluation_records']
-    logger.info(f'Output path: {join(output_dir, filename)}')
+    filename = config["evaluation"]["evaluation_records"]
+    logger.info(f"Output path: {join(output_dir, filename)}")
     dump_as_pickle(data=evaluation_results, output_dir=output_dir, filename=filename)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(config={})
