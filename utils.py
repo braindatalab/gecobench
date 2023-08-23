@@ -80,6 +80,14 @@ def generate_evaluation_dir(config: Dict) -> str:
     )
 
 
+def generate_visualization_dir(config: Dict) -> str:
+    return join(
+        config['general']['base_dir'],
+        config['general']['data_scenario'],
+        config['evaluation']['output_dir']
+    )
+
+
 def set_random_states(seed: int) -> Generator:
     torch.manual_seed(seed)
     np.random.seed(seed)
