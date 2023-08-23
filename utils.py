@@ -84,7 +84,7 @@ def generate_visualization_dir(config: Dict) -> str:
     return join(
         config['general']['base_dir'],
         config['general']['data_scenario'],
-        config['evaluation']['output_dir']
+        config['visualization']['output_dir']
     )
 
 
