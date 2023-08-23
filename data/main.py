@@ -6,7 +6,8 @@ from typing import Dict, List, Tuple
 import pandas as pd
 
 from common import NAME_OF_PROJECT_CONFIG, DataTargetPair
-from utils import load_pickle, dump_as_pickle, append_date, generate_data_dir, dump_as_json_file
+from utils import (load_pickle, dump_as_pickle, append_date, generate_data_dir,
+                   dump_as_json_file)
 
 SPACE = ' '
 JOIN_STRING = ''
@@ -103,7 +104,9 @@ def preprocess_test_datasets(config: Dict, output_dir: str) -> list:
         dataframe = load_pickle(file_path=file_path)
         word_list = assemble_list_of_words(data=dataframe.drop(['target'], axis=1))
         dataframe['sentence'] = word_list
-        ground_truth = load_pickle(file_path=config['data']['raw_data'][f'ground_truth_{data_type}'])
+        ground_truth = load_pickle(
+            file_path=config['data']['raw_data'][f'ground_truth_{data_type}']
+        )
         ground_truth = reformat_columns(data=ground_truth)
         ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
         dataframe['ground_truth'] = ground_truth_list
@@ -154,7 +157,10 @@ def main(config: Dict) -> None:
     preprocess_training_datasets(config=config, output_dir=data_output_dir)
     output_paths = preprocess_test_datasets(config=config, output_dir=data_output_dir)
     merge_and_dump_female_and_male_datasets(paths=output_paths, config=config)
-    dump_as_json_file(data=config, file_path=join(data_output_dir, NAME_OF_PROJECT_CONFIG))
+    dump_as_json_file(
+        data=config,
+        file_path=join(data_output_dir, NAME_OF_PROJECT_CONFIG)
+    )
 
 
 if __name__ == '__main__':

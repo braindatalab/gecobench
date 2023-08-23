@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "nlp-benchmark"
+name = "xai-nlp-benchmark"
 version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
@@ -20,6 +20,7 @@ pandas = "1.5.3"
 paramiko = "^3.1.0"
 loguru = "^0.6.0"
 captum = "^0.6.0"
+seaborn = "^0.12.2"
 
 
 [tool.poetry.group.dev.dependencies]

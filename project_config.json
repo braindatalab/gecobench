@@ -108,23 +108,12 @@
         "informative_suppressor",
         "informative_suppressor_uninformative"
       ],
-      "_xai_global": [
-        "informative_suppressor",
-        "informative_suppressor_uninformative"
-      ],
       "evaluation": [
-        "_roc_auc",
+        "roc_auc",
         "_precision_recall_auc",
         "_avg_precision",
         "_precision_specificity",
-        "top_k_precision"
-      ],
-      "_evaluation_global": [
-        "roc_auc",
-        "precision_recall_auc",
-        "avg_precision",
-        "precision_specificity",
-        "top_k_precision"
+        "_top_k_precision"
       ]
     }
   }
