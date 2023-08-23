@@ -36,55 +36,48 @@
     "training_records": "training_records.pkl",
     "models": {
       "bert_only_classification": {
-          "batch_size": 32,
-          "epochs": 1,
-          "learning_rate": 0.001,
-          "model_name": "bert_only_classification",
-          "model_performance": "bert_only_classification_history"
+        "batch_size": 32,
+        "epochs": 1,
+        "learning_rate": 0.001,
+        "model_name": "bert_only_classification",
+        "model_performance": "bert_only_classification_history"
       },
-      "bert_only_embedding_classification":{
-          "batch_size": 32,
-          "epochs": 1,
-          "learning_rate": 0.001,
-          "model_name": "bert_only_embedding_classification",
-          "model_performance": "bert_only_embedding_classification_history"
+      "bert_only_embedding_classification": {
+        "batch_size": 32,
+        "epochs": 1,
+        "learning_rate": 0.001,
+        "model_name": "bert_only_embedding_classification",
+        "model_performance": "bert_only_embedding_classification_history"
       },
-      "bert_all":{
-          "batch_size": 32,
-          "epochs": 1,
-          "learning_rate": 0.001,
-          "model_name": "bert_all",
-          "model_performance": "bert_all_history"
+      "bert_all": {
+        "batch_size": 32,
+        "epochs": 1,
+        "learning_rate": 0.001,
+        "model_name": "bert_all",
+        "model_performance": "bert_all_history"
       },
-      "bert_only_embedding":{
-          "batch_size": 32,
-          "epochs": 1,
-          "learning_rate": 0.001,
-          "model_name": "bert_only_embedding",
-          "model_performance": "bert_only_embedding_history"
-      },
-      "simple_model":{
-          "batch_size": 32,
-          "epochs": 1,
-          "learning_rate": 0.001,
-          "model_name": "simple_model",
-          "model_performance": "simple_model_history"
+      "bert_only_embedding": {
+        "batch_size": 32,
+        "epochs": 1,
+        "learning_rate": 0.001,
+        "model_name": "bert_only_embedding",
+        "model_performance": "bert_only_embedding_history"
       }
     }
   },
   "xai": {
     "output_dir": "xai",
-    "intermediate_xai_result_prefix":"intermediate_xai_result",
-    "intermediate_raw_xai_result_prefix":"intermediate_raw_xai_result",
+    "intermediate_xai_result_prefix": "intermediate_xai_result",
+    "intermediate_raw_xai_result_prefix": "intermediate_raw_xai_result",
     "xai_records": "xai_records.pkl",
     "class_of_interest": 1,
     "methods": [
-      "Integrated Gradients"
-    ],
-    "innvestigate_methods": [
-      "pattern.net",
-      "pattern.attribution",
-      "deep_taylor"
+      "Integrated Gradients",
+      "Saliency",
+      "InputXGradient",
+      "Guided Backprop",
+      "Deconvolution",
+      "DeepLift"
     ]
   },
   "evaluation": {
