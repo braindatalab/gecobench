@@ -379,7 +379,7 @@ def map_raw_attributions_to_original_tokens(
 
 def loop_over_training_records(
     training_records: list, data: dict, config: dict
-) -> list[XAIResult]:
+) -> list[str]:
     output = list()
     for dataset_name, model_params, model_path, _ in tqdm(training_records):
         dataset_type = determine_dataset_type(dataset_name=dataset_name)
@@ -401,7 +401,9 @@ def loop_over_training_records(
         )
 
         output_dir = generate_xai_dir(config=config)
-        filename = append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])
+        filename = (
+            f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
+        )
         dump_as_pickle(data=result, output_dir=output_dir, filename=filename)
         output += [join(output_dir, filename)]
 
