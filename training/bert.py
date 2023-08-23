@@ -272,7 +272,7 @@ def train_bert_only_embedding_classification(
     for k in range(config['training']['num_training_repetitions']):
         set_random_states(seed=config['general']['seed'] + k)
         logger.info(f"BERT Training, repetition {k + 1} of "
-                    f"{config['training']['num_training_repetitions']}, and"
+                    f"{config['training']['num_training_repetitions']}, and "
                     f"dataset: {dataset_name}")
 
         history = {
