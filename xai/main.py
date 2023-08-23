@@ -273,6 +273,7 @@ def apply_xai_methods(
             x=token_ids[0].unsqueeze(0),
             baseline=reference_tokens,
             methods=config['xai']['methods'],
+            target=row['target']
         )
 
         for xai_method, attribution in attributions.items():
@@ -291,8 +292,8 @@ def apply_xai_methods(
                 )
             ]
 
-        if 10 < k:
-            break
+        #if 1 < k:
+        #    break
 
     return results
 
@@ -311,7 +312,7 @@ def apply_xai_methods_on_sentence(
         model_type=model_type,
         x=token_ids[0].unsqueeze(0),
         baseline=reference_tokens,
-        methods=config['xai']['methods'],
+        methods=config['xai']['methods']
     )
 
     for xai_method, attribution in attributions.items():
@@ -397,7 +398,7 @@ def loop_over_training_records(
             dataset=dataset,
             config=config,
             dataset_type=dataset_type,
-            model_params=model_params,
+            model_params=model_params
         )
 
         output_dir = generate_xai_dir(config=config)

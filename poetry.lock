@@ -4077,16 +4077,3 @@ files = [
     {file = "ypy_websocket-0.8.2-py3-none-any.whl", hash = "sha256:9049d5a7d61c26c2b5a39757c9ffcbe2274bf3553adeea8de7fe1c04671d4145"},
     {file = "ypy_websocket-0.8.2.tar.gz", hash = "sha256:491b2cc4271df4dde9be83017c15f4532b597dc43148472eb20c5aeb838a5b46"},
 ]
-
-[package.dependencies]
-aiofiles = ">=22.1.0,<23"
-aiosqlite = ">=0.17.0,<1"
-y-py = ">=0.5.3,<0.6.0"
-
-[package.extras]
-test = ["mypy", "pre-commit", "pytest", "pytest-asyncio", "websockets (>=10.0)"]
-
-[metadata]
-lock-version = "2.0"
-python-versions = "^3.10"
-content-hash = "ad91a022a61bd20799b1ddee6ea800559683cd8a899643f77e08e843ffb83e2e"
