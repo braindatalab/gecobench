@@ -10,18 +10,18 @@ from utils import load_json_file
 def get_command_line_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config",
-        dest="config",
+        '--config',
+        dest='config',
         required=True,
-        help="File path to project config.",
+        help='File path to project config.',
         type=str,
         default=1,
     )
     parser.add_argument(
-        "--mode",
-        dest="mode",
+        '--mode',
+        dest='mode',
         required=True,
-        help="Modes: filtering, training, xai, evaluation, visualization.",
+        help='Modes: filtering, training, xai, evaluation, visualization.',
         type=str,
         default=1,
     )
@@ -34,12 +34,13 @@ def main(config_path: str, mode: str):
 
 
 Modes = {
-    "data": data_main,
-    "training": training_main,
-    "xai": xai_main,
-    "evaluation": evaluation_main,
+    'data': data_main,
+    'training': training_main,
+    'xai': xai_main,
+    'evaluation': evaluation_main,
+    
 }
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     args = get_command_line_arguments()
     main(config_path=args.config, mode=args.mode)
