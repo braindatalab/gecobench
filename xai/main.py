@@ -432,8 +432,9 @@ def main(config: Dict) -> None:
     )
     training_records = load_pickle(file_path=training_records_path)
     test_data = load_test_data(config=config)
-
     tensor_data = create_bert_tensor_data(data=test_data)
+
+    logger.info(f'Compute intersection dataset.')
     correctly_classified_mask = get_intersection_of_correctly_classified_samples(
         data=tensor_data, records=training_records
     )
@@ -445,6 +446,7 @@ def main(config: Dict) -> None:
         'correctly_classified_intersection'
     ] = correctly_classified_mask['subject']
 
+    logger.info(f'Generate explanations.')
     intermediate_results_paths = loop_over_training_records(
         training_records=training_records, data=test_data, config=config
     )
