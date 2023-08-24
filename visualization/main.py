@@ -22,22 +22,45 @@ def plot_evaluation_results(
         base_output_dir: str,
 ) -> None:
     data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
-    g = sns.catplot(
-        data=data, x='mapped_model_name', y=metric,
-        hue='attribution_method',
-        # row='num_gaussians',
-        col='dataset_type', kind='box', linewidth=0.3,
-        height=2.5,
-        # inner='stick',
-        estimator='median',
-        # errorbar=('pi':, 75),
-        # errorbar='sd',
-        showfliers=False,
-        medianprops={'color': 'black', 'linewidth': 1.0},
-        aspect=1., margin_titles=True,
-        # line_kws={'linewidth': 1.5},
-        facet_kws={'gridspec_kws': {'wspace': 0.1, 'hspace': 0.1}},
-    )
+    if 'top_k_precision' != metric:
+        g = sns.catplot(
+            data=data, x='mapped_model_name', y=metric,
+            hue='attribution_method',
+            # row='num_gaussians',
+            col='dataset_type',
+            kind='box',
+            linewidth=0.3,
+            height=2.5,
+            # inner='stick',
+            estimator='median',
+            # errorbar=('pi', 95) if 'top_k_precision' != metric else 'sd',
+            # errorbar='sd',
+            showfliers=False,
+            medianprops={'color': 'black', 'linewidth': 1.0},
+            aspect=1., margin_titles=True,
+            # line_kws={'linewidth': 1.5},
+            facet_kws={'gridspec_kws': {'wspace': 0.1, 'hspace': 0.1}},
+        )
+    else:
+        g = sns.catplot(
+            data=data, x='mapped_model_name', y=metric,
+            hue='attribution_method',
+            # row='num_gaussians',
+            col='dataset_type',
+            kind='bar',
+            # linewidth=0.3,
+            height=2.5,
+            # inner='stick',
+            estimator='mean',
+            # errorbar=('pi', 95) if 'top_k_precision' != metric else 'sd',
+            errorbar='sd',
+            errwidth=0.9,
+            # showfliers=False,
+            # medianprops={'color': 'black', 'linewidth': 1.0},
+            aspect=1., margin_titles=True,
+            # line_kws={'linewidth': 1.5},
+            facet_kws={'gridspec_kws': {'wspace': 0.1, 'hspace': 0.1}},
+        )
 
     for k in range(g.axes.shape[0]):
         for j in range(g.axes.shape[1]):
