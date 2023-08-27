@@ -39,3 +39,11 @@ class XAIResult:
     raw_attribution: list = field(default_factory=list)
     attribution: list = field(default_factory=list)
     ground_truth: list = field(default_factory=list)
+
+
+@dataclass
+class EvaluationResult:
+    model_name: str = None
+    dataset_type: str = None
+    attribution_method: str = None
+    # Here appended: evaluation metrics: ROC-AUC, precision, etc
