@@ -279,24 +279,6 @@ def apply_xai_methods(
         print(results)
         print(attributions.keys())
         print(attributions)
-        
-        # for xai_method, attribution in attributions.items():
-        #     # Input: XAI Result
-        #     results += [XAIResult(
-        #         model_name=model_params['model_name'],
-        #         dataset_type=dataset_type,
-        #         target=row['target'],
-        #         attribution_method=xai_method,
-        #         sentence=row['sentence'],
-        #         correct_classified_intersection=row['correctly_classified_intersection'],
-        #         raw_attribution=attribution,
-        #         ground_truth=row['ground_truth']
-        #     )]
-        #     print("")
-        #     print("Sentence:",row['sentence'])
-        #     print(xai_method)
-        #     print(attribution)
-        #     print(attribution.shape)
 
         #if 1 < k:
         #    break
