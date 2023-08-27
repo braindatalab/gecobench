@@ -256,7 +256,7 @@ def apply_xai_methods_on_sentence(
         dataset_type=dataset_type,
     )
 
-    return results
+#     return results
 
 
 def apply_xai_methods(

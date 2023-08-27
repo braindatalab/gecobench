@@ -198,7 +198,7 @@ def get_lime_attributions(data: torch.Tensor,
                           forward_function: Callable,
                           target: list
                           ) -> torch.tensor:
-    
+    print("Lime")
     # encode text indices into latent representations & calculate cosine similarity
     # Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
     def exp_embedding_cosine_distance(original_inp, perturbed_inp, _, **kwargs):
@@ -244,7 +244,7 @@ def get_lime_attributions(data: torch.Tensor,
         interpretable_model=linear_model.Lasso(alpha=0.08),
         similarity_func=exp_embedding_cosine_distance,
         perturb_func=bernoulli_perturb,
-        perturb_interpretable_space=False,
+        perturb_interpretable_space=True,
         from_interp_rep_transform=interp_to_input,
         to_interp_rep_transform=None
     )
