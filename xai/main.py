@@ -158,6 +158,7 @@ def create_xai_results(
     attributions: dict, row: pd.Series, model_params: dict, dataset_type: str
 ) -> list:
     results = list()
+<<<<<<< HEAD
     for xai_method, attribution in attributions.items():
         results += [
             XAIResult(
@@ -174,6 +175,44 @@ def create_xai_results(
                 ground_truth=row['ground_truth'],
             )
         ]
+=======
+    num_samples = dataset.shape[0]
+    for k, (_, row) in enumerate(dataset.iterrows()):
+        logger.info(f'Dataset type: {dataset_type}, sentence: {k} of {num_samples}')
+        model_type = determine_model_type(s=model_params['model_name'])
+        tokenizer = get_tokenizer[model_type]()
+        token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
+        num_ids = token_ids[0].shape[0]
+        reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
+        attributions = get_captum_attributions(
+            model=model,
+            model_type=model_type,
+            x=token_ids[0].unsqueeze(0),
+            baseline=reference_tokens,
+            methods=config['xai']['methods'],
+            target=row['target']
+        )
+
+        results += [XAIResultPerSentence(
+            model_name=model_params['model_name'],
+            dataset_type=dataset_type,
+            target=row['target'],
+            attribution_method=config['xai']['methods'],
+            sentence=row['sentence'],
+            correct_classified_intersection=row['correctly_classified_intersection'],
+            raw_attributions_all_xai_methods=attributions,
+            ground_truth=row['ground_truth']
+        )]
+
+        print("XAIResultPerSentence")
+        print(results)
+        print(attributions.keys())
+        print(attributions)
+
+        #if 1 < k:
+        #    break
+
+>>>>>>> a1df1a7 (deleted comment)
     return results
 
 
