@@ -74,7 +74,7 @@ def get_captum_attributions(
             a = a / torch.norm(a)
             a = a.cpu().detach().numpy()
 
-        attributions[method_name] = a
+        attributions[method_name] = np.abs(a)
 
     return attributions
 
