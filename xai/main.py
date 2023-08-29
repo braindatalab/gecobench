@@ -119,10 +119,10 @@ def highlight_words(gt, model, tokenizer, validation_set, n, show_highlight=True
     cls_token_id = tokenizer.cls_token_id
 
     ref_input_ids = (
-        [tokenizer.cls_token_id]
-        + [tokenizer.pad_token_id] * (len([i for i in tokenized if i != 0]) - 2)
-        + [tokenizer.sep_token_id]
-        + [tokenizer.pad_token_id] * (len([i for i in tokenized if i == 0]))
+            [tokenizer.cls_token_id]
+            + [tokenizer.pad_token_id] * (len([i for i in tokenized if i != 0]) - 2)
+            + [tokenizer.sep_token_id]
+            + [tokenizer.pad_token_id] * (len([i for i in tokenized if i == 0]))
     )
     ref_input_ids = torch.tensor([ref_input_ids])
 
@@ -163,7 +163,7 @@ def load_test_data(config: dict) -> dict:
 
 
 def create_bert_to_original_token_mapping_from_sentence(
-    tokenizer: BertTokenizer, sentence: list[str]
+        tokenizer: BertTokenizer, sentence: list[str]
 ) -> dict:
     output = dict()
     for k, word in enumerate(sentence):
@@ -222,7 +222,7 @@ def filter_data(data: dict, mask: dict) -> dict:
     output = {key: list() for key in data.keys()}
     for key, dataset in data.items():
         for sentence, target, mask_value in zip(
-            dataset[0], dataset[1], mask[key].tolist()
+                dataset[0], dataset[1], mask[key].tolist()
         ):
             if 0 == mask_value:
                 continue
@@ -238,7 +238,7 @@ def determine_model_type(s: str) -> str:
 
 
 def create_bert_reference_tokens(
-    bert_tokenizer: BertTokenizer, sequence_length: int
+        bert_tokenizer: BertTokenizer, sequence_length: int
 ) -> Tensor:
     reference_tokens_pad = TokenReferenceBase(
         reference_token_idx=bert_tokenizer.pad_token_id
@@ -252,11 +252,11 @@ def create_bert_reference_tokens(
 
 
 def apply_xai_methods(
-    model: Any,
-    dataset: pd.DataFrame,
-    dataset_type: str,
-    model_params: dict,
-    config: dict,
+        model: Any,
+        dataset: pd.DataFrame,
+        dataset_type: str,
+        model_params: dict,
+        config: dict,
 ) -> list[XAIResult]:
     results = list()
     num_samples = dataset.shape[0]
@@ -279,6 +279,7 @@ def apply_xai_methods(
         for xai_method, attribution in attributions.items():
             results += [
                 XAIResult(
+                    model_repetition_number=model_params['repetition'],
                     model_name=model_params['model_name'],
                     dataset_type=dataset_type,
                     target=row['target'],
@@ -292,14 +293,14 @@ def apply_xai_methods(
                 )
             ]
 
-        #if 1 < k:
+        # if 1 < k:
         #    break
 
     return results
 
 
 def apply_xai_methods_on_sentence(
-    model: Any, row: pd.Series, dataset_name: str, model_params: dict, config: dict
+        model: Any, row: pd.Series, dataset_name: str, model_params: dict, config: dict
 ) -> list[XAIResult]:
     results = list()
     model_type = determine_model_type(s=model_params['model_name'])
@@ -336,7 +337,7 @@ def get_bert_tokenizer(path: str = None) -> BertTokenizer:
 
 
 def map_bert_attributions_to_original_tokens(
-    model_type: str, result: XAIResult
+        model_type: str, result: XAIResult
 ) -> list:
     tokenizer = get_tokenizer[model_type]()
     token_mapping = create_model_token_to_original_token_mapping[model_type](
@@ -348,7 +349,7 @@ def map_bert_attributions_to_original_tokens(
 
     bert_token_to_attribution_mapping = dict()
     for word, attribution in zip(
-        list(token_mapping[0].keys()), result.raw_attribution[1:-1]
+            list(token_mapping[0].keys()), result.raw_attribution[1:-1]
     ):
         bert_token_to_attribution_mapping[word] = attribution
 
@@ -359,7 +360,7 @@ def map_bert_attributions_to_original_tokens(
 
 
 def map_raw_attributions_to_original_tokens(
-    xai_results_paths: list[str], config: dict
+        xai_results_paths: list[str], config: dict
 ) -> list[XAIResult]:
     output = list()
     for path in xai_results_paths:
@@ -379,9 +380,10 @@ def map_raw_attributions_to_original_tokens(
 
 
 def loop_over_training_records(
-    training_records: list, data: dict, config: dict
+        training_records: list, data: dict, config: dict
 ) -> list[str]:
     output = list()
+    # torch.set_num_threads(1)
     for dataset_name, model_params, model_path, _ in tqdm(training_records):
         dataset_type = determine_dataset_type(dataset_name=dataset_name)
         dataset = data[dataset_type]
