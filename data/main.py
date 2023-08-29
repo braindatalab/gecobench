@@ -118,7 +118,7 @@ def preprocess_test_datasets(config: Dict, output_dir: str) -> list:
     return paths
 
 
-def merge_and_dump_female_and_male_datasets(paths: list[str], config: dict) -> None:
+def stack_and_dump_female_and_male_datasets(paths: list[str], config: dict) -> None:
     female_male_all = list()
     female_male_subject = list()
 
@@ -156,7 +156,7 @@ def main(config: Dict) -> None:
     data_output_dir = generate_data_dir(config=config)
     preprocess_training_datasets(config=config, output_dir=data_output_dir)
     output_paths = preprocess_test_datasets(config=config, output_dir=data_output_dir)
-    merge_and_dump_female_and_male_datasets(paths=output_paths, config=config)
+    stack_and_dump_female_and_male_datasets(paths=output_paths, config=config)
     dump_as_json_file(
         data=config,
         file_path=join(data_output_dir, NAME_OF_PROJECT_CONFIG)
