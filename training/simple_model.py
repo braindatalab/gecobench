@@ -8,7 +8,7 @@ import torch
 
 from common import DataSet
 
-def train_simple_model(
+def train_simple_attention_model(
         dataset: DataSet,
         dataset_name: str,
         params: Dict,
