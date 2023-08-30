@@ -9,42 +9,10 @@ import pandas as pd
 from loguru import logger
 import seaborn as sns
 import matplotlib.pyplot as plt
-from tqdm import tqdm
+import numpy as np
 
-from utils import (
-    generate_visualization_dir,
-    generate_evaluation_dir,
-    load_pickle,
-    generate_training_dir,
-    generate_xai_dir,
-    dump_as_pickle,
-)
-
-MODEL_NAME_MAP = dict(
-    bert_only_classification='classification',
-    bert_only_embedding_classification='embedding,\nclassification',
-    bert_all='all',
-    bert_only_embedding='embedding',
-)
-
-
-GENDER = {0.0: 'female', 1.0: 'male'}
-
-
-def compute_average_score_per_repetition(data: pd.DataFrame) -> pd.DataFrame:
-    results = list()
-    for k, df_dataset_type in data.groupby(by='dataset_type'):
-        for l, df_model_type in df_dataset_type.groupby(by='model_name'):
-            for j, df_repetition in df_model_type.groupby(by='model_repetition_number'):
-                for i, df_xai_method in df_repetition.groupby(by='attribution_method'):
-                    average_scores = (
-                        df_xai_method._get_numeric_data().aggregate(['mean']).iloc[0, :]
-                    )
-                    first_row = deepcopy(df_xai_method.iloc[0, :])
-                    first_row.loc[average_scores.index.values] = np.nan
-                    results += [first_row.combine_first(average_scores)]
-
-    return pd.concat(results, axis=1).T
+from utils import generate_visualization_dir, generate_evaluation_dir, load_pickle
+from IPython.display import HTML
 
 
 def plot_evaluation_results(
@@ -305,6 +273,23 @@ def plot_most_common_xai_attributions(
     logger.info(file_path)
     plt.savefig(file_path, dpi=300)
     plt.close()
+
+
+def plot_attributions_per_sentence(
+        data: np.ndarray,
+        sentence: str
+) -> None:
+    """
+    Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
+    """
+    attrs = data
+    rgb = lambda x: '255,0,0' if x < 0 else '0,255,0'
+    alpha = lambda x: abs(x) ** 0.5
+    token_marks = [
+        f'<mark style="background-color:rgba({rgb(attr)},{alpha(attr)})">{token}</mark>'
+        for token, attr in zip(sentence, attrs.tolist())
+    ]    
+    return HTML('<p>' + ' '.join(token_marks) + '</p>')
 
 
 def create_evaluation_plots(base_output_dir: str, config: dict) -> None:

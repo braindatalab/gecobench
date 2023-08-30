@@ -126,8 +126,15 @@ def bundle_evaluation_results(xai_result: XAIResult, scores: dict) -> dict:
 def evaluate(xai_records_paths: list) -> list[dict]:
     results = list()
     for result_path in tqdm(xai_records_paths):
-        xai_records = load_pickle(file_path=result_path)
-        for record in xai_records:
+        xai_results = load_pickle(file_path=result_path)
+        print("result_path",result_path)
+        print("def evaluate(xai_records_paths: list)")
+        for xai_result in xai_results:
+            print("XAI Result Attribution:")
+            print(xai_result.attribution)
+            print("XAI Attribution Method:")
+            print(xai_result.attribution_method)
+            attribution_absolute = np.abs(np.array(xai_result.attribution))
             scores = calculate_scores(
                 attribution=np.abs(np.array(record.attribution)),
                 ground_truth=np.array(record.ground_truth),
