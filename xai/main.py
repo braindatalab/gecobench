@@ -11,7 +11,7 @@ from torch import Tensor
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-from common import DATASET_ALL, DATASET_SUBJECT, XAIResult, XAIResultPerSentence
+from common import DATASET_ALL, DATASET_SUBJECT, XAIResult
 from training.bert import create_tensor_dataset, create_bert_ids, get_bert_ids, BERT_CLASSIFICATION, \
     BERT_SEPARATION
 from utils import generate_training_dir, load_pickle, generate_data_dir, dump_as_pickle, generate_xai_dir, append_date
