@@ -109,7 +109,7 @@
         "informative_suppressor_uninformative"
       ],
       "evaluation": [
-        "roc_auc",
+        "_roc_auc",
         "_precision_recall_auc",
         "_avg_precision",
         "_precision_specificity",

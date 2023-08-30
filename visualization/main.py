@@ -5,8 +5,10 @@ import pandas as pd
 from loguru import logger
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
 from utils import generate_visualization_dir, generate_evaluation_dir, load_pickle
+from IPython.display import HTML
 
 
 def plot_evaluation_results(
@@ -33,6 +35,23 @@ def plot_evaluation_results(
         file_path = join(base_output_dir, f'{metric}.png')
         plt.savefig(file_path, dpi=300)
         plt.close()
+
+
+def plot_attributions_per_sentence(
+        data: np.ndarray,
+        sentence: str
+) -> None:
+    """
+    Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
+    """
+    attrs = data
+    rgb = lambda x: '255,0,0' if x < 0 else '0,255,0'
+    alpha = lambda x: abs(x) ** 0.5
+    token_marks = [
+        f'<mark style="background-color:rgba({rgb(attr)},{alpha(attr)})">{token}</mark>'
+        for token, attr in zip(sentence, attrs.tolist())
+    ]    
+    return HTML('<p>' + ' '.join(token_marks) + '</p>')
 
 
 def create_evaluation_plots(base_output_dir: str, config: dict) -> None:

@@ -240,12 +240,12 @@ def create_bert_reference_tokens(
 
 
 def apply_xai_methods(
-        model: Any,
-        dataset: pd.DataFrame,
-        dataset_type: str,
-        model_params: dict,
-        config: dict
-) -> list[XAIResultPerSentence]:
+    model: Any,
+    dataset: pd.DataFrame,
+    dataset_type: str,
+    model_params: dict,
+    config: dict,
+) -> list[XAIResult]:
     results = list()
     num_samples = dataset.shape[0]
     for k, (_, row) in enumerate(dataset.iterrows()):
@@ -264,21 +264,21 @@ def apply_xai_methods(
             target=row['target']
         )
 
-        results += [XAIResultPerSentence(
-            model_name=model_params['model_name'],
-            dataset_type=dataset_type,
-            target=row['target'],
-            attribution_method=config['xai']['methods'],
-            sentence=row['sentence'],
-            correct_classified_intersection=row['correctly_classified_intersection'],
-            raw_attributions_all_xai_methods=attributions,
-            ground_truth=row['ground_truth']
-        )]
-
-        print("XAIResultPerSentence")
-        print(results)
-        print(attributions.keys())
-        print(attributions)
+        for xai_method, attribution in attributions.items():
+            results += [
+                XAIResult(
+                    model_name=model_params['model_name'],
+                    dataset_type=dataset_type,
+                    target=row['target'],
+                    attribution_method=xai_method,
+                    sentence=row['sentence'],
+                    correct_classified_intersection=row[
+                        'correctly_classified_intersection'
+                    ],
+                    raw_attribution=attribution,
+                    ground_truth=row['ground_truth'],
+                )
+            ]
 
         #if 1 < k:
         #    break
@@ -286,38 +286,36 @@ def apply_xai_methods(
     return results
 
 
-# def apply_xai_methods_on_sentence(
-#         model: Any,
-#         row: pd.Series,
-#         dataset_name: str,
-#         model_params: dict,
-#         config: dict
-# ) -> list[XAIResult]:
-#     results = list()
-#     model_type = determine_model_type(s=model_params['model_name'])
-#     tokenizer = get_tokenizer[model_type]()
-#     token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
-#     num_ids = token_ids[0].shape[0]
-#     reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
-#     attributions = get_captum_attributions(
-#         model=model,
-#         model_type=model_type,
-#         x=token_ids[0].unsqueeze(0),
-#         baseline=reference_tokens,
-#         methods=config['xai']['methods']
-#     )
+def apply_xai_methods_on_sentence(
+    model: Any, row: pd.Series, dataset_name: str, model_params: dict, config: dict
+) -> list[XAIResult]:
+    results = list()
+    model_type = determine_model_type(s=model_params['model_name'])
+    tokenizer = get_tokenizer[model_type]()
+    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
+    num_ids = token_ids[0].shape[0]
+    reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
+    attributions = get_captum_attributions(
+        model=model,
+        model_type=model_type,
+        x=token_ids[0].unsqueeze(0),
+        baseline=reference_tokens,
+        methods=config['xai']['methods']
+    )
 
-#     for xai_method, attribution in attributions.items():
-#         results += [XAIResult(
-#             model_name=model_params['model_name'],
-#             dataset_type=dataset_name,
-#             target=row['target'],
-#             attribution_method=xai_method,
-#             sentence=row['sentence'],
-#             raw_attribution=attribution
-#         )]
+    for xai_method, attribution in attributions.items():
+        results += [
+            XAIResult(
+                model_name=model_params['model_name'],
+                dataset_type=dataset_name,
+                target=row['target'],
+                attribution_method=xai_method,
+                sentence=row['sentence'],
+                raw_attribution=attribution,
+            )
+        ]
 
-#     return results
+    return results
 
 
 def get_bert_tokenizer(path: str = None) -> BertTokenizer:

@@ -18,17 +18,6 @@ DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
 #     'raw_attribution attribution ground_truth'
 # )
 @dataclass
-class XAIResultPerSentence:
-    model_name: str = None
-    dataset_type: str = None
-    target: float = None
-    correct_classified_intersection: float = None
-    attribution_method: list = field(default_factory=list)
-    sentence: list = field(default_factory=list)
-    raw_attributions_all_xai_methods: list = field(default_factory=list)
-    attribution: list = field(default_factory=list)
-    ground_truth: list = field(default_factory=list)
-
 class XAIResult:
     model_name: str = None
     dataset_type: str = None
