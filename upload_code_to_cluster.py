@@ -22,7 +22,7 @@ def create_tarfile(source_dir: str, output_filename: str) -> None:
 
 
 def copy_file_to_cluster(source_path: str, target_path: str, user_name: str = 'rick') -> None:
-    command = ['scp', source_path, f'{user_name}@cluster-ida:{target_path}']
+    command = ['scp', source_path, f'{user_name}@hydra:{target_path}']
     _ = subprocess.run(command, stdout=subprocess.PIPE)
 
 
@@ -39,7 +39,7 @@ def pause_script(seconds: int):
 def get_ssh_connection_to_cluster() -> SSHClient:
     client = SSHClient()
     client.load_host_keys(filename='/home/rick/.ssh/known_hosts')
-    client.connect('cluster.ml.tu-berlin.de')
+    client.connect('hydra.ml.tu-berlin.de')
     return client
 
 
