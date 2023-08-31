@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #SBATCH --job xai-nlp-benchmark
 #SBATCH --partition=gpu-2h
+##SBATCH --cpus-per-task=4        # cpu-cores per task (>1 if multi-threaded tasks)
+##SBATCH --mem-per-cpu=4G         # memory per cpu-core (4G per cpu-core is default)
 #SBATCH --gpus-per-node=1
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=1
 #SBATCH --output=logs/xai-nlp-benchmark-job-%j.out
 
 
