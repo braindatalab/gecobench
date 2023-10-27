@@ -10,15 +10,9 @@ from paramiko.client import SSHClient
 from utils import append_date
 
 CLUSTER_NAMES = ['hydra', 'hpc']
-CLUSTER_DOMAINS = dict(
-    hydra='hydra.ml.tu-berlin.de',
-    hpc='gateway.hpc.tu-berlin.de'
-)
+CLUSTER_DOMAINS = dict(hydra='hydra.ml.tu-berlin.de', hpc='gateway.hpc.tu-berlin.de')
 
-CLUSTER_BASE_DIRS = dict(
-    hydra='/home/space/uniml/rick',
-    hpc='/home/users/r/rick'
-)
+CLUSTER_BASE_DIRS = dict(hydra='/home/space/uniml/rick', hpc='/home/users/r/rick')
 
 
 def create_tarfile(source_dir: str, output_filename: str) -> None:
@@ -33,10 +27,7 @@ def create_tarfile(source_dir: str, output_filename: str) -> None:
 
 
 def copy_file_to_cluster(
-        cluster_name: str,
-        source_path: str,
-        target_path: str,
-        user_name: str = 'rick'
+    cluster_name: str, source_path: str, target_path: str, user_name: str = 'rick'
 ) -> None:
     command = ['scp', source_path, f'{user_name}@{cluster_name}:{target_path}']
     _ = subprocess.run(command, stdout=subprocess.PIPE)
@@ -78,20 +69,19 @@ def main(cluster_name: str) -> None:
 
     print('Copy code to cluster.')
     target_path_compressed_code = join(
-        CLUSTER_BASE_DIRS[cluster_name],
-        filename_compressed_code
+        CLUSTER_BASE_DIRS[cluster_name], filename_compressed_code
     )
     copy_file_to_cluster(
         cluster_name=cluster_name,
         source_path=filename_compressed_code,
-        target_path=target_path_compressed_code
+        target_path=target_path_compressed_code,
     )
 
     print('Extract tar file on cluster.')
     pause_script(seconds=5)
     _ = extract_tar_file(
         ssh_client=get_ssh_connection_to_cluster(cluster_name=cluster_name),
-        file_path=target_path_compressed_code
+        file_path=target_path_compressed_code,
     )
 
     pause_script(seconds=5)
