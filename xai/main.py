@@ -327,7 +327,7 @@ def preprocess_artifacts(config: dict) -> tuple:
         'correctly_classified_intersection'
     ] = correctly_classified_mask['subject']
 
-    return training_records, test_data, tensor_data
+    return training_records, test_data
 
 
 get_tokenizer = {'bert': get_bert_tokenizer}
