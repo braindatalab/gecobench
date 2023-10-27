@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 from IPython.display import display, HTML
 from captum.attr import LayerIntegratedGradients, TokenReferenceBase
+from joblib import Parallel, delayed
 from loguru import logger
 from torch import Tensor
 from tqdm import tqdm
@@ -41,108 +42,10 @@ def custom_forward_grad(inputs, model):
     return y
 
 
-def colorize(words, gt, attrs):
-    # gt=gt.drop(['index'],axis=1)
-    # words is a list of words
-    # color_array is an array of numbers between 0 and 1 of length equal to words
-
-    # CLS
-    color = _get_color(summarize_attributions(attrs)[0].item())
-    colored_string = (
-        f'<span style="color: black; background-color: {color}">{words[0]}</span>'
-    )
-
-    # sentence words (which are the ones that exist in the ground truth)
-    for i, word in enumerate(words[1:-1], start=1):
-        color = _get_color(summarize_attributions(attrs)[i].item())
-
-        #         if int(gt[i-1].item())==1:
-        #             template = f'<span  style='color:black; border: 3px solid black;  background-color: {color}'> {word}</span> '
-        #         else:
-        #             template = f'<span style='color: black; background-color: {color}'>{word}</span> '
-        template = (
-            f'<span style="color: black; background-color: {color}">{word}</span> '
-        )
-
-        colored_string += template
-
-    # SEP
-    color = _get_color(summarize_attributions(attrs)[-1].item())
-    colored_string += (
-        f'<span style="color: black; background-color: {color}">{words[-1]}</span>'
-    )
-
-    return colored_string
-
-
-def _get_color(attr):
-    # clip values to prevent CSS errors (Values should be from [-1,1])
-    if attr > 0:
-        hue = 120
-        sat = 75
-        lig = 100 - int(50 * attr)
-    else:
-        hue = 0
-        sat = 75
-        lig = 100 - int(-40 * attr)
-    colour = f'hsl({hue}, {sat}%, {lig}%)'
-    return colour
-
-
 def summarize_attributions(attributions):
     attributions = attributions.sum(dim=-1).squeeze(0)
     attributions = attributions / torch.norm(attributions)
     return attributions
-
-
-def highlight_words(gt, model, tokenizer, validation_set, n, show_highlight=True):
-    # encode text: from a dataset of phrase and target, we locate the text, target and associate a ground-truth.
-    # Then the text is tokenized.
-    validation_set = pd.DataFrame(validation_set, columns=['phrases', 'target'])
-
-    text = validation_set['phrases'].loc[n]
-    print(text)
-    # gt_ph = gt.iloc[n]
-    true_label = validation_set['target'].loc[n]
-    tokenized = tokenizer.encode(text)
-
-    input_ids = torch.tensor([tokenized]).to(DEVICE)
-    score = model(input_ids)[0]
-    score_list = [round(x, 4) for x in score.detach().tolist()[0]]
-    pred_label = score_list.index(max(score_list))
-
-    # A token used for generating token reference
-    ref_token_id = tokenizer.pad_token_id
-    # A token used as a separator between question and text and it is also added to the end of the text.
-    sep_token_id = tokenizer.sep_token_id
-    # A token used for prepending to the concatenated question-text word sequence
-    cls_token_id = tokenizer.cls_token_id
-
-    ref_input_ids = (
-            [tokenizer.cls_token_id]
-            + [tokenizer.pad_token_id] * (len([i for i in tokenized if i != 0]) - 2)
-            + [tokenizer.sep_token_id]
-            + [tokenizer.pad_token_id] * (len([i for i in tokenized if i == 0]))
-    )
-    ref_input_ids = torch.tensor([ref_input_ids])
-
-    lig = LayerIntegratedGradients(custom_forward_grad, model.bert.embeddings)
-
-    attributions, delta = lig.attribute(
-        inputs=input_ids.long(),
-        baselines=ref_input_ids.to(DEVICE),
-        #                                     internal_batch_size=3,
-        return_convergence_delta=True,
-    )
-
-    words = [tokenizer.decode(t).replace(' ', '') for t in tokenized]
-    s = colorize(words, None, attributions)
-
-    if show_highlight:
-        print('correct label:', true_label, 'predicted label', pred_label)
-        display(HTML(s))
-
-    return int(true_label), pred_label
 
 
 def determine_dataset_type(dataset_name: str) -> str:
@@ -163,7 +66,7 @@ def load_test_data(config: dict) -> dict:
 
 
 def create_bert_to_original_token_mapping_from_sentence(
-        tokenizer: BertTokenizer, sentence: list[str]
+    tokenizer: BertTokenizer, sentence: list[str]
 ) -> dict:
     output = dict()
     for k, word in enumerate(sentence):
@@ -222,7 +125,7 @@ def filter_data(data: dict, mask: dict) -> dict:
     output = {key: list() for key in data.keys()}
     for key, dataset in data.items():
         for sentence, target, mask_value in zip(
-                dataset[0], dataset[1], mask[key].tolist()
+            dataset[0], dataset[1], mask[key].tolist()
         ):
             if 0 == mask_value:
                 continue
@@ -238,7 +141,7 @@ def determine_model_type(s: str) -> str:
 
 
 def create_bert_reference_tokens(
-        bert_tokenizer: BertTokenizer, sequence_length: int
+    bert_tokenizer: BertTokenizer, sequence_length: int
 ) -> Tensor:
     reference_tokens_pad = TokenReferenceBase(
         reference_token_idx=bert_tokenizer.pad_token_id
@@ -251,83 +154,26 @@ def create_bert_reference_tokens(
     return reference_indices
 
 
-def apply_xai_methods(
-        model: Any,
-        dataset: pd.DataFrame,
-        dataset_type: str,
-        model_params: dict,
-        config: dict,
-) -> list[XAIResult]:
+def create_xai_results(
+    attributions: dict, row: pd.Series, model_params: dict, dataset_type: str
+) -> list:
     results = list()
-    num_samples = dataset.shape[0]
-    for k, (_, row) in enumerate(dataset.iterrows()):
-        logger.info(f'Dataset type: {dataset_type}, sentence: {k} of {num_samples}')
-        model_type = determine_model_type(s=model_params['model_name'])
-        tokenizer = get_tokenizer[model_type]()
-        token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
-        num_ids = token_ids[0].shape[0]
-        reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
-        attributions = get_captum_attributions(
-            model=model,
-            model_type=model_type,
-            x=token_ids[0].unsqueeze(0),
-            baseline=reference_tokens,
-            methods=config['xai']['methods'],
-            target=row['target']
-        )
-
-        for xai_method, attribution in attributions.items():
-            results += [
-                XAIResult(
-                    model_repetition_number=model_params['repetition'],
-                    model_name=model_params['model_name'],
-                    dataset_type=dataset_type,
-                    target=row['target'],
-                    attribution_method=xai_method,
-                    sentence=row['sentence'],
-                    correct_classified_intersection=row[
-                        'correctly_classified_intersection'
-                    ],
-                    raw_attribution=attribution,
-                    ground_truth=row['ground_truth'],
-                )
-            ]
-
-        # if 1 < k:
-        #    break
-
-    return results
-
-
-def apply_xai_methods_on_sentence(
-        model: Any, row: pd.Series, dataset_name: str, model_params: dict, config: dict
-) -> list[XAIResult]:
-    results = list()
-    model_type = determine_model_type(s=model_params['model_name'])
-    tokenizer = get_tokenizer[model_type]()
-    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
-    num_ids = token_ids[0].shape[0]
-    reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
-    attributions = get_captum_attributions(
-        model=model,
-        model_type=model_type,
-        x=token_ids[0].unsqueeze(0),
-        baseline=reference_tokens,
-        methods=config['xai']['methods']
-    )
-
     for xai_method, attribution in attributions.items():
         results += [
             XAIResult(
+                model_repetition_number=model_params['repetition'],
                 model_name=model_params['model_name'],
-                dataset_type=dataset_name,
+                dataset_type=dataset_type,
                 target=row['target'],
                 attribution_method=xai_method,
                 sentence=row['sentence'],
+                correct_classified_intersection=row[
+                    'correctly_classified_intersection'
+                ],
                 raw_attribution=attribution,
+                ground_truth=row['ground_truth'],
             )
         ]
-
     return results
 
 
@@ -337,7 +183,7 @@ def get_bert_tokenizer(path: str = None) -> BertTokenizer:
 
 
 def map_bert_attributions_to_original_tokens(
-        model_type: str, result: XAIResult
+    model_type: str, result: XAIResult
 ) -> list:
     tokenizer = get_tokenizer[model_type]()
     token_mapping = create_model_token_to_original_token_mapping[model_type](
@@ -349,7 +195,7 @@ def map_bert_attributions_to_original_tokens(
 
     bert_token_to_attribution_mapping = dict()
     for word, attribution in zip(
-            list(token_mapping[0].keys()), result.raw_attribution[1:-1]
+        list(token_mapping[0].keys()), result.raw_attribution[1:-1]
     ):
         bert_token_to_attribution_mapping[word] = attribution
 
@@ -360,7 +206,7 @@ def map_bert_attributions_to_original_tokens(
 
 
 def map_raw_attributions_to_original_tokens(
-        xai_results_paths: list[str], config: dict
+    xai_results_paths: list[str], config: dict
 ) -> list[XAIResult]:
     output = list()
     for path in xai_results_paths:
@@ -379,28 +225,76 @@ def map_raw_attributions_to_original_tokens(
     return output
 
 
+def apply_xai_methods_on_sentence(
+    model: Any,
+    row: pd.Series,
+    dataset_type: str,
+    model_params: dict,
+    config: dict,
+    num_samples: int,
+    index: int,
+) -> list[XAIResult]:
+    logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
+    model_type = determine_model_type(s=model_params['model_name'])
+    tokenizer = get_tokenizer[model_type]()
+    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
+    num_ids = token_ids[0].shape[0]
+    reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
+    attributions = get_captum_attributions(
+        model=model,
+        model_type=model_type,
+        x=token_ids[0].unsqueeze(0),
+        baseline=reference_tokens,
+        methods=config['xai']['methods'],
+        target=row['target'],
+    )
+
+    results = create_xai_results(
+        attributions=attributions,
+        row=row,
+        model_params=model_params,
+        dataset_type=dataset_type,
+    )
+
+    return results
+
+
+def apply_xai_methods(
+    model: Any,
+    dataset: pd.DataFrame,
+    dataset_type: str,
+    model_params: dict,
+    config: dict,
+) -> list[XAIResult]:
+    results = list()
+    num_samples = dataset.shape[0]
+
+    results += Parallel(n_jobs=4)(
+        delayed(apply_xai_methods_on_sentence)(
+            model, row, dataset_type, model_params, config, num_samples, k
+        )
+        for k, (_, row) in enumerate(dataset.iterrows())
+    )
+
+    return results
+
+
 def loop_over_training_records(
-        training_records: list, data: dict, config: dict
+    training_records: list, data: dict, config: dict
 ) -> list[str]:
     output = list()
-    # torch.set_num_threads(1)
+    torch.set_num_threads(1)
     for dataset_name, model_params, model_path, _ in tqdm(training_records):
         dataset_type = determine_dataset_type(dataset_name=dataset_name)
         dataset = data[dataset_type]
         model = load_model(path=model_path)
-
-        # output += Parallel(n_jobs=4)(
-        #     delayed(apply_xai_methods_on_sentence)(
-        #         model, row, dataset_name, model_params, config
-        #     ) for k, row in dataset.iterrows()
-        # )
 
         result = apply_xai_methods(
             model=model,
             dataset=dataset,
             config=config,
             dataset_type=dataset_type,
-            model_params=model_params
+            model_params=model_params,
         )
 
         output_dir = generate_xai_dir(config=config)
@@ -413,22 +307,7 @@ def loop_over_training_records(
     return output
 
 
-get_tokenizer = {'bert': get_bert_tokenizer}
-
-create_token_ids = {'bert': create_bert_ids}
-
-create_model_token_to_original_token_mapping = {
-    'bert': create_bert_to_original_token_mapping
-}
-
-create_reference_tokens = {'bert': create_bert_reference_tokens}
-
-raw_attributions_to_original_tokens_mapping = {
-    'bert': map_bert_attributions_to_original_tokens
-}
-
-
-def main(config: Dict) -> None:
+def preprocess_artifacts(config: dict) -> tuple:
     training_records_path = join(
         generate_training_dir(config=config), config['training']['training_records']
     )
@@ -448,10 +327,32 @@ def main(config: Dict) -> None:
         'correctly_classified_intersection'
     ] = correctly_classified_mask['subject']
 
+    return training_records, test_data, tensor_data
+
+
+get_tokenizer = {'bert': get_bert_tokenizer}
+
+create_token_ids = {'bert': create_bert_ids}
+
+create_model_token_to_original_token_mapping = {
+    'bert': create_bert_to_original_token_mapping
+}
+
+create_reference_tokens = {'bert': create_bert_reference_tokens}
+
+raw_attributions_to_original_tokens_mapping = {
+    'bert': map_bert_attributions_to_original_tokens
+}
+
+
+def main(config: Dict) -> None:
+    training_records, test_data = preprocess_artifacts(config=config)
+
     logger.info(f'Generate explanations.')
     intermediate_results_paths = loop_over_training_records(
         training_records=training_records, data=test_data, config=config
     )
+
     results = map_raw_attributions_to_original_tokens(
         xai_results_paths=intermediate_results_paths, config=config
     )
