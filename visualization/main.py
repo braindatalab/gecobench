@@ -91,7 +91,7 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
         top_k_precision=plot_evaluation_results
     )
 
-    plot_types = config['visualization']['visualizations']['evaluation']
+    plot_types = config['visualization']['base_data_type']['evaluation']
     for plot_type in plot_types:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
@@ -100,8 +100,8 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
 
 
 def visualize_results(base_output_dir: str, config: dict) -> None:
-    for result_type, _ in config['visualization']['visualizations'].items():
-        v = VISUALIZATIONS.get(result_type, None)
+    for base_data_type, _ in config['visualization']['base_data_type'].items():
+        v = VISUALIZATIONS.get(base_data_type, None)
         if v is not None:
             v(base_output_dir, config)
 
