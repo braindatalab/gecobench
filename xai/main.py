@@ -1,6 +1,6 @@
 from os.path import join
-from os.path import join
 from typing import Dict, Any
+from itertools import chain
 
 import pandas as pd
 import torch
@@ -269,14 +269,14 @@ def apply_xai_methods(
     results = list()
     num_samples = dataset.shape[0]
 
-    results += Parallel(n_jobs=4)(
+    results = Parallel(n_jobs=4)(
         delayed(apply_xai_methods_on_sentence)(
             model, row, dataset_type, model_params, config, num_samples, k
         )
         for k, (_, row) in enumerate(dataset.iterrows())
     )
 
-    return results
+    return list(chain.from_iterable(results))
 
 
 def loop_over_training_records(
