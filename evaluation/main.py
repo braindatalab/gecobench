@@ -102,25 +102,6 @@ def calculate_scores(attribution: np.ndarray, ground_truth: np.ndarray) -> Dict:
     return result
 
 
-def rectify_attribution_values(a: np.ndarray, global_mode: bool) -> List[np.ndarray]:
-    if global_mode:
-        output = [a]
-    else:
-        output = [a[k, :] for k in range(a.shape[0])]
-    return output
-
-
-def evaluate_explanations(
-    explanations: List, ground_truth: np.ndarray, global_mode: bool, num_workers: int
-) -> List:
-    return Parallel(n_jobs=num_workers)(
-        delayed(assemble_scores)(
-            attributions, ground_truth, method_name, global_mode, json.loads(meta_data)
-        )
-        for meta_data, method_name, attributions in explanations
-    )
-
-
 def bundle_evaluation_results(xai_result: XAIResult, scores: dict) -> dict:
     output = asdict(
         EvaluationResult(
@@ -136,14 +117,13 @@ def bundle_evaluation_results(xai_result: XAIResult, scores: dict) -> dict:
 def evaluate(xai_records_paths: list) -> list[dict]:
     results = list()
     for result_path in tqdm(xai_records_paths):
-        xai_results = load_pickle(file_path=result_path)
-        for xai_result in xai_results:
-            attribution_absolute = np.abs(np.array(xai_result.attribution))
+        xai_records = load_pickle(file_path=result_path)
+        for record in xai_records:
             scores = calculate_scores(
-                attribution=attribution_absolute,
-                ground_truth=np.array(xai_result.ground_truth),
+                attribution=np.abs(np.array(record.attribution)),
+                ground_truth=np.array(record.ground_truth),
             )
-            result = bundle_evaluation_results(xai_result=xai_result, scores=scores)
+            result = bundle_evaluation_results(xai_result=record, scores=scores)
             results += [result]
 
     return results
