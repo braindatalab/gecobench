@@ -35,5 +35,6 @@ class XAIResult:
 class EvaluationResult:
     model_name: str = None
     dataset_type: str = None
+    model_repetition_number: int = None
     attribution_method: str = None
-    # Here appended: evaluation metrics: ROC-AUC, precision, etc
+    # Here, we append evaluation metrics: ROC-AUC, precision, etc

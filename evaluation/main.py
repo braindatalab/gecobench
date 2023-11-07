@@ -106,6 +106,7 @@ def bundle_evaluation_results(xai_result: XAIResult, scores: dict) -> dict:
     output = asdict(
         EvaluationResult(
             model_name=xai_result.model_name,
+            model_repetition_number=xai_result.model_repetition_number,
             dataset_type=xai_result.dataset_type,
             attribution_method=xai_result.attribution_method,
         )
