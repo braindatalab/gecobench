@@ -8,7 +8,12 @@ from loguru import logger
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from utils import generate_visualization_dir, generate_evaluation_dir, load_pickle
+from utils import (
+    generate_visualization_dir,
+    generate_evaluation_dir,
+    load_pickle,
+    generate_training_dir,
+)
 
 MODEL_NAME_MAP = dict(
     bert_only_classification='classification',
@@ -128,6 +133,61 @@ def plot_evaluation_results(
     plt.close()
 
 
+def plot_model_performance(
+    data: pd.DataFrame,
+    plot_type: str,
+    base_output_dir: str,
+) -> None:
+    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+    g = sns.catplot(
+        data=data,
+        x='mapped_model_name',
+        # x='attribution_method',
+        y='accuracy',
+        hue='data_split',
+        # hue='dataset_type',
+        # split=True,
+        # row='num_gaussians',
+        col='dataset_type',
+        # col='mapped_model_name',
+        kind='bar',
+        palette=sns.color_palette(palette='pastel'),
+        fill=True,
+        linewidth=0.0,
+        height=2.5,
+        # inner_kws=dict(box_width=2, whis_width=0.2, color='0.4', marker='o'),
+        # inner='stick',
+        estimator='mean',
+        # errorbar=('pi', 95) if 'top_k_precision' != metric else 'sd',
+        errorbar='sd',
+        # showfliers=False,
+        # medianprops={'color': 'white', 'linewidth': 1.0},
+        aspect=2.0,
+        margin_titles=True,
+        # line_kws={'linewidth': 1.5},
+        facet_kws={'gridspec_kws': {'wspace': 0.1, 'hspace': 0.1}},
+    )
+
+    for k in range(g.axes.shape[0]):
+        for j in range(g.axes.shape[1]):
+            g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
+            # g.axes[k, j].title.set_size(6)
+            # g.axes[k, j].set_xticklabels('')
+            # g.axes[k, j].set_xlabel('')
+
+            g.axes[k, j].set_ylim(0, 1)
+            # g.axes[k, j].set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
+            g.axes[k, j].set_yticks(np.arange(start=0.1, step=0.1, stop=1.1))
+            for label in (
+                g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+            ):
+                label.set_fontsize(4)
+
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    plt.savefig(file_path, dpi=300)
+    plt.close()
+
+
 def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
     evaluation_dir = generate_evaluation_dir(config=config)
     file_path = join(evaluation_dir, config['evaluation']['evaluation_records'])
@@ -148,6 +208,42 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
             v(evaluation_results, plot_type, base_output_dir)
 
 
+def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
+    data_dict = dict(
+        dataset_type=list(), model_name=list(), accuracy=list(), data_split=list()
+    )
+
+    def load_training_history(records: list) -> pd.DataFrame:
+        for record in records:
+            history_path = join(*record[-1].split('/')[2:])
+            training_history = load_pickle(file_path=history_path)
+            data_dict['dataset_type'] += [record[0].split('_')[-1]]
+            data_dict['model_name'] += [record[1]['model_name']]
+            data_dict['accuracy'] += [training_history['train_acc'][-1]]
+            data_dict['data_split'] += ['training']
+            data_dict['dataset_type'] += [record[0].split('_')[-1]]
+            data_dict['model_name'] += [record[1]['model_name']]
+            data_dict['accuracy'] += [training_history['val_acc'][-1]]
+            data_dict['data_split'] += ['validation']
+        return pd.DataFrame(data_dict)
+
+    training_dir = generate_training_dir(config=config)
+    file_path = join(training_dir, config['training']['training_records'])
+    training_records = load_pickle(file_path=file_path)
+    history = load_training_history(records=training_records)
+    visualization_methods = dict(
+        model_performance=plot_model_performance,
+    )
+
+    plot_types = config['visualization']['base_data_type']['model']
+    for plot_type in plot_types:
+        logger.info(f'Type of plot: {plot_type}')
+        v = visualization_methods.get(plot_type, None)
+        if v is None:
+            continue
+        v(history, plot_type, base_output_dir)
+
+
 def visualize_results(base_output_dir: str, config: dict) -> None:
     for base_data_type, _ in config['visualization']['base_data_type'].items():
         v = VISUALIZATIONS.get(base_data_type, None)
@@ -158,8 +254,8 @@ def visualize_results(base_output_dir: str, config: dict) -> None:
 VISUALIZATIONS = dict(
     # data=create_data_plots,
     # xai=create_xai_plots,
-    evaluation=create_evaluation_plots
-    # model=create_model_performance_plots
+    evaluation=create_evaluation_plots,
+    model=create_model_performance_plots,
 )
 
 
