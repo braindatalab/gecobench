@@ -56,6 +56,7 @@ TrainModel = {
     'bert_only_embedding_classification': train_bert,
     'bert_all': train_bert,
     'bert_only_embedding': train_bert,
+    'bert_randomly_init_embedding_classification': train_bert,
     'simple_model': train_simple_attention_model,
 }
 

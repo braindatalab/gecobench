@@ -171,6 +171,11 @@ def create_bert_ids(data: List, tokenizer: BertTokenizer) -> List:
     return bert_ids
 
 
+def initialize_embedding(module: torch.nn.Module) -> None:
+    if isinstance(module, torch.nn.Embedding):
+        torch.nn.init.xavier_uniform_(module.weight)
+
+
 def train_model(
     config: dict,
     dataset_name: str,
@@ -182,8 +187,9 @@ def train_model(
     set_random_states(seed=config['general']['seed'] + idx)
     logger.info(
         f"BERT Training, repetition {idx + 1} of "
-        f"{config['training']['num_training_repetitions']}, and "
-        f"dataset: {dataset_name}"
+        f"{config['training']['num_training_repetitions']}, "
+        f"dataset: {dataset_name}, and "
+        f"model name: {training_params['model_name']}"
     )
 
     history = {
@@ -214,6 +220,9 @@ def train_model(
             param.requires_grad = True
         else:
             param.requires_grad = False
+
+    if 'bert_randomly_init_embedding_classification' == training_params['model_name']:
+        model.apply(initialize_embedding)
 
     for epoch in range(num_epochs):
         train_loss, train_acc = train_epoch(
