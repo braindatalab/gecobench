@@ -137,6 +137,3 @@ dmypy.json
 
 # Artifacts
 artifacts/
-
-# generated data
-data/dataset_generation/data
