@@ -1,28 +1,160 @@
+import os
 from os.path import join
+from os import listdir
+from os.path import isfile, join
 from pathlib import Path
+from itertools import islice
 
 import pandas as pd
 from loguru import logger
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import ast
 
-from utils import generate_visualization_dir, generate_evaluation_dir, load_pickle
-from IPython.display import HTML
+from utils import generate_visualization_dir, generate_evaluation_dir, load_pickle, dump_as_pickle
+from dataclasses import asdict
+
+path_to_xai_records_file = '/Users/arturdox/coding/qailabs/xai-nlp-benchmark/artifacts/nlp-benchmark-2023-08-23-15-26-05-V2/xai/xai_records.pkl'
+
+def load_data_xai_visualization(path_to_xai_records_file: list):
+    xai_results_paths = load_pickle(file_path=path_to_xai_records_file)
+    # remove /mnt in and adjust path
+    xai_results_paths = [w.replace('/mnt/', '') for w in xai_results_paths]
+    xai_results_paths = [w.replace('nlp-benchmark-2023-08-23-15-26-05', 'nlp-benchmark-2023-08-23-15-26-05-V2') for w in xai_results_paths]
+    data = list()
+    for path in xai_results_paths[:10]: 
+        list_of_xai_results = load_pickle(file_path=path)
+        for result in list_of_xai_results:
+            data_dict = asdict(result)
+            data_dict['sentence'] = str(data_dict['sentence'])
+            data += [data_dict]
+    xai_results = pd.DataFrame(data)
+    xai_results_grouped = xai_results.groupby(["model_name", "dataset_type", "sentence"])
+    return xai_results_grouped
 
 
-"""
-    Call 04.10.:
-    # 0. Alle Daten Ordner vom Cluster holen und in neuen artifacts folder packen ()"Copy alle aus Dicetory -r")
-    # 0. Generien einer Liste aller Pfade zu den Intermediate XAI Results Dateein 
-    # 1. Group by Satz und Model Name und Model Reptition Number -> Dict mit 5 XAI Methoden
-    # 2. Pro Wort die Attribution Scores -> Für Rechteck Visualisierung
-    # 3. ... Ground Truth -> Für Rechteck Visualisierung
-    
-    # Logik: Auch über Modelle iterieren (aktuell nur 1 Modell)
-    # Hinweis: Falls mehr attribution scores als Wörter - Rest abschneiden
+def plot_attributions(
+        xai_results_grouped: pd.DataFrame
+) -> None:
 
-"""
+    # islice for selecting a specific sample
+    for i, dataframe in islice(xai_results_grouped, 4, None):
+        sentence = ast.literal_eval(dataframe['sentence'].iloc[0])
+        xai_methods_per_sentence = dataframe['attribution_method']
+        attribution_scores_per_sentence = dataframe['attribution']
+        ground_truth_per_sentence = dataframe['ground_truth']
+
+        # sanity check
+        assert len(sentence) == len(attribution_scores_per_sentence[:6].iloc[0])
+   
+        # pick one model (model repition number)
+        attribution_scores_per_sentence = attribution_scores_per_sentence[:6]
+        xai_methods_per_sentence = xai_methods_per_sentence[:6]
+        ground_truth_per_sentence = ground_truth_per_sentence[:6].iloc[0]
+
+        sentences_w_ground_truths = list(zip(sentence, ground_truth_per_sentence))
+        word_idx = 0
+
+        image_paths = []
+        for word in range(len(sentence)):
+            attribution_scores_per_word = []
+            xai_methods_per_word = [] 
+
+            for method in range(len(attribution_scores_per_sentence)):
+                attribution_scores_per_word.append(attribution_scores_per_sentence.iloc[method][word])
+                xai_methods_per_word.append(xai_methods_per_sentence.iloc[method])
+            
+            g = sns.barplot(
+                x=xai_methods_per_word, 
+                y=attribution_scores_per_word,
+            )
+            
+            # GPT4-generated code
+            g.set_xticklabels([])
+            for bar, label in zip(g.patches, xai_methods_per_word):
+                height = bar.get_height()  
+                g.text(
+                    bar.get_x() + bar.get_width() / 2,  # X position is the center of the bar
+                    height + 0.04,                      # Y position is at the top of the bar
+                    label,                              # The text to display
+                    ha='center',                        # Center the text horizontally
+                    va='bottom',                        # Position the text above the bar
+                    rotation=90
+                )
+
+            plt.yticks(np.arange(0, 1.1, 0.1))
+            dir_path = "/Users/arturdox/Downloads/xai_sentence/"
+            save_path = dir_path + str(word_idx) + "_attributions_word_"+sentence[word]+".png"
+            image_paths.append(save_path)
+            plt.savefig(save_path , dpi=300)
+            plt.close()
+
+            word_idx += 1
+
+        # GPT4-generated code
+        html_content = '''
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Concatenated Images</title>
+            <style>
+                .image-container{
+                    display: inline-flex;
+                    flex-direction: row;
+                    justify-content: flex-start;
+                    align-items: center;
+                }
+                .image-box {
+                    margin-right: 20px; /* Adjust spacing between image-text blocks */
+                }
+                .image-box img {
+                    max-width: 120px; /* Set a maximum width for each image */
+                    max-height: 120px; /* Set a maximum height for each image */
+                    object-fit: contain; /* Ensure the aspect ratio of images is maintained */
+                    display: block; /* Makes the image a block-level element */
+                    margin-bottom: 5px; /* Spacing between image and text */
+                }
+                .image-text {
+                    text-align: center; /* Center-aligns the text below the image */
+                }
+                .highlight {
+                    background-color: lightgrey; /* Highlight color */
+                    border-radius: 5px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="image-container">
+        '''
+
+        for img_path, (text, highlight) in zip(image_paths, sentences_w_ground_truths):
+            if os.path.exists(img_path):
+                highlight_class = 'highlight' if highlight else ''
+                html_content += f'''
+                <div class="image-box">
+                    <img src="{img_path}" alt="Image">
+                    <div class="image-text {highlight_class}">{text}</div>
+                </div>
+                '''
+            else:
+                print(f"Warning: Image {img_path} not found.")
+
+        html_content += '''
+            </div> <!-- Closing image-container -->
+        </body>
+        </html>
+        '''
+
+        html_file = '/Users/arturdox/Downloads/V3_plot_gt_highlited_FINAL.html'
+        with open(html_file, 'w') as file:
+            file.write(html_content)
+
+        break
+        
+    return None
+
 
 def plot_evaluation_results(
         data: pd.DataFrame,
@@ -50,92 +182,11 @@ def plot_evaluation_results(
         plt.close()
 
 
-# ToDo: Not hardcoded
-xai_records_paths = "/Users/arturdox/coding/qailabs/xai-nlp-benchmark/artifacts/nlp-benchmark-2023-05-23-11-48-27/xai/xai_records_test.pkl"
-# intermediate_raw_xai_result-2023-09-20-16-05-48.pkl
-# xai_records.pkl
-
-def load_data_sentence_visualization(xai_records_paths: list):
-    # 'path/to/xai_records.pkl'
-    print("load_data_sentence_visualization")
-    print("xai_records_paths:", xai_records_paths)
-    xai_results_paths = load_pickle(file_path=xai_records_paths)
-    print("xai_results_paths")
-    print(xai_results_paths)
-
-    data = list()
-    for path in xai_results_paths:
-        data += [load_pickle(file_path=path)]
-    xai_results = pd.DataFrame(data)
-
-    # get number of XAI methods
-    methods = []
-    for i in range(xai_results.shape[1]):
-        methods.append(xai_results.iloc[0][i].attribution_method)
-    num_xai_methods = len(set(methods))
-    print(set(methods))
-
-    print(xai_results.shape)
-    print("#################")
-    print(xai_results.iloc[0])
-    print("#################")
-    print("xai_results.iloc[0][0].model_repetition_number")
-    print(xai_results.iloc[0][0].model_repetition_number)
-    print(xai_results.iloc[0][0])
-    print(xai_results.iloc[0][1])
-    print(xai_results.iloc[0][2])
-    print(xai_results.iloc[0][3])
-    print(xai_results.iloc[0][4])
-    print(xai_results.iloc[0][5])
-    
-    # hardcode one plot example
-    sentence = xai_results.iloc[0][0+num_xai_methods].sentence
-    attributions = []
-    xai_methods = []
-    for i in range(num_xai_methods):
-        print(i+num_xai_methods)
-        print(xai_results.iloc[0][i+num_xai_methods].sentence)
-        print(xai_results.iloc[0][i+num_xai_methods].raw_attribution)
-        attributions.append(xai_results.iloc[0][i+num_xai_methods].raw_attribution)
-        xai_methods.append(xai_results.iloc[0][i+num_xai_methods].attribution_method)
-    print(sentence)
-    attributions = np.array(attributions)
-    print(np.array(attributions))
-
-    html_file = plot_attributions_per_sentence(attributions, sentence, xai_methods)
-    with open('/Users/arturdox/Downloads/one_sentence_2.html', 'w') as f:
-        f.write(html_file.data)
-
-    print("#########################")
-    print(xai_results.iloc[0][0+num_xai_methods].sentence)
-
-def plot_attributions_per_sentence(
-        attrs: np.ndarray,
-        sentence: str,
-        xai_methods: list
-) -> None:
-    """
-    Adapted from https://captum.ai/tutorials/Image_and_Text_Classification_LIME
-    """
-    rgb = lambda x: '255,0,0' if x < 0 else '0,255,0'
-    alpha = lambda x: abs(x) ** 0.5
-    
-    html_string = ""
-
-    #print("plot_attributions_per_sentence")
-    #print(sentence)
-    #print(xai_methods)
-    print(attrs)
-
-    for idx, xai_attribution in enumerate(attrs):
-        token_marks = [
-            f'<mark style="background-color:rgba({rgb(attr)},{alpha(attr)})">{token}</mark>'
-            for token, attr in zip(sentence, xai_attribution.tolist())
-            ]
-        #print(xai_methods[idx])
-        html_string = html_string + 'XAI Method: ' + xai_methods[idx] + '<p>' + ' '.join(token_marks) + '</p>' + '</br>'
-     
-    return HTML(html_string)
+def visualize_results(base_output_dir: str, config: dict) -> None:
+    for result_type, _ in config['visualization']['visualizations'].items():
+        v = VISUALIZATIONS.get(result_type, None)
+        if v is not None:
+            v(base_output_dir, config)
 
 
 def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
@@ -158,18 +209,10 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
             v(evaluation_results, plot_type, base_output_dir)
 
 
-
-def visualize_results(base_output_dir: str, config: dict) -> None:
-    for result_type, _ in config['visualization']['visualizations'].items():
-        v = VISUALIZATIONS.get(result_type, None)
-        if v is not None:
-            v(base_output_dir, config)
-
-
 VISUALIZATIONS = dict(
     # data=create_data_plots,
     # xai=create_xai_plots,
-    evaluation=create_evaluation_plots
+    # evaluation=create_evaluation_plots
     # model=create_model_performance_plots
 )
 
@@ -179,7 +222,10 @@ def main(config: dict) -> None:
     output_dir = generate_visualization_dir(config=config)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     visualize_results(base_output_dir=output_dir, config=config)
-    load_data_sentence_visualization(xai_records_paths)
+
+    #xai_records_file = create_xai_records_list()
+    xai_results_grouped = load_data_xai_visualization(path_to_xai_records_file)
+    plot_attributions(xai_results_grouped)
 
 
 if __name__ == "__main__":
