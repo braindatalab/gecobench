@@ -5,26 +5,22 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from common import DataSet
-from training.bert import train_bert_only_classification, train_bert_only_embedding_classification, train_bert_all, train_bert_only_embedding
+from training.bert import train_bert
 from training.simple_model import train_simple_attention_model
 from utils import dump_as_pickle, load_pickle, generate_data_dir, generate_training_dir
 
 
 def split_train_data_into_train_val_data(
-        x: pd.DataFrame,
-        y: pd.DataFrame,
-        config: Dict
+    x: pd.DataFrame, y: pd.DataFrame, config: Dict
 ) -> DataSet:
     x_train, x_test, y_train, y_test = train_test_split(
-        x, y,
+        x,
+        y,
         test_size=config['training']['val_size'],
-        random_state=config['general']['seed']
+        random_state=config['general']['seed'],
     )
 
-    return DataSet(
-        x_train=x_train, y_train=y_train,
-        x_test=x_test, y_test=y_test
-    )
+    return DataSet(x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test)
 
 
 def extract_name_of_dataset(s: str) -> str:
@@ -49,16 +45,18 @@ def generate_data_paths(config: Dict) -> List:
     output_paths = list()
     data_dir = generate_data_dir(config=config)
     output_paths += [join(data_dir, config['data']['output_filenames']['train_all'])]
-    output_paths += [join(data_dir, config['data']['output_filenames']['train_subject'])]
+    output_paths += [
+        join(data_dir, config['data']['output_filenames']['train_subject'])
+    ]
     return output_paths
 
 
 TrainModel = {
-    'bert_only_classification': train_bert_only_classification,
-    'bert_only_embedding_classification': train_bert_only_embedding_classification,
-    'bert_all': train_bert_all,
-    'bert_only_embedding': train_bert_only_embedding,
-    'simple_model': train_simple_attention_model
+    'bert_only_classification': train_bert,
+    'bert_only_embedding_classification': train_bert,
+    'bert_all': train_bert,
+    'bert_only_embedding': train_bert,
+    'simple_model': train_simple_attention_model,
 }
 
 
@@ -66,11 +64,11 @@ def main(config: Dict) -> None:
     paths = generate_data_paths(config=config)
     training_records = train_models(data_paths=paths, config=config)
     output_dir = generate_training_dir(config=config)
-    dump_as_pickle(
-        data=training_records,
-        output_dir=output_dir,
-        filename=config['training']['training_records']
-    )
+    # dump_as_pickle(
+    #     data=training_records,
+    #     output_dir=output_dir,
+    #     filename=config['training']['training_records'],
+    # )
 
 
 if __name__ == '__main__':

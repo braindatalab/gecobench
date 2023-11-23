@@ -40,28 +40,32 @@
         "epochs": 1,
         "learning_rate": 0.001,
         "model_name": "bert_only_classification",
-        "model_performance": "bert_only_classification_history"
+        "model_performance": "bert_only_classification_history",
+        "layers_to_train": ["classifier"]
       },
       "bert_only_embedding_classification": {
         "batch_size": 32,
         "epochs": 1,
         "learning_rate": 0.001,
         "model_name": "bert_only_embedding_classification",
-        "model_performance": "bert_only_embedding_classification_history"
+        "model_performance": "bert_only_embedding_classification_history",
+        "layers_to_train": ["bert.embeddings" ,"classification"]
       },
       "bert_all": {
         "batch_size": 32,
         "epochs": 1,
         "learning_rate": 0.001,
         "model_name": "bert_all",
-        "model_performance": "bert_all_history"
+        "model_performance": "bert_all_history",
+        "layers_to_train": []
       },
       "bert_only_embedding": {
         "batch_size": 32,
         "epochs": 1,
         "learning_rate": 0.001,
         "model_name": "bert_only_embedding",
-        "model_performance": "bert_only_embedding_history"
+        "model_performance": "bert_only_embedding_history",
+        "layers_to_train": ["bert.embeddings"]
       }
     }
   },
