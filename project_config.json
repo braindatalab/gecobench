@@ -1,6 +1,7 @@
 {
   "general": {
     "seed": 43532791,
+    "apptainer_data_dir": "/mnt",
     "base_dir": "artifacts",
     "data_scenario": "nlp-benchmark"
   },
