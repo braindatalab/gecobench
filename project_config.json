@@ -43,7 +43,8 @@
         "model_name": "bert_randomly_init_embedding_classification",
         "model_performance": "bert_only_embedding_history",
         "layers_to_train": [
-          "bert.embeddings", "classifier"
+          "bert.embeddings",
+          "classifier"
         ]
       },
       "bert_only_classification": {
@@ -128,7 +129,8 @@
         "_precision_recall_auc",
         "_avg_precision",
         "_precision_specificity",
-        "_top_k_precision"
+        "_top_k_precision",
+        "_mass_accuracy"
       ]
     }
   }

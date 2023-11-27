@@ -74,6 +74,12 @@ def top_k_precision_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
     return float(len(intersection)) / float(len(true_ground_truth_indices))
 
 
+def mass_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+    a = np.sum(y_pred[1 == y_true])
+    b = np.sum(y_pred)
+    return np.divide(a, b, where=(0 != b))
+
+
 def compute_precision_based_scores(y_true: np.ndarray, y_score: np.ndarray) -> Dict:
     precision, recall, thresholds, specificity = precision_curves(
         y_true=y_true, probas_pred=y_score
@@ -93,8 +99,10 @@ def compute_precision_based_scores(y_true: np.ndarray, y_score: np.ndarray) -> D
 
 
 def calculate_scores(attribution: np.ndarray, ground_truth: np.ndarray) -> Dict:
-    roc_auc = roc_auc_scores(y_true=ground_truth, y_score=attribution)
-    result = dict(roc_auc=roc_auc)
+    result = dict(
+        roc_auc=roc_auc_scores(y_true=ground_truth, y_score=attribution),
+        mass_accuracy=mass_accuracy(y_true=ground_truth, y_pred=attribution),
+    )
     precision_based_scores = compute_precision_based_scores(
         y_true=ground_truth, y_score=attribution
     )
