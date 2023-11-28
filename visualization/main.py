@@ -1,7 +1,4 @@
-import os
-from os.path import join
-from os import listdir
-from os.path import isfile, join
+from os.path import join, exists
 from pathlib import Path
 from itertools import islice
 
@@ -11,19 +8,21 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import ast
+import imgkit
 
-from utils import generate_visualization_dir, generate_evaluation_dir, load_pickle, dump_as_pickle
+from utils import generate_visualization_dir, generate_evaluation_dir, load_pickle, generate_xai_dir
 from dataclasses import asdict
 
-path_to_xai_records_file = '/Users/arturdox/coding/qailabs/xai-nlp-benchmark/artifacts/nlp-benchmark-2023-08-23-15-26-05-V2/xai/xai_records.pkl'
 
-def load_data_xai_visualization(path_to_xai_records_file: list):
-    xai_results_paths = load_pickle(file_path=path_to_xai_records_file)
-    # remove /mnt in and adjust path
+def load_data_xai_visualization(
+        xai_records_file_path: list
+) -> pd.DataFrame:
+    xai_results_paths = load_pickle(file_path=xai_records_file_path)
+    # remove /mnt in xai_results_paths from cluster
     xai_results_paths = [w.replace('/mnt/', '') for w in xai_results_paths]
-    xai_results_paths = [w.replace('nlp-benchmark-2023-08-23-15-26-05', 'nlp-benchmark-2023-08-23-15-26-05-V2') for w in xai_results_paths]
     data = list()
-    for path in xai_results_paths[:10]: 
+    # For running locally, slice xai_results_paths
+    for path in xai_results_paths[:10]:
         list_of_xai_results = load_pickle(file_path=path)
         for result in list_of_xai_results:
             data_dict = asdict(result)
@@ -34,9 +33,10 @@ def load_data_xai_visualization(path_to_xai_records_file: list):
     return xai_results_grouped
 
 
-def plot_attributions(
-        xai_results_grouped: pd.DataFrame
-) -> None:
+def create_xai_plots(base_output_dir: str, config: dict) -> None:
+    xai_dir = generate_xai_dir(config=config)
+    xai_records_file_path = join(xai_dir, config['xai']['xai_records'])
+    xai_results_grouped = load_data_xai_visualization(xai_records_file_path)
 
     # islice for selecting a specific sample
     for i, dataframe in islice(xai_results_grouped, 4, None):
@@ -83,11 +83,12 @@ def plot_attributions(
                     rotation=90
                 )
 
-            plt.yticks(np.arange(0, 1.1, 0.1))
-            dir_path = "/Users/arturdox/Downloads/xai_sentence/"
-            save_path = dir_path + str(word_idx) + "_attributions_word_"+sentence[word]+".png"
-            image_paths.append(save_path)
-            plt.savefig(save_path , dpi=300)
+            plt.yticks(np.arange(0, 1.1, 0.1))        
+            folder_path = join(base_output_dir, 'xai_attributions_per_word')
+            Path(folder_path).mkdir(parents=True, exist_ok=True)
+            file_path = join(folder_path, f'{str(word_idx)}_attributions_word_{sentence[word]}.png')
+            image_paths.append(file_path)
+            plt.savefig(file_path , dpi=300)
             plt.close()
 
             word_idx += 1
@@ -129,12 +130,15 @@ def plot_attributions(
             <div class="image-container">
         '''
 
+        # For opening HTML file using browser locally
+        local_machine_path = "/Users/arturdox/coding/qailabs/xai-nlp-benchmark/"
+        
         for img_path, (text, highlight) in zip(image_paths, sentences_w_ground_truths):
-            if os.path.exists(img_path):
+            if exists(img_path):
                 highlight_class = 'highlight' if highlight else ''
                 html_content += f'''
                 <div class="image-box">
-                    <img src="{img_path}" alt="Image">
+                    <img src="{local_machine_path}{img_path}" alt="Image">
                     <div class="image-text {highlight_class}">{text}</div>
                 </div>
                 '''
@@ -147,13 +151,11 @@ def plot_attributions(
         </html>
         '''
 
-        html_file = '/Users/arturdox/Downloads/V3_plot_gt_highlited_FINAL.html'
-        with open(html_file, 'w') as file:
+        file_path = join(base_output_dir, 'xai_sentence_html_plot.html')
+        with open(file_path, 'w') as file:
             file.write(html_content)
 
         break
-        
-    return None
 
 
 def plot_evaluation_results(
@@ -211,8 +213,8 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
 
 VISUALIZATIONS = dict(
     # data=create_data_plots,
-    # xai=create_xai_plots,
-    # evaluation=create_evaluation_plots
+    xai=create_xai_plots,
+    evaluation=create_evaluation_plots
     # model=create_model_performance_plots
 )
 
@@ -222,11 +224,6 @@ def main(config: dict) -> None:
     output_dir = generate_visualization_dir(config=config)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     visualize_results(base_output_dir=output_dir, config=config)
-
-    #xai_records_file = create_xai_records_list()
-    xai_results_grouped = load_data_xai_visualization(path_to_xai_records_file)
-    plot_attributions(xai_results_grouped)
-
 
 if __name__ == "__main__":
     main(config={})
