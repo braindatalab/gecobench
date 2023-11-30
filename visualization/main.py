@@ -1,18 +1,23 @@
+from collections import Counter
 from copy import deepcopy
 from os.path import join
 from pathlib import Path
+from dataclasses import asdict
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 import seaborn as sns
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from utils import (
     generate_visualization_dir,
     generate_evaluation_dir,
     load_pickle,
     generate_training_dir,
+    generate_xai_dir,
+    dump_as_pickle,
 )
 
 MODEL_NAME_MAP = dict(
@@ -21,6 +26,9 @@ MODEL_NAME_MAP = dict(
     bert_all='all',
     bert_only_embedding='embedding',
 )
+
+
+GENDER = {0.0: 'female', 1.0: 'male'}
 
 
 def compute_average_score_per_repetition(data: pd.DataFrame) -> pd.DataFrame:
@@ -190,6 +198,115 @@ def plot_model_performance(
     plt.close()
 
 
+def plot_most_common_xai_attributions(
+    data: pd.DataFrame,
+    plot_type: str,
+    base_output_dir: str,
+) -> None:
+    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+
+    rows = np.unique(data['mapped_model_name'].values)
+    columns = np.unique(data['dataset_type'].values)
+    attribution_methods = np.unique(data['attribution_method'].values)
+    ranks = np.unique(data['rank'].values)
+
+    fig, axs = plt.subplots(
+        nrows=len(rows),
+        ncols=len(columns),
+        sharex=True,
+        sharey=True,
+        layout='constrained',
+        gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
+        figsize=(4, 8),
+    )
+
+    grouped_data = data.groupby(by=['mapped_model_name', 'dataset_type'])
+
+    for k, r in enumerate(rows):
+        for j, c in enumerate(columns):
+            for keys, df in grouped_data:
+                if (r, c) != keys:
+                    continue
+                for normalized, gdf in df.groupby(by='normalized'):
+                    if normalized:
+                        continue
+                    for s, (gender, ggdf) in enumerate(gdf.groupby(by='gender')):
+                        ggdf[gender] = (
+                            ggdf['attribution']
+                            if 1 == s
+                            else (-1) * ggdf['attribution']
+                        )
+
+                        g = sns.barplot(
+                            data=ggdf,
+                            x=gender,
+                            y='rank',
+                            order=ranks,
+                            hue='attribution_method',
+                            orient='y',
+                            ax=axs[k, j],
+                            width=0.8,
+                            native_scale=False,
+                            legend=True if 1 == s else False,
+                            palette=sns.color_palette(
+                                'pastel', len(attribution_methods)
+                            )
+                            if 1 == s
+                            else sns.color_palette('muted', len(attribution_methods)),
+                        )
+                        start = (
+                            0
+                            if len(attribution_methods) == len(g.containers)
+                            else len(attribution_methods)
+                        )
+                        for container, (name, mggdf) in zip(
+                            g.containers[start:], ggdf.groupby(by='attribution_method')
+                        ):
+                            g.bar_label(container, labels=mggdf['word'], fontsize=3)
+                        axs[k, j].legend(
+                            loc='lower right',
+                            ncols=1,
+                            # fontsize='xx-small',
+                            prop={'size': 2},
+                        )
+
+                        for label in (
+                            axs[k, j].get_xticklabels() + axs[k, j].get_yticklabels()
+                        ):
+                            label.set_fontsize(4)
+
+                        axs[k, j].set_box_aspect(1)
+                        axs[k, j].axvline(
+                            x=0, color='black', linestyle='-', linewidth=0.5
+                        )
+
+                        axs[k, j].set_xticks(
+                            [-1000, -500, 0, 500, 1000], [1000, 500, 0, 500, 1000]
+                        )
+                        axs[k, j].set_yticks(ranks, ranks + 1)
+                        axs[k, j].set_xlabel(
+                            'Cumulated attribution for female/male', fontsize=4
+                        )
+                        axs[k, j].set_ylabel(
+                            ggdf.loc[ggdf.index[0], 'model_name'], fontsize=4
+                        )
+                        axs[k, j].spines['top'].set_linewidth(0.5)
+                        axs[k, j].spines['right'].set_linewidth(0.5)
+                        axs[k, j].spines['bottom'].set_linewidth(0.5)
+                        axs[k, j].spines['left'].set_linewidth(0.5)
+                        axs[k, j].grid(linewidth=0.2)
+                        if 0 == k:
+                            axs[k, j].set_title(
+                                f'Dataset: {ggdf.loc[ggdf.index[0], "dataset_type"]}',
+                                fontsize=4,
+                            )
+
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    plt.savefig(file_path, dpi=300)
+    plt.close()
+
+
 def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
     evaluation_dir = generate_evaluation_dir(config=config)
     file_path = join(evaluation_dir, config['evaluation']['evaluation_records'])
@@ -246,16 +363,116 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
         v(history, plot_type, base_output_dir)
 
 
+def create_dataset_for_xai_plot(plot_type: str, data: pd.DataFrame) -> pd.DataFrame:
+    # d = '/home/rick/research/xai-nlp-benchmark/artifacts/nlp-benchmark-2023-08-23-15-26-05/visualization'
+    # dump_as_pickle(data=data, output_dir=d, filename='xai_records_dataframe.pkl')
+    output = None
+    if 'most_common_xai_attributions' == plot_type:
+        grouped_data = data.groupby(
+            by=['model_name', 'dataset_type', 'target', 'attribution_method']
+        )
+        data_dict = dict(
+            gender=list(),
+            dataset_type=list(),
+            model_name=list(),
+            word=list(),
+            attribution=list(),
+            attribution_method=list(),
+            rank=list(),
+            normalized=list(),
+        )
+
+        for keys, df in tqdm(grouped_data):
+            word_frequencies = dict()
+            accumulated_attributions = dict()
+            normalized_attributions = dict()
+            for j, row in df.iterrows():
+                for k, word in enumerate(row['sentence']):
+                    if word not in accumulated_attributions:
+                        accumulated_attributions[word] = row['attribution'][k]
+                        word_frequencies[word] = 1
+                    else:
+                        accumulated_attributions[word] += row['attribution'][k]
+                        word_frequencies[word] += 1
+
+            for word in accumulated_attributions:
+                r = accumulated_attributions[word] / word_frequencies[word]
+                normalized_attributions[word] = r
+
+            word_counter = Counter(accumulated_attributions)
+            word_counter_normalized = Counter(normalized_attributions)
+            word_counters = zip(
+                word_counter.most_common(n=5),
+                word_counter_normalized.most_common(n=5),
+            )
+
+            for i, (c, cn) in enumerate(word_counters):
+                data_dict['model_name'] += [keys[0]]
+                data_dict['dataset_type'] += [keys[1]]
+                data_dict['gender'] += [GENDER[keys[2]]]
+                data_dict['attribution_method'] += [keys[3]]
+                data_dict['word'] += [c[0]]
+                data_dict['attribution'] += [c[1]]
+                data_dict['rank'] += [i]
+                data_dict['normalized'] += [0]
+
+                data_dict['model_name'] += [keys[0]]
+                data_dict['dataset_type'] += [keys[1]]
+                data_dict['gender'] += [GENDER[keys[2]]]
+                data_dict['attribution_method'] += [keys[3]]
+                data_dict['word'] += [cn[0]]
+                data_dict['attribution'] += [cn[1]]
+                data_dict['rank'] += [i]
+                data_dict['normalized'] += [1]
+
+        output = pd.DataFrame(data_dict)
+    return output
+
+    # d = '/home/rick/research/xai-nlp-benchmark/artifacts/nlp-benchmark-2023-08-23-15-26-05/visualization'
+    # dump_as_pickle(data=results, output_dir=d, filename='results.pkl')
+    # results = load_pickle(file_path=join(d, 'results.pkl'))
+
+
+def load_xai_records(config: dict) -> pd.DataFrame:
+    xai_dir = generate_xai_dir(config=config)
+    file_path = join(xai_dir, config['xai']['xai_records'])
+    paths_to_xai_records = load_pickle(file_path=file_path)
+    data_list = list()
+    for p in tqdm(paths_to_xai_records):
+        local_path = join(*p.split('/')[2:])
+        results = load_pickle(file_path=local_path)
+        for xai_records in results:
+            data_list += [asdict(xai_records)]
+
+    return pd.DataFrame(data_list)
+
+
+def create_xai_plots(base_output_dir: str, config: dict) -> None:
+    xai_records = load_xai_records(config=config)
+    visualization_methods = dict(
+        most_common_xai_attributions=plot_most_common_xai_attributions,
+    )
+
+    plot_types = config['visualization']['visualizations']['xai']
+    for plot_type in plot_types:
+        logger.info(f'Type of plot: {plot_type}')
+        v = visualization_methods.get(plot_type, None)
+        if v is None:
+            continue
+        data = create_dataset_for_xai_plot(plot_type=plot_type, data=xai_records)
+        v(data, plot_type, base_output_dir)
+
+
 def visualize_results(base_output_dir: str, config: dict) -> None:
-    for base_data_type, _ in config['visualization']['base_data_type'].items():
-        v = VISUALIZATIONS.get(base_data_type, None)
+    for visualization, _ in config['visualization']['visualizations'].items():
+        v = VISUALIZATIONS.get(visualization, None)
         if v is not None:
             v(base_output_dir, config)
 
 
 VISUALIZATIONS = dict(
     # data=create_data_plots,
-    # xai=create_xai_plots,
+    xai=create_xai_plots,
     evaluation=create_evaluation_plots,
     model=create_model_performance_plots,
 )
