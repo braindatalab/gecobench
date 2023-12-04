@@ -22,6 +22,10 @@ loguru = "^0.6.0"
 captum = "^0.6.0"
 black = "^23.10.1"
 seaborn = "^0.13.0"
+openpyxl = "^3.1.2"
+selenium = "^4.15.2"
+lxml = "^4.9.3"
+xlsxwriter = "^3.1.9"
 
 
 [tool.poetry.group.dev.dependencies]
