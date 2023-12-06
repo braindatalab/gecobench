@@ -4,6 +4,8 @@ from os import listdir
 from os.path import isfile, join
 from pathlib import Path
 from dataclasses import asdict
+from os.path import join, exists
+from pathlib import Path
 from itertools import islice
 
 import numpy as np
@@ -430,6 +432,13 @@ def visualize_results(base_output_dir: str, config: dict) -> None:
             v(base_output_dir, config)
 
 
+def visualize_results(base_output_dir: str, config: dict) -> None:
+    for result_type, _ in config['visualization']['visualizations'].items():
+        v = VISUALIZATIONS.get(result_type, None)
+        if v is not None:
+            v(base_output_dir, config)
+
+
 def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
     evaluation_dir = generate_evaluation_dir(config=config)
     file_path = join(evaluation_dir, config['evaluation']['evaluation_records'])
@@ -448,14 +457,6 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
         v = visualization_methods.get(plot_type, None)
         if v is not None:
             v(evaluation_results, plot_type, base_output_dir)
-
-
-
-def visualize_results(base_output_dir: str, config: dict) -> None:
-    for result_type, _ in config['visualization']['visualizations'].items():
-        v = VISUALIZATIONS.get(result_type, None)
-        if v is not None:
-            v(base_output_dir, config)
 
 
 VISUALIZATIONS = dict(
