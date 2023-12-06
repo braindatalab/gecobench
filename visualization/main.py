@@ -22,9 +22,10 @@ from utils import (
 
 MODEL_NAME_MAP = dict(
     bert_only_classification='classification',
-    bert_only_embedding_classification='embedding,\nclassification',
+    bert_only_embedding_classification='fine-tuned embedding,\nclassification',
     bert_all='all',
     bert_only_embedding='embedding',
+    bert_randomly_init_embedding_classification='newly initialized embedding,\nclassification',
 )
 
 
@@ -334,7 +335,8 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
 
     def load_training_history(records: list) -> pd.DataFrame:
         for record in records:
-            history_path = join(*record[-1].split('/')[2:])
+            # history_path = join(*record[-1].split('/')[2:])
+            history_path = record[-1]
             training_history = load_pickle(file_path=history_path)
             data_dict['dataset_type'] += [record[0].split('_')[-1]]
             data_dict['model_name'] += [record[1]['model_name']]
@@ -439,8 +441,8 @@ def load_xai_records(config: dict) -> pd.DataFrame:
     paths_to_xai_records = load_pickle(file_path=file_path)
     data_list = list()
     for p in tqdm(paths_to_xai_records):
-        local_path = join(*p.split('/')[2:])
-        results = load_pickle(file_path=local_path)
+        # local_path = join(*p.split('/')[2:])
+        results = load_pickle(file_path=p)
         for xai_records in results:
             data_list += [asdict(xai_records)]
 
