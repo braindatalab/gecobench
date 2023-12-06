@@ -289,7 +289,7 @@ def plot_most_common_xai_attributions(
                             'Cumulated attribution for female/male', fontsize=4
                         )
                         axs[k, j].set_ylabel(
-                            ggdf.loc[ggdf.index[0], 'model_name'], fontsize=4
+                            ggdf.loc[ggdf.index[0], 'mapped_model_name'], fontsize=4
                         )
                         axs[k, j].spines['top'].set_linewidth(0.5)
                         axs[k, j].spines['right'].set_linewidth(0.5)
