@@ -21,10 +21,10 @@ from utils import (
 )
 
 MODEL_NAME_MAP = dict(
-    bert_only_classification='classification',
-    bert_only_embedding_classification='fine-tuned embedding,\nclassification',
-    bert_all='all',
-    bert_only_embedding='embedding',
+    bert_only_classification='newly initialized\nclassification',
+    bert_only_embedding_classification='fine-tuned embedding,\nnewly initialized classification',
+    bert_all='fine-tuned all',
+    bert_only_embedding='fine-tuned embedding',
     bert_randomly_init_embedding_classification='newly initialized embedding,\nclassification',
 )
 
@@ -318,9 +318,10 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
         avg_precision=plot_evaluation_results,
         precision_specificity=plot_evaluation_results,
         top_k_precision=plot_evaluation_results,
+        mass_accuracy=plot_evaluation_results,
     )
 
-    plot_types = config['visualization']['base_data_type']['evaluation']
+    plot_types = config['visualization']['visualizations']['evaluation']
     for plot_type in plot_types:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
@@ -356,7 +357,7 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
         model_performance=plot_model_performance,
     )
 
-    plot_types = config['visualization']['base_data_type']['model']
+    plot_types = config['visualization']['visualizations']['model']
     for plot_type in plot_types:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
