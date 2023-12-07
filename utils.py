@@ -12,7 +12,7 @@ import torch
 from numpy.random import Generator
 from torch.utils.data import TensorDataset, random_split
 
-LOCAL_PLATFORM_NAME = '#37~22.04.1-Ubuntu'
+LOCAL_PLATFORM_NAME = '22.04.1-Ubuntu'
 LOCAL_DIR = ''
 
 
@@ -44,7 +44,11 @@ def append_date(s: str) -> str:
 
 
 def on_local_platform() -> bool:
-    return True if LOCAL_PLATFORM_NAME in platform.version() else False
+    return (
+        True
+        if LOCAL_PLATFORM_NAME in platform.version().split(' ')[0].split('~')[-1]
+        else False
+    )
 
 
 def generate_data_dir(config: Dict) -> str:

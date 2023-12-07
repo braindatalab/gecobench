@@ -192,7 +192,7 @@ def train_model(
         f"model name: {training_params['model_name']}"
     )
 
-    history = {
+    training_history = {
         'train_loss': list(),
         'val_loss': list(),
         'train_acc': list(),
@@ -238,17 +238,17 @@ def train_model(
             loss=loss,
             device=config['training']['device'],
         )
-        history['train_loss'] += [train_loss / float(len(train_loader))]
-        history['train_acc'] += [train_acc / float(len(train_loader))]
-        history['val_loss'] += [val_loss / float(len(val_loader))]
-        history['val_acc'] += [val_acc / float(len(val_loader))]
+        training_history['train_loss'] += [train_loss / float(len(train_loader))]
+        training_history['train_acc'] += [train_acc / float(len(train_loader))]
+        training_history['val_loss'] += [val_loss / float(len(val_loader))]
+        training_history['val_acc'] += [val_acc / float(len(val_loader))]
 
         logger.info(
             f"Epoch:{epoch}/{num_epochs},"
-            f"AVG Training Loss:{history['train_loss'][-1]:.2f}, "
-            f"AVG Val Loss:{history['val_loss'][-1]:.2f}, "
-            f"AVG Training Acc {history['train_acc'][-1]:.2f}, "
-            f"AVG Val Acc {history['val_acc'][-1]:.2f}"
+            f"AVG Training Loss:{training_history['train_loss'][-1]:.2f}, "
+            f"AVG Val Loss:{training_history['val_loss'][-1]:.2f}, "
+            f"AVG Training Acc {training_history['train_acc'][-1]:.2f}, "
+            f"AVG Val Acc {training_history['val_acc'][-1]:.2f}"
         )
 
     model_path = save_model(
@@ -257,7 +257,7 @@ def train_model(
         model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}.pt',
     )
     history_path = dump_history(
-        history=history,
+        history=training_history,
         output_dir=generate_training_dir(config=config),
         history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}.pkl',
     )
