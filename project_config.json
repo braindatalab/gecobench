@@ -122,7 +122,8 @@
       ],
       "_xai": [
         "informative_suppressor",
-        "informative_suppressor_uninformative"
+        "informative_suppressor_uninformative",
+        "sentence_html_plot"
       ],
       "evaluation": [
         "roc_auc",
