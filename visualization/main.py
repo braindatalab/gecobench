@@ -470,14 +470,14 @@ def create_xai_sentence_html_plots(
         '''
 
         # For opening HTML file using browser locally
-        local_machine_path = "/Users/arturdox/coding/qailabs/xai-nlp-benchmark/"
+        # local_machine_path = "/Users/arturdox/coding/qailabs/xai-nlp-benchmark/"
 
         for img_path, (text, highlight) in zip(image_paths, sentences_w_ground_truths):
             if exists(img_path):
                 highlight_class = 'highlight' if highlight else ''
                 html_content += f'''
                 <div class="image-box">
-                    <img src="{local_machine_path}{img_path}" alt="Image">
+                    <img src="{img_path}" alt="Image">
                     <div class="image-text {highlight_class}">{text}</div>
                 </div>
                 '''
@@ -611,6 +611,9 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
             xai_dir = generate_xai_dir(config=config)
             xai_records_file_path = join(xai_dir, config['xai']['xai_records'])
             data = load_data_xai_sentence_visualization(xai_records_file_path)
+            base_output_dir = join(
+                config['visualization']['absolute_dir_to_project'], base_output_dir
+            )
         elif v is None:
             continue
         else:

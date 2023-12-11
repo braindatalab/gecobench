@@ -110,6 +110,7 @@
   },
   "visualization": {
     "output_dir": "visualization",
+    "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
       "_data": [
         "contourplot",
