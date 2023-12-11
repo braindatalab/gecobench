@@ -12,6 +12,7 @@ from loguru import logger
 import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from pandas.core.groupby.generic import DataFrameGroupBy
 
 from utils import (
     generate_visualization_dir,
@@ -367,7 +368,10 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
             continue
         v(history, plot_type, base_output_dir)
 
-def create_xai_sentence_html_plots(data: pd.DataFrame, plot_type: str, base_output_dir: str) -> None:
+
+def create_xai_sentence_html_plots(
+    data: DataFrameGroupBy, plot_type: str, base_output_dir: str
+) -> None:
     # islice for selecting a specific sample
     for i, dataframe in islice(data, 4, None):
         sentence = ast.literal_eval(dataframe['sentence'].iloc[0])
@@ -377,7 +381,7 @@ def create_xai_sentence_html_plots(data: pd.DataFrame, plot_type: str, base_outp
 
         # sanity check
         assert len(sentence) == len(attribution_scores_per_sentence[:6].iloc[0])
-   
+
         # pick one model (model repition number)
         attribution_scores_per_sentence = attribution_scores_per_sentence[:6]
         xai_methods_per_sentence = xai_methods_per_sentence[:6]
@@ -389,36 +393,41 @@ def create_xai_sentence_html_plots(data: pd.DataFrame, plot_type: str, base_outp
         image_paths = []
         for word in range(len(sentence)):
             attribution_scores_per_word = []
-            xai_methods_per_word = [] 
+            xai_methods_per_word = []
 
             for method in range(len(attribution_scores_per_sentence)):
-                attribution_scores_per_word.append(attribution_scores_per_sentence.iloc[method][word])
+                attribution_scores_per_word.append(
+                    attribution_scores_per_sentence.iloc[method][word]
+                )
                 xai_methods_per_word.append(xai_methods_per_sentence.iloc[method])
-            
+
             g = sns.barplot(
-                x=xai_methods_per_word, 
+                x=xai_methods_per_word,
                 y=attribution_scores_per_word,
             )
-            
+
             # GPT4-generated code
             g.set_xticklabels([])
             for bar, label in zip(g.patches, xai_methods_per_word):
-                height = bar.get_height()  
+                height = bar.get_height()
                 g.text(
-                    bar.get_x() + bar.get_width() / 2,  # X position is the center of the bar
-                    height + 0.04,                      # Y position is at the top of the bar
-                    label,                              # The text to display
-                    ha='center',                        # Center the text horizontally
-                    va='bottom',                        # Position the text above the bar
-                    rotation=90
+                    bar.get_x()
+                    + bar.get_width() / 2,  # X position is the center of the bar
+                    height + 0.04,  # Y position is at the top of the bar
+                    label,  # The text to display
+                    ha='center',  # Center the text horizontally
+                    va='bottom',  # Position the text above the bar
+                    rotation=90,
                 )
 
-            plt.yticks(np.arange(0, 1.1, 0.1))        
+            plt.yticks(np.arange(0, 1.1, 0.1))
             folder_path = join(base_output_dir, 'xai_attributions_per_word')
             Path(folder_path).mkdir(parents=True, exist_ok=True)
-            file_path = join(folder_path, f'{str(word_idx)}_attributions_word_{sentence[word]}.png')
+            file_path = join(
+                folder_path, f'{str(word_idx)}_attributions_word_{sentence[word]}.png'
+            )
             image_paths.append(file_path)
-            plt.savefig(file_path , dpi=300)
+            plt.savefig(file_path, dpi=300)
             plt.close()
 
             word_idx += 1
@@ -462,7 +471,7 @@ def create_xai_sentence_html_plots(data: pd.DataFrame, plot_type: str, base_outp
 
         # For opening HTML file using browser locally
         local_machine_path = "/Users/arturdox/coding/qailabs/xai-nlp-benchmark/"
-        
+
         for img_path, (text, highlight) in zip(image_paths, sentences_w_ground_truths):
             if exists(img_path):
                 highlight_class = 'highlight' if highlight else ''
@@ -487,9 +496,8 @@ def create_xai_sentence_html_plots(data: pd.DataFrame, plot_type: str, base_outp
 
         break
 
+
 def create_dataset_for_xai_plot(plot_type: str, data: pd.DataFrame) -> pd.DataFrame:
-    # d = '/home/rick/research/xai-nlp-benchmark/artifacts/nlp-benchmark-2023-08-23-15-26-05/visualization'
-    # dump_as_pickle(data=data, output_dir=d, filename='xai_records_dataframe.pkl')
     output = None
     if 'most_common_xai_attributions' == plot_type:
         grouped_data = data.groupby(
@@ -552,10 +560,6 @@ def create_dataset_for_xai_plot(plot_type: str, data: pd.DataFrame) -> pd.DataFr
         output = pd.DataFrame(data_dict)
     return output
 
-    # d = '/home/rick/research/xai-nlp-benchmark/artifacts/nlp-benchmark-2023-08-23-15-26-05/visualization'
-    # dump_as_pickle(data=results, output_dir=d, filename='results.pkl')
-    # results = load_pickle(file_path=join(d, 'results.pkl'))
-
 
 def load_xai_records(config: dict) -> pd.DataFrame:
     xai_dir = generate_xai_dir(config=config)
@@ -570,12 +574,13 @@ def load_xai_records(config: dict) -> pd.DataFrame:
 
     return pd.DataFrame(data_list)
 
+
 def load_data_xai_sentence_visualization(
-        xai_records_file_path: list
-) -> pd.DataFrame:
+    xai_records_file_path: str,
+) -> DataFrameGroupBy:
     xai_results_paths = load_pickle(file_path=xai_records_file_path)
     # remove /mnt in xai_results_paths from cluster
-    xai_results_paths = [w.replace('/mnt/', '') for w in xai_results_paths]
+    # xai_results_paths = [w.replace('/mnt/', '') for w in xai_results_paths]
     data = list()
     # For running locally, slice xai_results_paths
     for path in xai_results_paths[:10]:
@@ -585,14 +590,17 @@ def load_data_xai_sentence_visualization(
             data_dict['sentence'] = str(data_dict['sentence'])
             data += [data_dict]
     xai_results = pd.DataFrame(data)
-    xai_results_grouped = xai_results.groupby(["model_name", "dataset_type", "sentence"])
+    xai_results_grouped = xai_results.groupby(
+        ["model_name", "dataset_type", "sentence"]
+    )
     return xai_results_grouped
+
 
 def create_xai_plots(base_output_dir: str, config: dict) -> None:
     xai_records = load_xai_records(config=config)
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
-        sentence_html_plot=create_xai_sentence_html_plots
+        sentence_html_plot=create_xai_sentence_html_plots,
     )
 
     plot_types = config['visualization']['visualizations']['xai']
@@ -602,8 +610,7 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
         if plot_type == 'sentence_html_plot':
             xai_dir = generate_xai_dir(config=config)
             xai_records_file_path = join(xai_dir, config['xai']['xai_records'])
-            xai_results_grouped = load_data_xai_sentence_visualization(xai_records_file_path)
-            data = xai_results_grouped
+            data = load_data_xai_sentence_visualization(xai_records_file_path)
         elif v is None:
             continue
         else:
