@@ -497,9 +497,12 @@ def create_xai_sentence_html_plots(
         break
 
 
-def create_dataset_for_xai_plot(plot_type: str, data: pd.DataFrame) -> pd.DataFrame:
+def create_dataset_for_xai_plot(
+    plot_type: str, xai_records: list
+) -> pd.DataFrame | DataFrameGroupBy:
     output = None
     if 'most_common_xai_attributions' == plot_type:
+        data = pd.DataFrame(xai_records)
         grouped_data = data.groupby(
             by=['model_name', 'dataset_type', 'target', 'attribution_method']
         )
@@ -558,42 +561,29 @@ def create_dataset_for_xai_plot(plot_type: str, data: pd.DataFrame) -> pd.DataFr
                 data_dict['normalized'] += [1]
 
         output = pd.DataFrame(data_dict)
+    elif 'sentence_html_plot' == plot_type:
+        data_list = list()
+        for record in xai_records:
+            new_record = deepcopy(record)
+            new_record['sentence'] = str(record['sentence'])
+            data_list.append(new_record)
+        output = pd.DataFrame(data_list).groupby(
+            ["model_name", "dataset_type", "sentence"]
+        )
     return output
 
 
-def load_xai_records(config: dict) -> pd.DataFrame:
+def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     file_path = join(xai_dir, config['xai']['xai_records'])
     paths_to_xai_records = load_pickle(file_path=file_path)
     data_list = list()
     for p in tqdm(paths_to_xai_records):
-        # local_path = join(*p.split('/')[2:])
         results = load_pickle(file_path=p)
         for xai_records in results:
             data_list += [asdict(xai_records)]
 
-    return pd.DataFrame(data_list)
-
-
-def load_data_xai_sentence_visualization(
-    xai_records_file_path: str,
-) -> DataFrameGroupBy:
-    xai_results_paths = load_pickle(file_path=xai_records_file_path)
-    # remove /mnt in xai_results_paths from cluster
-    # xai_results_paths = [w.replace('/mnt/', '') for w in xai_results_paths]
-    data = list()
-    # For running locally, slice xai_results_paths
-    for path in xai_results_paths[:10]:
-        list_of_xai_results = load_pickle(file_path=path)
-        for result in list_of_xai_results:
-            data_dict = asdict(result)
-            data_dict['sentence'] = str(data_dict['sentence'])
-            data += [data_dict]
-    xai_results = pd.DataFrame(data)
-    xai_results_grouped = xai_results.groupby(
-        ["model_name", "dataset_type", "sentence"]
-    )
-    return xai_results_grouped
+    return data_list
 
 
 def create_xai_plots(base_output_dir: str, config: dict) -> None:
@@ -607,17 +597,14 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
     for plot_type in plot_types:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
-        if plot_type == 'sentence_html_plot':
-            xai_dir = generate_xai_dir(config=config)
-            xai_records_file_path = join(xai_dir, config['xai']['xai_records'])
-            data = load_data_xai_sentence_visualization(xai_records_file_path)
-            base_output_dir = join(
-                config['visualization']['absolute_dir_to_project'], base_output_dir
-            )
-        elif v is None:
+        base_output_dir = (
+            join(config['visualization']['absolute_dir_to_project'], base_output_dir)
+            if plot_type == 'sentence_html_plot'
+            else base_output_dir
+        )
+        if v is None:
             continue
-        else:
-            data = create_dataset_for_xai_plot(plot_type=plot_type, data=xai_records)
+        data = create_dataset_for_xai_plot(plot_type=plot_type, xai_records=xai_records)
         v(data, plot_type, base_output_dir)
 
 
