@@ -118,12 +118,10 @@
         "_sankey"
       ],
       "_model": [
-        "performance_grid",
         "model_performance"
       ],
       "_xai": [
-        "informative_suppressor",
-        "informative_suppressor_uninformative",
+        "_most_common_xai_attributions",
         "sentence_html_plot"
       ],
       "evaluation": [
