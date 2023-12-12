@@ -97,8 +97,11 @@ def create_bert_tensor_data(data: dict) -> dict:
         tensor_data = create_tensor_dataset(
             data=bert_ids, target=target, tokenizer=bert_tokenizer
         )
-        x, target = tensor_data.tensors[0], tensor_data.tensors[2]
-        output[name] = (x, target)
+        output[name] = (
+            tensor_data.tensors[0],
+            tensor_data.tensors[1],
+            tensor_data.tensors[2],
+        )
     return output
 
 
@@ -112,10 +115,12 @@ def load_model(path: str) -> Any:
 def get_intersection_of_correctly_classified_samples(data: dict, records: list) -> dict:
     output = {key: torch.ones((len(data['all'][1]),)) for key in data.keys()}
     for dataset_name, model_params, model_path, _ in tqdm(records):
+        if 'bert_all' == model_params['model_name']:
+            continue
         dataset_type = determine_dataset_type(dataset_name=dataset_name)
-        x, target = data[dataset_type]
+        x, attention_mask, target = data[dataset_type]
         model = load_model(path=model_path)
-        prediction = torch.argmax(model(x).logits, dim=1)
+        prediction = torch.argmax(model(x, attention_mask=attention_mask).logits, dim=1)
         output[dataset_type] *= target == prediction
 
     return output
