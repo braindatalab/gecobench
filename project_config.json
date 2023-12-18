@@ -35,6 +35,7 @@
     "num_training_repetitions": 1,
     "device": "cuda",
     "training_records": "training_records.pkl",
+    "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
     "models": {
       "bert_randomly_init_embedding_classification": {
         "batch_size": 32,

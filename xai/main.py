@@ -88,10 +88,10 @@ def create_bert_to_original_token_mapping(data: list, tokenizer: BertTokenizer) 
     return mappings
 
 
-def create_bert_tensor_data(data: dict) -> dict:
+def create_bert_tensor_data(data: dict, config: dict) -> dict:
     output = dict()
     for name, dataset in data.items():
-        bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        bert_tokenizer = get_bert_tokenizer(config=config)
         sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
         bert_ids = create_bert_ids(data=sentences, tokenizer=bert_tokenizer)
         tensor_data = create_tensor_dataset(
@@ -182,15 +182,17 @@ def create_xai_results(
     return results
 
 
-def get_bert_tokenizer(path: str = None) -> BertTokenizer:
-    path_or_name = 'bert-base-uncased' if path is None else path
-    return BertTokenizer.from_pretrained(pretrained_model_name_or_path=path_or_name)
+def get_bert_tokenizer(config: dict) -> BertTokenizer:
+    return BertTokenizer.from_pretrained(
+        pretrained_model_name_or_path='bert-base-uncased',
+        revision=config['training']['bert_revision'],
+    )
 
 
 def map_bert_attributions_to_original_tokens(
-    model_type: str, result: XAIResult
+    model_type: str, result: XAIResult, config: dict
 ) -> list:
-    tokenizer = get_tokenizer[model_type]()
+    tokenizer = get_tokenizer[model_type](config)
     token_mapping = create_model_token_to_original_token_mapping[model_type](
         [result.sentence], tokenizer
     )
@@ -220,7 +222,7 @@ def map_raw_attributions_to_original_tokens(
             model_type = determine_model_type(s=result.model_name)
             result.attribution = raw_attributions_to_original_tokens_mapping[
                 model_type
-            ](model_type, result)
+            ](model_type, result, config)
 
         output_dir = generate_xai_dir(config=config)
         filename = append_date(s=config['xai']['intermediate_xai_result_prefix'])
@@ -241,7 +243,7 @@ def apply_xai_methods_on_sentence(
 ) -> list[XAIResult]:
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
-    tokenizer = get_tokenizer[model_type]()
+    tokenizer = get_tokenizer[model_type](config)
     token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
     num_ids = token_ids[0].shape[0]
     reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
@@ -318,7 +320,7 @@ def preprocess_artifacts(config: dict) -> tuple:
     )
     training_records = load_pickle(file_path=training_records_path)
     test_data = load_test_data(config=config)
-    tensor_data = create_bert_tensor_data(data=test_data)
+    tensor_data = create_bert_tensor_data(data=test_data, config=config)
 
     logger.info(f'Compute intersection dataset.')
     correctly_classified_mask = get_intersection_of_correctly_classified_samples(

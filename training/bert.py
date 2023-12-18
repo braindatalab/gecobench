@@ -203,7 +203,8 @@ def train_model(
     learning_rate = training_params['learning_rate']
 
     model = BertForSequenceClassification.from_pretrained(
-        "bert-base-uncased",
+        pretrained_model_name_or_path="bert-base-uncased",
+        revision=config['training']['bert_revision'],
         num_labels=2,  # binary classification
         output_attentions=False,
         output_hidden_states=False,
@@ -270,7 +271,10 @@ def train_bert(
     dataset: DataSet, dataset_name: str, params: Dict, config: Dict
 ) -> List[Tuple]:
     output = list()
-    bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    bert_tokenizer = BertTokenizer.from_pretrained(
+        pretrained_model_name_or_path='bert-base-uncased',
+        revision=config['training']['bert_revision'],
+    )
     bert_ids_train = create_bert_ids(data=dataset.x_train, tokenizer=bert_tokenizer)
     bert_ids_val = create_bert_ids(data=dataset.x_test, tokenizer=bert_tokenizer)
     train_data = create_tensor_dataset(
