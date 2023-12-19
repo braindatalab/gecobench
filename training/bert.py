@@ -225,6 +225,7 @@ def train_model(
     if 'bert_randomly_init_embedding_classification' == training_params['model_name']:
         model.apply(initialize_embedding)
 
+    lowest_loss_so_far = 1e7
     for epoch in range(num_epochs):
         train_loss, train_acc = train_epoch(
             model=model,
@@ -252,16 +253,19 @@ def train_model(
             f"AVG Val Acc {training_history['val_acc'][-1]:.2f}"
         )
 
-    model_path = save_model(
-        model=model,
-        output_dir=generate_training_dir(config=config),
-        model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}.pt',
-    )
-    history_path = dump_history(
-        history=training_history,
-        output_dir=generate_training_dir(config=config),
-        history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}.pkl',
-    )
+        if lowest_loss_so_far > val_loss:
+            logger.info(f'Save model weights at epoch: {epoch}')
+            lowest_loss_so_far = val_loss
+            model_path = save_model(
+                model=model,
+                output_dir=generate_training_dir(config=config),
+                model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}.pt',
+            )
+            history_path = dump_history(
+                history=training_history,
+                output_dir=generate_training_dir(config=config),
+                history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}.pkl',
+            )
     output_params = deepcopy(training_params)
     output_params['repetition'] = idx
     return [(dataset_name, output_params, model_path, history_path)]
