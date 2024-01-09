@@ -23,7 +23,6 @@ class XAIResult:
     model_repetition_number: int = None
     dataset_type: str = None
     target: float = None
-    correct_classified_intersection: float = None
     attribution_method: str = None
     sentence: list = field(default_factory=list)
     raw_attribution: list = field(default_factory=list)

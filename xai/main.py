@@ -35,19 +35,7 @@ BERT_MODEL_TYPE = 'bert'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def custom_forward_grad(inputs, model):
-    preds = model(inputs)[0]
-    y = torch.softmax(preds, dim=1)[0][1].unsqueeze(-1)
-    return y
-
-
-def summarize_attributions(attributions):
-    attributions = attributions.sum(dim=-1).squeeze(0)
-    attributions = attributions / torch.norm(attributions)
-    return attributions
-
-
-def load_test_data(config: dict) -> dict:
+def load_test_data(config: dict) -> dict[pd.DataFrame]:
     data = dict()
     data_dir = generate_data_dir(config=config)
     filename_all = config['data']['output_filenames']['test_all']
@@ -78,49 +66,6 @@ def create_bert_to_original_token_mapping(data: list, tokenizer: BertTokenizer) 
             )
         ]
     return mappings
-
-
-def create_bert_tensor_data(data: dict, config: dict) -> dict:
-    output = dict()
-    for name, dataset in data.items():
-        bert_tokenizer = get_bert_tokenizer(config=config)
-        sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
-        bert_ids = create_bert_ids(data=sentences, tokenizer=bert_tokenizer)
-        tensor_data = create_tensor_dataset(
-            data=bert_ids, target=target, tokenizer=bert_tokenizer
-        )
-        output[name] = (
-            tensor_data.tensors[0],
-            tensor_data.tensors[1],
-            tensor_data.tensors[2],
-        )
-    return output
-
-
-def get_intersection_of_correctly_classified_samples(data: dict, records: list) -> dict:
-    output = {key: torch.ones((len(data['all'][1]),)) for key in data.keys()}
-    for dataset_name, model_params, model_path, _ in tqdm(records):
-        if 'bert_all' == model_params['model_name']:
-            continue
-        dataset_type = determine_dataset_type(dataset_name=dataset_name)
-        x, attention_mask, target = data[dataset_type]
-        model = load_model(path=model_path)
-        prediction = torch.argmax(model(x, attention_mask=attention_mask).logits, dim=1)
-        output[dataset_type] *= target == prediction
-
-    return output
-
-
-def filter_data(data: dict, mask: dict) -> dict:
-    output = {key: list() for key in data.keys()}
-    for key, dataset in data.items():
-        for sentence, target, mask_value in zip(
-            dataset[0], dataset[1], mask[key].tolist()
-        ):
-            if 0 == mask_value:
-                continue
-            output[key] += [(sentence, target)]
-    return output
 
 
 def determine_model_type(s: str) -> str:
@@ -157,9 +102,6 @@ def create_xai_results(
                 target=row['target'],
                 attribution_method=xai_method,
                 sentence=row['sentence'],
-                correct_classified_intersection=row[
-                    'correctly_classified_intersection'
-                ],
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
             )
@@ -299,29 +241,6 @@ def loop_over_training_records(
     return output
 
 
-def preprocess_artifacts(config: dict) -> tuple:
-    training_records_path = join(
-        generate_training_dir(config=config), config['training']['training_records']
-    )
-    training_records = load_pickle(file_path=training_records_path)
-    test_data = load_test_data(config=config)
-    tensor_data = create_bert_tensor_data(data=test_data, config=config)
-
-    logger.info(f'Compute intersection dataset.')
-    correctly_classified_mask = get_intersection_of_correctly_classified_samples(
-        data=tensor_data, records=training_records
-    )
-
-    test_data['all']['correctly_classified_intersection'] = correctly_classified_mask[
-        'all'
-    ]
-    test_data['subject'][
-        'correctly_classified_intersection'
-    ] = correctly_classified_mask['subject']
-
-    return training_records, test_data
-
-
 get_tokenizer = {'bert': get_bert_tokenizer}
 
 create_token_ids = {'bert': create_bert_ids}
@@ -338,7 +257,11 @@ raw_attributions_to_original_tokens_mapping = {
 
 
 def main(config: Dict) -> None:
-    training_records, test_data = preprocess_artifacts(config=config)
+    training_records_path = join(
+        generate_training_dir(config=config), config['training']['training_records']
+    )
+    training_records = load_pickle(file_path=training_records_path)
+    test_data = load_test_data(config=config)
 
     logger.info(f'Generate explanations.')
     intermediate_results_paths = loop_over_training_records(
