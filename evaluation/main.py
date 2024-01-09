@@ -1,3 +1,4 @@
+import ast
 import json
 import json
 import warnings
@@ -8,14 +9,27 @@ from typing import Dict, Tuple, List
 from uuid import uuid4
 
 import numpy as np
+import pandas as pd
 from joblib import Parallel, delayed
 from loguru import logger
 from sklearn.metrics import auc, roc_curve
 from sklearn.metrics._ranking import _binary_clf_curve, average_precision_score
 from tqdm import tqdm
+from transformers import BertTokenizer
+import torch
 
-from common import EvaluationResult, XAIResult
-from utils import load_pickle, dump_as_pickle, generate_xai_dir, generate_evaluation_dir
+from common import EvaluationResult, XAIResult, DATASET_ALL, DATASET_SUBJECT
+from training.bert import create_bert_ids, create_tensor_dataset
+from utils import (
+    load_pickle,
+    dump_as_pickle,
+    generate_xai_dir,
+    generate_evaluation_dir,
+    generate_training_dir,
+    generate_data_dir,
+    determine_dataset_type,
+    load_model,
+)
 
 
 def roc_auc_scores(y_true: np.ndarray, y_score: np.ndarray) -> float:
@@ -110,42 +124,145 @@ def calculate_scores(attribution: np.ndarray, ground_truth: np.ndarray) -> Dict:
     return result
 
 
-def bundle_evaluation_results(xai_result: XAIResult, scores: dict) -> dict:
+def bundle_evaluation_results(xai_record: pd.Series, scores: dict) -> dict:
     output = asdict(
         EvaluationResult(
-            model_name=xai_result.model_name,
-            model_repetition_number=xai_result.model_repetition_number,
-            dataset_type=xai_result.dataset_type,
-            attribution_method=xai_result.attribution_method,
+            model_name=xai_record.model_name,
+            model_repetition_number=xai_record.model_repetition_number,
+            dataset_type=xai_record.dataset_type,
+            attribution_method=xai_record.attribution_method,
         )
     )
     output.update(scores)
     return output
 
 
-def evaluate(xai_records_paths: list) -> list[dict]:
+def evaluate(data: pd.DataFrame) -> list[dict]:
     results = list()
-    for result_path in tqdm(xai_records_paths):
-        xai_records = load_pickle(file_path=result_path)
-        for record in xai_records:
-            scores = calculate_scores(
-                attribution=np.abs(np.array(record.attribution)),
-                ground_truth=np.array(record.ground_truth),
-            )
-            result = bundle_evaluation_results(xai_result=record, scores=scores)
-            results += [result]
+    for k, row in tqdm(data.iterrows()):
+        scores = calculate_scores(
+            attribution=np.abs(np.array(row['attribution'])),
+            ground_truth=np.array(row['ground_truth']),
+        )
+        result = bundle_evaluation_results(xai_record=row, scores=scores)
+        results += [result]
 
     return results
 
 
-def main(config: Dict) -> None:
-    xai_dir = generate_xai_dir(config=config)
-    xai_result_paths = load_pickle(
-        file_path=join(xai_dir, config["xai"]["xai_records"])
+def load_test_data(config: dict) -> dict:
+    data = dict()
+    data_dir = generate_data_dir(config=config)
+    filename_all = config['data']['output_filenames']['test_all']
+    filename_subject = config['data']['output_filenames']['test_subject']
+    data[DATASET_ALL] = load_pickle(file_path=join(data_dir, filename_all))
+    data[DATASET_SUBJECT] = load_pickle(file_path=join(data_dir, filename_subject))
+    return data
+
+
+def create_bert_tensor_data(data: dict, config: dict) -> dict:
+    output = dict(tensors=dict(), sentences=dict())
+    for name, dataset in data.items():
+        bert_tokenizer = BertTokenizer.from_pretrained(
+            pretrained_model_name_or_path='bert-base-uncased',
+            revision=config['training']['bert_revision'],
+        )
+        sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
+        bert_ids = create_bert_ids(data=sentences, tokenizer=bert_tokenizer)
+        tensor_data = create_tensor_dataset(
+            data=bert_ids, target=target, tokenizer=bert_tokenizer
+        )
+        output['sentences'][name] = sentences
+        output['tensors'][name] = (
+            tensor_data.tensors[0],
+            tensor_data.tensors[1],
+            tensor_data.tensors[2],
+        )
+    return output
+
+
+def create_dataset_with_predictions(data: dict, records: list, config: dict) -> dict:
+    data_dict = {
+        'model_repetition_number': list(),
+        'model_name': list(),
+        'sentence': list(),
+        'target': list(),
+        'prediction': list(),
+        'dataset_type': list(),
+    }
+    tensor_data = create_bert_tensor_data(data=data, config=config)
+    for dataset_name, model_params, model_path, _ in tqdm(records):
+        dataset_type = determine_dataset_type(dataset_name=dataset_name)
+        x, attention_mask, target = tensor_data['tensors'][dataset_type]
+        model = load_model(path=model_path)
+        prediction = torch.argmax(model(x, attention_mask=attention_mask).logits, dim=1)
+        n = target.shape[0]
+        data_dict['model_repetition_number'] += n * [model_params['repetition']]
+        data_dict['model_name'] += n * [model_params['model_name']]
+        data_dict['sentence'] += [
+            str(sentence) for sentence in tensor_data['sentences'][dataset_type]
+        ]
+        data_dict['target'] += target.detach().numpy().tolist()
+        data_dict['prediction'] += prediction.detach().numpy().tolist()
+        data_dict['dataset_type'] += n * [dataset_type]
+
+    return data_dict
+
+
+def load_xai_results(config: dict) -> list:
+    output = list()
+    file_path = join(generate_xai_dir(config=config), config["xai"]["xai_records"])
+    xai_result_paths = load_pickle(file_path=file_path)
+    for result_path in tqdm(xai_result_paths):
+        xai_records = load_pickle(file_path=result_path)
+        for record in xai_records:
+            record.sentence = str(record.sentence)
+            output += [asdict(record)]
+
+    return output
+
+
+def create_evaluation_data(config: dict) -> pd.DataFrame:
+    training_records_path = join(
+        generate_training_dir(config=config), config['training']['training_records']
+    )
+    training_records = load_pickle(file_path=training_records_path)
+    test_data = load_test_data(config=config)
+
+    logger.info(f'Compute prediction dataset.')
+    data_with_predictions = create_dataset_with_predictions(
+        data=test_data, records=training_records, config=config
+    )
+    logger.info(f'Assemble XAI dataset.')
+    xai_results = load_xai_results(config=config)
+
+    xai_df = pd.DataFrame(xai_results)
+    prediction_df = pd.DataFrame(data_with_predictions)
+
+    data_for_evaluation = pd.merge(
+        xai_df,
+        prediction_df,
+        how='outer',
+        on=[
+            'model_repetition_number',
+            'model_name',
+            'sentence',
+            'target',
+            'dataset_type',
+        ],
     )
 
+    correctly_classified_mask = (
+        data_for_evaluation['target'] == data_for_evaluation['prediction']
+    )
+    correctly_classified = data_for_evaluation[correctly_classified_mask]
+    return correctly_classified
+
+
+def main(config: Dict) -> None:
+    evaluation_data = create_evaluation_data(config=config)
     logger.info(f"Calculate evaluation scores.")
-    evaluation_results = evaluate(xai_records_paths=xai_result_paths)
+    evaluation_results = evaluate(data=evaluation_data)
     output_dir = generate_evaluation_dir(config=config)
     filename = config["evaluation"]["evaluation_records"]
     logger.info(f"Output path: {join(output_dir, filename)}")

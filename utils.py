@@ -12,6 +12,8 @@ import torch
 from numpy.random import Generator
 from torch.utils.data import TensorDataset, random_split
 
+from common import DATASET_ALL, DATASET_SUBJECT
+
 LOCAL_PLATFORM_NAME = '22.04.1-Ubuntu'
 LOCAL_DIR = ''
 
@@ -104,3 +106,17 @@ def create_train_val_split(data: TensorDataset, val_size: float) -> List:
     num_val_samples = int(val_size * num_samples)
     num_train_samples = num_samples - num_val_samples
     return random_split(dataset=data, lengths=[num_train_samples, num_val_samples])
+
+
+def determine_dataset_type(dataset_name: str) -> str:
+    output = DATASET_ALL
+    if DATASET_SUBJECT in dataset_name:
+        output = DATASET_SUBJECT
+    return output
+
+
+def load_model(path: str) -> Any:
+    model = torch.load(path, map_location=torch.device('cpu'))
+    model.eval()
+    model.zero_grad()
+    return model

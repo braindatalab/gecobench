@@ -1,11 +1,10 @@
+from itertools import chain
 from os.path import join
 from typing import Dict, Any
-from itertools import chain
 
 import pandas as pd
 import torch
-from IPython.display import display, HTML
-from captum.attr import LayerIntegratedGradients, TokenReferenceBase
+from captum.attr import TokenReferenceBase
 from joblib import Parallel, delayed
 from loguru import logger
 from torch import Tensor
@@ -17,8 +16,6 @@ from training.bert import (
     create_tensor_dataset,
     create_bert_ids,
     get_bert_ids,
-    BERT_CLASSIFICATION,
-    BERT_SEPARATION,
 )
 from utils import (
     generate_training_dir,
@@ -27,6 +24,8 @@ from utils import (
     dump_as_pickle,
     generate_xai_dir,
     append_date,
+    determine_dataset_type,
+    load_model,
 )
 from xai.methods import get_captum_attributions
 
@@ -46,13 +45,6 @@ def summarize_attributions(attributions):
     attributions = attributions.sum(dim=-1).squeeze(0)
     attributions = attributions / torch.norm(attributions)
     return attributions
-
-
-def determine_dataset_type(dataset_name: str) -> str:
-    output = DATASET_ALL
-    if DATASET_SUBJECT in dataset_name:
-        output = DATASET_SUBJECT
-    return output
 
 
 def load_test_data(config: dict) -> dict:
@@ -103,13 +95,6 @@ def create_bert_tensor_data(data: dict, config: dict) -> dict:
             tensor_data.tensors[2],
         )
     return output
-
-
-def load_model(path: str) -> Any:
-    model = torch.load(path, map_location=torch.device('cpu'))
-    model.eval()
-    model.zero_grad()
-    return model
 
 
 def get_intersection_of_correctly_classified_samples(data: dict, records: list) -> dict:
