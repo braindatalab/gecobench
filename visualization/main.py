@@ -406,6 +406,10 @@ def create_xai_sentence_html_plots(
                 y=attribution_scores_per_word,
             )
 
+            sns.despine(left=True, bottom=True)
+            g.set_yticklabels([])
+            g.tick_params(left=False)
+            
             # GPT4-generated code
             g.set_xticklabels([])
             for bar, label in zip(g.patches, xai_methods_per_word):
@@ -447,21 +451,21 @@ def create_xai_sentence_html_plots(
                     align-items: center;
                 }
                 .image-box {
-                    margin-right: 20px; /* Adjust spacing between image-text blocks */
+                    margin-right: -15px; /* Adjust spacing between image-text blocks */
                 }
                 .image-box img {
                     max-width: 120px; /* Set a maximum width for each image */
                     max-height: 120px; /* Set a maximum height for each image */
                     object-fit: contain; /* Ensure the aspect ratio of images is maintained */
                     display: block; /* Makes the image a block-level element */
-                    margin-bottom: 5px; /* Spacing between image and text */
+                    margin-bottom: 0px; /* Spacing between image and text */
                 }
                 .image-text {
                     text-align: center; /* Center-aligns the text below the image */
                 }
                 .highlight {
                     background-color: lightgrey; /* Highlight color */
-                    border-radius: 5px;
+                    border-radius: 0px;
                 }
             </style>
         </head>
@@ -577,8 +581,11 @@ def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     file_path = join(xai_dir, config['xai']['xai_records'])
     paths_to_xai_records = load_pickle(file_path=file_path)
+    # Temporary fix for running locally
+    paths_to_xai_records = [s.strip('/mnt/') for s in paths_to_xai_records]
     data_list = list()
-    for p in tqdm(paths_to_xai_records):
+    # Temporary slicing to speed up
+    for p in tqdm(paths_to_xai_records[:10]):
         results = load_pickle(file_path=p)
         for xai_records in results:
             data_list += [asdict(xai_records)]
@@ -618,8 +625,8 @@ def visualize_results(base_output_dir: str, config: dict) -> None:
 VISUALIZATIONS = dict(
     # data=create_data_plots,
     xai=create_xai_plots,
-    evaluation=create_evaluation_plots,
-    model=create_model_performance_plots,
+    # evaluation=create_evaluation_plots,
+    # model=create_model_performance_plots,
 )
 
 
