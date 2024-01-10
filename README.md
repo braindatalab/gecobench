@@ -12,9 +12,22 @@ python run_experiments.py --mode=data --config=project_config.json
 ```bash
 ./copy_data_to_cluster.sh
 ```
-3. Run model training via Apptainer
+4. Run model training via Apptainer
 ```bash
 python run_experiments.py --mode=data --config=project_config.json
+```
+5.  Create visualizations
+
+We have to update `"absolute_dir_to_project"` in `project_config.json` of `"artifacts/nlp-benchmark-.../data/"`:
+```
+  "visualization": {
+    "output_dir": "visualization",
+    "absolute_dir_to_project": "local_project_path/xai-nlp-benchmark",
+    ..
+  }
+```
+```bash
+python run_experiments.py --mode=visualization --config=project_config.json
 ```
 
 # On the cluster
