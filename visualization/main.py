@@ -391,7 +391,7 @@ def create_xai_sentence_html_plots(
         word_idx = 0
 
         image_paths = []
-        for word in range(len(sentence)):
+        for word, counter in enumerate(range(len(sentence))):
             attribution_scores_per_word = []
             xai_methods_per_word = []
 
@@ -401,9 +401,64 @@ def create_xai_sentence_html_plots(
                 )
                 xai_methods_per_word.append(xai_methods_per_sentence.iloc[method])
 
+            # Save only plot legend as separte figure to be appended in HTML file at the bottom
+            folder_path = join(base_output_dir, 'xai_attributions_per_word')
+            Path(folder_path).mkdir(parents=True, exist_ok=True)
+            file_path_legend_plot = join(
+                folder_path, f'plot_legend.png'
+            )
+            
+            h = sns.barplot(
+                x=xai_methods_per_word,
+                y=attribution_scores_per_word,
+                hue=xai_methods_per_word,
+                #width=0.8
+            )
+        
+            # GPT4-generated code
+            h.legend(loc='center')
+            # Extract the legend's handles and labels
+            handles, labels = h.get_legend_handles_labels()
+            # Create a new figure for the legend
+            fig_legend = plt.figure(figsize=(3, 2))
+            ax_legend = fig_legend.add_subplot(111)
+            # Draw the legend on the new figure using the handles and labels
+            ax_legend.legend(handles, labels, loc='center', ncol=len(labels), frameon=False)
+            ax_legend.axis('off')
+            fig_legend.canvas.draw()
+            # Save the legend as a separate image
+            fig_legend.savefig(file_path_legend_plot, bbox_inches='tight', dpi=300)
+            # Close the figures to free memory
+            plt.close(fig_legend)
+            plt.close()
+
+            # GPT4-generated code to remove the white borders around legend image
+            # Makes border handling with the respect to the whole html file easier and
+            # Ensures a tighter layout
+            from PIL import Image
+            def trim_whitespace(image_path):
+                with Image.open(image_path) as img:
+                    # Convert to a NumPy array for image processing
+                    img_array = np.array(img)
+                    # Find non-white pixels
+                    non_white_pix = np.where(img_array < 255)
+                    # Get the bounding box of non-white pixels
+                    bbox = [np.min(non_white_pix[1]), np.min(non_white_pix[0]), 
+                            np.max(non_white_pix[1]), np.max(non_white_pix[0])]
+                    # Crop the image according to the bounding box
+                    trimmed_img = img.crop(bbox)
+                    # Save the trimmed image
+                    trimmed_img.save(file_path_legend_plot)
+
+            # Call the function to trim whitespace
+            trim_whitespace(file_path_legend_plot)
+
+            # Barplots for each word
             g = sns.barplot(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
+                #hue=xai_methods_per_word,
+                #width=0.8
             )
 
             sns.despine(left=True, bottom=True)
@@ -412,17 +467,17 @@ def create_xai_sentence_html_plots(
             
             # GPT4-generated code
             g.set_xticklabels([])
-            for bar, label in zip(g.patches, xai_methods_per_word):
-                height = bar.get_height()
-                g.text(
-                    bar.get_x()
-                    + bar.get_width() / 2,  # X position is the center of the bar
-                    height + 0.04,  # Y position is at the top of the bar
-                    label,  # The text to display
-                    ha='center',  # Center the text horizontally
-                    va='bottom',  # Position the text above the bar
-                    rotation=90,
-                )
+            # for bar, label in zip(g.patches, xai_methods_per_word):
+            #     height = bar.get_height()
+            #     g.text(
+            #         bar.get_x()
+            #         + bar.get_width() / 2,  # X position is the center of the bar
+            #         height + 0.04,  # Y position is at the top of the bar
+            #         label,  # The text to display (name of XAI method)
+            #         ha='center',  # Center the text horizontally
+            #         va='bottom',  # Position the text above the bar
+            #         rotation=90,
+            #     )
 
             plt.yticks(np.arange(0, 1.1, 0.1))
             folder_path = join(base_output_dir, 'xai_attributions_per_word')
@@ -431,6 +486,7 @@ def create_xai_sentence_html_plots(
                 folder_path, f'{str(word_idx)}_attributions_word_{sentence[word]}.png'
             )
             image_paths.append(file_path)
+
             plt.savefig(file_path, dpi=300)
             plt.close()
 
@@ -450,6 +506,13 @@ def create_xai_sentence_html_plots(
                     justify-content: flex-start;
                     align-items: center;
                 }
+                .legend-plot{
+                    display: flex; /* Use flexbox to center the content */
+                    justify-content: left; /* Center horizontally */
+                    align-items: left; /* Center vertically */
+
+                    margin-top: 20px; /* Add some space above the vertical image row */
+                }
                 .image-box {
                     margin-right: -15px; /* Adjust spacing between image-text blocks */
                 }
@@ -466,6 +529,11 @@ def create_xai_sentence_html_plots(
                 .highlight {
                     background-color: lightgrey; /* Highlight color */
                     border-radius: 0px;
+                }
+                .legend-plot img {
+                    max-width: 800px; /* Adjust max width as needed */
+                    max-height: 800px; /* Adjust max height for vertical image */
+                    object-fit: contain;
                 }
             </style>
         </head>
@@ -488,11 +556,19 @@ def create_xai_sentence_html_plots(
             else:
                 print(f"Warning: Image {img_path} not found.")
 
-        html_content += '''
-            </div> <!-- Closing image-container -->
-        </body>
-        </html>
-        '''
+        if exists(file_path_legend_plot):
+            html_content += f'''
+                </div> <!-- Closing image-container -->
+
+                <!-- New container for the vertical image -->
+                <div class="legend-plot">
+                    <img src="{file_path_legend_plot}" alt="Legend Plot">
+                </div>
+            </body>
+            </html>
+            '''
+        else:
+           print(f"Warning: Image {file_path_legend_plot} not found.") 
 
         file_path = join(base_output_dir, 'xai_sentence_html_plot.html')
         with open(file_path, 'w') as file:
