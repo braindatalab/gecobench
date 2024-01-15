@@ -391,7 +391,7 @@ def create_xai_sentence_html_plots(
         word_idx = 0
 
         image_paths = []
-        for word, counter in enumerate(range(len(sentence))):
+        for word in range(len(sentence)):
             attribution_scores_per_word = []
             xai_methods_per_word = []
 
