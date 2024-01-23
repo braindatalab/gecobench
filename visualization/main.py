@@ -655,10 +655,8 @@ def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     file_path = join(xai_dir, config['xai']['xai_records'])
     paths_to_xai_records = load_pickle(file_path=file_path)
-    # Temporary fix for running locally
-    paths_to_xai_records = [s.strip('/mnt/') for s in paths_to_xai_records]
     data_list = list()
-    for p in tqdm(paths_to_xai_records[:10]):
+    for p in tqdm(paths_to_xai_records):
         results = load_pickle(file_path=p)
         for xai_records in results:
             data_list += [asdict(xai_records)]
