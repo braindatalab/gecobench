@@ -407,30 +407,31 @@ def create_xai_sentence_html_plots(
             file_path_legend_plot = join(
                 folder_path, f'plot_legend.png'
             )
-            
+
             h = sns.barplot(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
                 hue=xai_methods_per_word,
                 #width=0.8
             )
-        
-            # GPT4-generated code
-            h.legend(loc='center')
-            # Extract the legend's handles and labels
-            handles, labels = h.get_legend_handles_labels()
+
+            # GPT4-generated code to create legend of barplot and save it as a figure used in the final plot
+            # Previous approach: handles, labels = h.get_legend_handles_labels() with 
+            # ax_legend.legend(handles, labels,...) stopped working
+            
+            # Get the unique colors of the bars
+            colors = [p.get_facecolor() for p in h.patches]
+            # Create custom legend
+            legend_patches = [plt.Rectangle((0,0),1,1, facecolor=colors[i]) for i in range(len(xai_methods_per_word))]
+            
             # Create a new figure for the legend
-            fig_legend = plt.figure(figsize=(3, 2))
+            fig_legend = plt.figure(figsize=(3,3))
             ax_legend = fig_legend.add_subplot(111)
-            # Draw the legend on the new figure using the handles and labels
-            ax_legend.legend(handles, labels, loc='center', ncol=len(labels), frameon=False)
-            ax_legend.axis('off')
-            fig_legend.canvas.draw()
-            # Save the legend as a separate image
+            ax_legend.legend(handles=legend_patches, labels=xai_methods_per_word, loc='center', ncol=len(legend_patches), frameon=False)
+            ax_legend.axis('off')  # Hide the axes
+            # Save the legend as a figure
             fig_legend.savefig(file_path_legend_plot, bbox_inches='tight', dpi=300)
-            # Close the figures to free memory
             plt.close(fig_legend)
-            plt.close()
 
             # GPT4-generated code to remove the white borders around legend image
             # Makes border handling with the respect to the whole html file easier and
@@ -457,7 +458,7 @@ def create_xai_sentence_html_plots(
             g = sns.barplot(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
-                #hue=xai_methods_per_word,
+                hue=xai_methods_per_word,
                 #width=0.8
             )
 
