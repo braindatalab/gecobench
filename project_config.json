@@ -7,25 +7,54 @@
   },
   "data": {
     "output_dir": "data",
-    "raw_data": {
-      "train_all": "data/training_df_all.pkl",
-      "train_subject": "data/training_df_subj.pkl",
-      "test_female_all": "data/df_validation_female_all.pkl",
-      "test_female_subject": "data/df_validation_female_subj.pkl",
-      "test_male_all": "data/df_validation_male_all.pkl",
-      "test_male_subject": "data/df_validation_male_subj.pkl",
-      "ground_truth_all": "data/gt_all_val.pkl",
-      "ground_truth_subject": "data/gt_subj_val.pkl"
-    },
-    "output_filenames": {
-      "train_all": "training_all.pkl",
-      "train_subject": "training_subject.pkl",
-      "test_female_all": "test_female_all.pkl",
-      "test_female_subject": "test_female_subject.pkl",
-      "test_male_all": "test_male_all.pkl",
-      "test_male_subject": "test_male_subject.pkl",
-      "test_all": "test_all.pkl",
-      "test_subject": "test_subject.pkl"
+    "datasets": {
+      "gender": {
+        "raw_data": {
+          "train_all": "data/training_df_all.pkl",
+          "train_subject": "data/training_df_subj.pkl",
+          "test_female_all": "data/df_validation_female_all.pkl",
+          "test_female_subject": "data/df_validation_female_subj.pkl",
+          "test_male_all": "data/df_validation_male_all.pkl",
+          "test_male_subject": "data/df_validation_male_subj.pkl",
+          "ground_truth_all": "data/gt_all_val.pkl",
+          "ground_truth_subject": "data/gt_subj_val.pkl"
+        },
+        "output_filenames": {
+          "train_all": "training_all.pkl",
+          "train_subject": "training_subject.pkl",
+          "test_female_all": "test_female_all.pkl",
+          "test_female_subject": "test_female_subject.pkl",
+          "test_male_all": "test_male_all.pkl",
+          "test_male_subject": "test_male_subject.pkl",
+          "test_all": "test_all.pkl",
+          "test_subject": "test_subject.pkl"
+        }
+      },
+      "sentiment_twitter": {
+        "kaggle": {
+          "user": "jp797498e",
+          "name": "twitter-entity-sentiment-analysis"
+        },
+        "raw_data": {
+          "train": "twitter_training.csv",
+          "test": "twitter_validation.csv"
+        }
+      },
+      "sentiment_imdb": {
+        "kaggle": {
+          "user": "yasserh",
+          "name": "imdb-movie-ratings-sentiment-analysis"
+        },
+        "raw_data": {
+          "raw_data": {
+            "all": "movie.csv"
+          },
+          "output_filenames": {
+            "train": "imdb_train.csv",
+            "test": "imdb_test.csv"
+          }
+        }
+      }
     }
   },
   "training": {
