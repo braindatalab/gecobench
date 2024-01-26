@@ -8,29 +8,38 @@
   "data": {
     "output_dir": "data",
     "datasets": {
-      "gender": {
+      "gender_all": {
+        "num_labels": 2,
         "raw_data": {
-          "train_all": "data/training_df_all.pkl",
-          "train_subject": "data/training_df_subj.pkl",
-          "test_female_all": "data/df_validation_female_all.pkl",
-          "test_female_subject": "data/df_validation_female_subj.pkl",
-          "test_male_all": "data/df_validation_male_all.pkl",
-          "test_male_subject": "data/df_validation_male_subj.pkl",
-          "ground_truth_all": "data/gt_all_val.pkl",
-          "ground_truth_subject": "data/gt_subj_val.pkl"
+          "train": "data/training_df_all.pkl",
+          "test_female": "data/df_validation_female_all.pkl",
+          "test_male": "data/df_validation_male_all.pkl",
+          "ground_truth": "data/gt_all_val.pkl"
         },
         "output_filenames": {
-          "train_all": "training_all.pkl",
-          "train_subject": "training_subject.pkl",
-          "test_female_all": "test_female_all.pkl",
-          "test_female_subject": "test_female_subject.pkl",
-          "test_male_all": "test_male_all.pkl",
-          "test_male_subject": "test_male_subject.pkl",
-          "test_all": "test_all.pkl",
-          "test_subject": "test_subject.pkl"
+          "train": "training_all.pkl",
+          "test_female": "test_female_all.pkl",
+          "test_male": "test_male_all.pkl",
+          "test": "test_all.pkl"
+        }
+      },
+      "gender_subj": {
+        "num_labels": 2,
+        "raw_data": {
+          "train": "data/training_df_subj.pkl",
+          "test_female": "data/df_validation_female_subj.pkl",
+          "test_male": "data/df_validation_male_subj.pkl",
+          "ground_truth": "data/gt_subj_val.pkl"
+        },
+        "output_filenames": {
+          "train": "training_subject.pkl",
+          "test_female": "test_female_subject.pkl",
+          "test_male": "test_male_subject.pkl",
+          "test": "test_subject.pkl"
         }
       },
       "sentiment_twitter": {
+        "num_labels": 3,
         "kaggle": {
           "user": "jp797498e",
           "name": "twitter-entity-sentiment-analysis"
@@ -41,6 +50,7 @@
         }
       },
       "sentiment_imdb": {
+        "num_labels": 2,
         "test_split": 0.2,
         "kaggle": {
           "user": "yasserh",
@@ -61,6 +71,11 @@
     "device": "cuda",
     "training_records": "training_records.pkl",
     "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
+    "datasets": [
+      "gender",
+      "sentiment_twitter",
+      "sentiment_imdb"
+    ],
     "models": {
       "bert_randomly_init_embedding_classification": {
         "batch_size": 32,

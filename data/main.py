@@ -9,12 +9,13 @@ from utils import (
     dump_as_json_file,
 )
 
-from .handler.gender import prepare_gender_data
+from .handler.gender import prepare_gender_all_data, prepare_gender_subj_data
 from .handler.sentiment_twitter import prepare_twitter_sentiment_data
 from .handler.sentiment_imdb import prepare_imdb_sentiment_data
 
 HANDLERS = {
-    "gender": prepare_gender_data,
+    "gender_all": prepare_gender_all_data,
+    "gender_subj": prepare_gender_subj_data,
     "sentiment_twitter": prepare_twitter_sentiment_data,
     "sentiment_imdb": prepare_imdb_sentiment_data,
 }

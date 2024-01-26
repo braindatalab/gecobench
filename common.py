@@ -13,7 +13,8 @@ DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
 
 
 class DatasetsKeys(Enum):
-    gender = "gender"
+    gender_all = "gender_all"
+    gender_subj = "gender_subj"
     sentiment_twitter = "sentiment_twitter"
     sentiment_imdb = "sentiment_imdb"
 
