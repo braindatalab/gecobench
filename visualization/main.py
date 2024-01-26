@@ -664,8 +664,18 @@ def load_xai_records(config: dict) -> list:
     return data_list
 
 
+def get_correctly_classified_records(records: list) -> list:
+    result = list()
+    for r in records:
+        if 0 == r['correct_classified_intersection']:
+            continue
+        result.append(deepcopy(r))
+    return result
+
+
 def create_xai_plots(base_output_dir: str, config: dict) -> None:
     xai_records = load_xai_records(config=config)
+    filtered_xai_records = get_correctly_classified_records(records=xai_records)
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
         sentence_html_plot=create_xai_sentence_html_plots,
@@ -682,7 +692,13 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
         )
         if v is None:
             continue
-        data = create_dataset_for_xai_plot(plot_type=plot_type, xai_records=xai_records)
+        if 'sentence_html_plot' == plot_type:
+            base_output_dir = join(
+                config['visualization']['absolute_dir_to_project'], base_output_dir
+            )
+        data = create_dataset_for_xai_plot(
+            plot_type=plot_type, xai_records=filtered_xai_records
+        )
         v(data, plot_type, base_output_dir)
 
 
