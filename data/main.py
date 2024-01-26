@@ -11,11 +11,12 @@ from utils import (
 
 from .handler.gender import prepare_gender_data
 from .handler.sentiment_twitter import prepare_twitter_sentiment_data
+from .handler.sentiment_imdb import prepare_imdb_sentiment_data
 
 HANDLERS = {
     "gender": prepare_gender_data,
     "sentiment_twitter": prepare_twitter_sentiment_data,
-    "sentiment_imdb": prepare_twitter_sentiment_data,
+    "sentiment_imdb": prepare_imdb_sentiment_data,
 }
 
 
@@ -34,7 +35,7 @@ def main(config: Dict) -> None:
     # Build every dataset specified in config
     datasets = config["data"]["datasets"].keys()
     for dataset in datasets:
-        HANDLERS[dataset](config=config, output_dir=data_output_dir)
+        HANDLERS[dataset](config=config, data_output_dir=data_output_dir)
 
     dump_as_json_file(
         data=config, file_path=join(data_output_dir, NAME_OF_PROJECT_CONFIG)

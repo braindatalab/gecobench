@@ -35,24 +35,20 @@
           "user": "jp797498e",
           "name": "twitter-entity-sentiment-analysis"
         },
-        "raw_data": {
+        "output_filenames": {
           "train": "twitter_training.csv",
-          "test": "twitter_validation.csv"
+          "test": "twitter_test.csv"
         }
       },
       "sentiment_imdb": {
+        "test_split": 0.2,
         "kaggle": {
           "user": "yasserh",
           "name": "imdb-movie-ratings-sentiment-analysis"
         },
-        "raw_data": {
-          "raw_data": {
-            "all": "movie.csv"
-          },
-          "output_filenames": {
-            "train": "imdb_train.csv",
-            "test": "imdb_test.csv"
-          }
+        "output_filenames": {
+          "train": "imdb_train.csv",
+          "test": "imdb_test.csv"
         }
       }
     }

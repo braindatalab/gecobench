@@ -1,6 +1,5 @@
 from typing import Dict, List, Tuple
 import string
-from copy import deepcopy
 from os.path import join
 
 import pandas as pd
@@ -9,7 +8,7 @@ from utils import (
     load_pickle,
     dump_as_pickle,
 )
-from common import NAME_OF_PROJECT_CONFIG, DataTargetPair
+from common import DataTargetPair, DatasetsKeys
 
 SPACE = ' '
 JOIN_STRING = ''
@@ -56,8 +55,8 @@ def adjust_data_format(data: pd.DataFrame) -> Tuple:
     return output_data
 
 
-def preprocess_training_datasets(config: Dict, output_dir: str) -> None:
-    for data_name, file_path in config['data']['raw_data'].items():
+def preprocess_training_datasets(dataset_config: Dict, output_dir: str) -> None:
+    for data_name, file_path in dataset_config['raw_data'].items():
         if 'train' not in data_name:
             continue
         dataframe = load_pickle(file_path=file_path)
@@ -65,7 +64,7 @@ def preprocess_training_datasets(config: Dict, output_dir: str) -> None:
         dump_as_pickle(
             data=output_data,
             output_dir=output_dir,
-            filename=config['data']['output_filenames'][data_name],
+            filename=dataset_config['output_filenames'][data_name],
         )
 
 
@@ -89,9 +88,9 @@ def reformat_columns(data: pd.DataFrame) -> pd.DataFrame:
     return tmp
 
 
-def preprocess_test_datasets(config: Dict, output_dir: str) -> list:
+def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
     paths = list()
-    for data_name, file_path in config['data']['raw_data'].items():
+    for data_name, file_path in dataset_config['raw_data'].items():
         if 'train' in data_name or 'ground_truth' in data_name:
             continue
         data_type = determine_data_type(name=data_name)
@@ -99,20 +98,23 @@ def preprocess_test_datasets(config: Dict, output_dir: str) -> list:
         word_list = assemble_list_of_words(data=dataframe.drop(['target'], axis=1))
         dataframe['sentence'] = word_list
         ground_truth = load_pickle(
-            file_path=config['data']['raw_data'][f'ground_truth_{data_type}']
+            file_path=dataset_config['raw_data'][f'ground_truth_{data_type}']
         )
         ground_truth = reformat_columns(data=ground_truth)
         ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
         dataframe['ground_truth'] = ground_truth_list
 
-        filename = config['data']['output_filenames'][data_name]
+        filename = dataset_config['output_filenames'][data_name]
         paths += [join(output_dir, filename)]
         dump_as_pickle(data=dataframe, output_dir=output_dir, filename=filename)
 
     return paths
 
 
-def stack_and_dump_female_and_male_datasets(paths: list[str], config: dict) -> None:
+def stack_and_dump_female_and_male_datasets(
+    dataset_config: dict,
+    paths: list[str],
+) -> None:
     female_male_all = list()
     female_male_subject = list()
 
@@ -138,16 +140,24 @@ def stack_and_dump_female_and_male_datasets(paths: list[str], config: dict) -> N
     dump_as_pickle(
         data=data_all,
         output_dir=output_dir,
-        filename=config['data']['output_filenames']['test_all'],
+        filename=dataset_config['output_filenames']['test_all'],
     )
     dump_as_pickle(
         data=data_subject,
         output_dir=output_dir,
-        filename=config['data']['output_filenames']['test_subject'],
+        filename=dataset_config['output_filenames']['test_subject'],
     )
 
 
 def prepare_gender_data(config: Dict, data_output_dir: str):
-    preprocess_training_datasets(config=config, output_dir=data_output_dir)
-    output_paths = preprocess_test_datasets(config=config, output_dir=data_output_dir)
-    stack_and_dump_female_and_male_datasets(paths=output_paths, config=config)
+    dataset_config = config['data']['datasets'][DatasetsKeys.gender.value]
+    dataset_output_dir = join(data_output_dir, DatasetsKeys.gender.value)
+    preprocess_training_datasets(
+        dataset_config=dataset_config, output_dir=dataset_output_dir
+    )
+    output_paths = preprocess_test_datasets(
+        dataset_config=dataset_config, output_dir=dataset_output_dir
+    )
+    stack_and_dump_female_and_male_datasets(
+        dataset_config=dataset_config, paths=output_paths
+    )

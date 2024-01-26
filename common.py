@@ -1,5 +1,6 @@
 from collections import namedtuple
 from dataclasses import dataclass, field
+from enum import Enum
 
 NAME_OF_PROJECT_CONFIG = 'project_config.json'
 CLUSTER_PLATFORM_NAME = '#102-Ubuntu'
@@ -9,6 +10,12 @@ DATASET_SUBJECT = 'subject'
 
 DataTargetPair = namedtuple('DataTargetPair', 'data target')
 DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
+
+
+class DatasetsKeys(Enum):
+    gender = "gender"
+    sentiment_twitter = "sentiment_twitter"
+    sentiment_imdb = "sentiment_imdb"
 
 
 # XAIResult = namedtuple(

@@ -1,35 +1,38 @@
 from typing import Dict
 import os
 import pandas as pd
-import numpy as np
+from os.path import join
 from data.utils.kaggle import download_kaggle
+from sklearn.model_selection import train_test_split
+
+from common import DatasetsKeys
+
+RAW_ALL = "movie.csv"
 
 
-def create_train_val_datasets(config: dict, split: float):
-    df = pd.read_csv(os.path.join(self.data_dir, "movie.csv"))
+def prepare_imdb_sentiment_data(config: Dict, data_output_dir: str):
+    ds_config = config["data"]["datasets"][DatasetsKeys.sentiment_imdb.value]
+    dataset_output_dir = join(data_output_dir, DatasetsKeys.sentiment_imdb.value)
+
+    download_kaggle(
+        dataset_output_dir=dataset_output_dir,
+        ds_config=ds_config["kaggle"],
+    )
+
+    df = pd.read_csv(join(dataset_output_dir, RAW_ALL))
 
     # Drop nan values
     df = df.dropna()
 
-    # Shuffle
-    idxs = np.arange(len(df))
-    idxs = np.random.permutation(idxs)
-    train_idxs = idxs[: int(len(idxs) * split)]
-    val_idxs = idxs[int(len(idxs) * split) :]
+    # Create train and test datasets
 
-    train_df = df.iloc[train_idxs]
-    val_df = df.iloc[val_idxs]
-
-    # Save to csv
-    train_df.to_csv(self.train_df_path, index=False)
-    val_df.to_csv(self.val_df_path, index=False)
-
-
-def prepare_imdb_sentiment_data(config: Dict, data_output_dir: str):
-    ds_config = config["data"]["datasets"]["sentiment_twitter"]
-
-    download_data_dir = download_kaggle(
-        data_output_dir=data_output_dir,
-        dataset_subdir="sentiment_imdb",
-        ds_config=ds_config["kaggle"],
+    train, test = train_test_split(
+        df, test_size=ds_config["test_split"], random_state=config["general"]["seed"]
     )
+
+    # Save datasets
+    train.to_csv(join(dataset_output_dir, ds_config["output_filenames"]["train"]))
+    test.to_csv(join(dataset_output_dir, ds_config["output_filenames"]["test"]))
+
+    # Remove raw data
+    os.remove(join(dataset_output_dir, RAW_ALL))
