@@ -12,7 +12,7 @@ DataTargetPair = namedtuple('DataTargetPair', 'data target')
 DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
 
 
-class DatasetsKeys(Enum):
+class DatasetKeys(Enum):
     gender_all = "gender_all"
     gender_subj = "gender_subj"
     sentiment_twitter = "sentiment_twitter"

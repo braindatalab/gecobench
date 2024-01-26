@@ -2,7 +2,7 @@ from copy import deepcopy
 from os.path import join
 from typing import Dict
 
-from common import NAME_OF_PROJECT_CONFIG, DataTargetPair
+from common import NAME_OF_PROJECT_CONFIG, DatasetKeys
 from utils import (
     append_date,
     generate_data_dir,
@@ -14,10 +14,10 @@ from .handler.sentiment_twitter import prepare_twitter_sentiment_data
 from .handler.sentiment_imdb import prepare_imdb_sentiment_data
 
 HANDLERS = {
-    "gender_all": prepare_gender_all_data,
-    "gender_subj": prepare_gender_subj_data,
-    "sentiment_twitter": prepare_twitter_sentiment_data,
-    "sentiment_imdb": prepare_imdb_sentiment_data,
+    DatasetKeys.gender_all.value: prepare_gender_all_data,
+    DatasetKeys.gender_subj.value: prepare_gender_subj_data,
+    DatasetKeys.sentiment_twitter.value: prepare_twitter_sentiment_data,
+    DatasetKeys.sentiment_imdb.value: prepare_imdb_sentiment_data,
 }
 
 

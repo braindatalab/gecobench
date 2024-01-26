@@ -8,7 +8,7 @@ from utils import (
     load_pickle,
     dump_as_pickle,
 )
-from common import DataTargetPair, DatasetsKeys
+from common import DataTargetPair, DatasetKeys
 
 SPACE = ' '
 JOIN_STRING = ''
@@ -148,7 +148,7 @@ def prepare_gender_all_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
         config=config,
         data_output_dir=data_output_dir,
-        dataset_key=DatasetsKeys.gender_all.value,
+        dataset_key=DatasetKeys.gender_all.value,
     )
 
 
@@ -156,5 +156,5 @@ def prepare_gender_subj_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
         config=config,
         data_output_dir=data_output_dir,
-        dataset_key=DatasetsKeys.gender_subj.value,
+        dataset_key=DatasetKeys.gender_subj.value,
     )

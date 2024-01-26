@@ -45,8 +45,8 @@
           "name": "twitter-entity-sentiment-analysis"
         },
         "output_filenames": {
-          "train": "twitter_training.csv",
-          "test": "twitter_test.csv"
+          "train": "training.csv",
+          "test": "test.csv"
         }
       },
       "sentiment_imdb": {
@@ -57,8 +57,8 @@
           "name": "imdb-movie-ratings-sentiment-analysis"
         },
         "output_filenames": {
-          "train": "imdb_train.csv",
-          "test": "imdb_test.csv"
+          "train": "train.csv",
+          "test": "test.csv"
         }
       }
     }
@@ -72,9 +72,8 @@
     "training_records": "training_records.pkl",
     "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
     "datasets": [
-      "gender",
-      "sentiment_twitter",
-      "sentiment_imdb"
+      "gender_all",
+      "gender_subj"
     ],
     "models": {
       "bert_randomly_init_embedding_classification": {
