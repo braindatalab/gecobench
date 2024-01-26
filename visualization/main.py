@@ -373,6 +373,8 @@ def create_xai_sentence_html_plots(
     data: DataFrameGroupBy, plot_type: str, base_output_dir: str
 ) -> None:
 
+    # TODO: Two type of functions? One for models and for one model only?
+
     # # islice for selecting a specific sample
     # for i, dataframe in islice(data, 1000, None):
     #     #print(dataframe)
@@ -792,25 +794,55 @@ def create_xai_sentence_html_plots(
         <div class="image-container">
     '''
 
+    # pre_trained_models = ['bert_all', 'bert_only_embedding_classification', 'bert_only_classification', 'bert_only_embedding']
+
+    model01 = ["&nbsp;" for _ in range(len(sentences_w_ground_truths))]
+    model01[0] = "(a) Layers: All"
+    model02 = ["&nbsp; &nbsp;" for _ in range(len(sentences_w_ground_truths))]
+    model02[0] = "(b) Layers: EmdC"
+    model03 = ["&nbsp; &nbsp;" for _ in range(len(sentences_w_ground_truths))]
+    model03[0] = "(c) Layers: C"
+    model04 = ["&nbsp; &nbsp;" for _ in range(len(sentences_w_ground_truths))]
+    model04[0] = "(d) Layers: Emd"
+
+    image_model_captions_zipped = zip(model01, model02, model03, model04)
+    image_model_captions_zipped = [list(group) for group in image_model_captions_zipped]
+    print(image_model_captions_zipped)
+
     model_image_paths_zipped = [list(group) for group in zip(*model_image_paths)]
-    for index, (img_path, (text, highlight)) in enumerate(zip(model_image_paths_zipped, sentences_w_ground_truths)):
+    for index, (model_name_caption, img_path, (text, highlight)) in enumerate(zip(image_model_captions_zipped, model_image_paths_zipped, sentences_w_ground_truths)):
         if exists(img_path[0]) and exists(img_path[1] and exists(img_path[2]) and exists(img_path[3])):
+            print(index)
+            print(model_name_caption)
             highlight_class = 'highlight' if highlight else ''
             html_content += f'''
             <div class="image-box">
                 <div class="image-model-one">
                     <img src="{img_path[0]}" alt="Image">
                 </div>
+                <div class="image-text {highlight_class}">{text}</div>
+                <div class="image-text">{model_name_caption[0]}</div>
+
+                
                 <div class="image-model-two">
                     <img src="{img_path[1]}" alt="Image">
                 </div>
+                <div class="image-text {highlight_class}">{text}</div>
+                <div class="image-text">{model_name_caption[1]}</div>
+                
+                
                 <div class="image-model-three">
                     <img src="{img_path[2]}" alt="Image">
                 </div>
+                <div class="image-text {highlight_class}">{text}</div>
+                <div class="image-text">{model_name_caption[2]}</div>
+                
+                
                 <div class="image-model-fourth">
                     <img src="{img_path[3]}" alt="Image">
                 </div>
                 <div class="image-text {highlight_class}">{text}</div>
+                <div class="image-text">{model_name_caption[3]}</div>
             </div>
             '''
         else:
