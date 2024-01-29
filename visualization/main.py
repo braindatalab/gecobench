@@ -372,242 +372,12 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
 def create_xai_sentence_html_plots(
     data: DataFrameGroupBy, plot_type: str, base_output_dir: str
 ) -> None:
-
-    # TODO: Two type of functions? One for models and for one model only?
-
-    # # islice for selecting a specific sample
-    # for i, dataframe in islice(data, 1000, None):
-    #     #print(dataframe)
-    #     #print(dataframe['sentence'])
-
-    #     sentence = ast.literal_eval(dataframe['sentence'].iloc[0])
-    #     xai_methods_per_sentence = dataframe['attribution_method']
-    #     attribution_scores_per_sentence = dataframe['attribution']
-    #     ground_truth_per_sentence = dataframe['ground_truth']
-
-    #     # sanity check
-    #     assert len(sentence) == len(attribution_scores_per_sentence[:6].iloc[0])
-
-    #     # pick one model (model repition number)
-    #     model_repetition_number = dataframe['model_repetition_number'].iloc[0]
-    #     model_name = dataframe['model_name'].iloc[0]
-    #     attribution_scores_per_sentence = attribution_scores_per_sentence[:6]
-    #     xai_methods_per_sentence = xai_methods_per_sentence[:6]
-    #     ground_truth_per_sentence = ground_truth_per_sentence[:6].iloc[0]
-
-    #     # Unique sample
-    #     # print(sentence)
-    #     # print(attribution_scores_per_sentence)
-    #     # print(model_repetition_number)
-    #     # print(model_name)
-
-    #     sentences_w_ground_truths = list(zip(sentence, ground_truth_per_sentence))
-    #     word_idx = 0
-
-    #     image_paths = []
-    #     for word in range(len(sentence)):
-    #         attribution_scores_per_word = []
-    #         xai_methods_per_word = []
-
-    #         for method in range(len(attribution_scores_per_sentence)):
-    #             attribution_scores_per_word.append(
-    #                 attribution_scores_per_sentence.iloc[method][word]
-    #             )
-    #             xai_methods_per_word.append(xai_methods_per_sentence.iloc[method])
-
-    #         # Save only plot legend as separte figure to be appended in HTML file at the bottom
-    #         folder_path = join(base_output_dir, 'xai_attributions_per_word')
-    #         Path(folder_path).mkdir(parents=True, exist_ok=True)
-    #         file_path_legend_plot = join(
-    #             folder_path, f'plot_legend.png'
-    #         )
-
-    #         h = sns.barplot(
-    #             x=xai_methods_per_word,
-    #             y=attribution_scores_per_word,
-    #             hue=xai_methods_per_word,
-    #             #width=0.8
-    #         )
-
-    #         # GPT4-generated code to create legend of barplot and save it as a figure used in the final plot
-    #         # Previous approach: handles, labels = h.get_legend_handles_labels() with 
-    #         # ax_legend.legend(handles, labels,...) stopped working
-            
-    #         # Get the unique colors of the bars
-    #         colors = [p.get_facecolor() for p in h.patches]
-    #         # Create custom legend
-    #         legend_patches = [plt.Rectangle((0,0),1,1, facecolor=colors[i]) for i in range(len(xai_methods_per_word))]
-            
-    #         # Create a new figure for the legend
-    #         fig_legend = plt.figure(figsize=(3,3))
-    #         ax_legend = fig_legend.add_subplot(111)
-    #         ax_legend.legend(handles=legend_patches, labels=xai_methods_per_word, loc='center', ncol=len(legend_patches), frameon=False)
-    #         ax_legend.axis('off')  # Hide the axes
-    #         # Save the legend as a figure
-    #         fig_legend.savefig(file_path_legend_plot, bbox_inches='tight', dpi=300)
-    #         plt.close(fig_legend)
-
-    #         # GPT4-generated code to remove the white borders around legend image
-    #         # Makes border handling with the respect to the whole html file easier and
-    #         # Ensures a tighter layout
-    #         from PIL import Image
-    #         def trim_whitespace(image_path):
-    #             with Image.open(image_path) as img:
-    #                 # Convert to a NumPy array for image processing
-    #                 img_array = np.array(img)
-    #                 # Find non-white pixels
-    #                 non_white_pix = np.where(img_array < 255)
-    #                 # Get the bounding box of non-white pixels
-    #                 bbox = [np.min(non_white_pix[1]), np.min(non_white_pix[0]), 
-    #                         np.max(non_white_pix[1]), np.max(non_white_pix[0])]
-    #                 # Crop the image according to the bounding box
-    #                 trimmed_img = img.crop(bbox)
-    #                 # Save the trimmed image
-    #                 trimmed_img.save(file_path_legend_plot)
-
-    #         # Call the function to trim whitespace
-    #         trim_whitespace(file_path_legend_plot)
-
-    #         # Barplots for each word
-    #         g = sns.barplot(
-    #             x=xai_methods_per_word,
-    #             y=attribution_scores_per_word,
-    #             hue=xai_methods_per_word,
-    #             #width=0.8
-    #         )
-
-    #         sns.despine(left=True, bottom=True)
-    #         g.set_yticklabels([])
-    #         g.tick_params(left=False)
-            
-    #         # GPT4-generated code
-    #         g.set_xticklabels([])
-    #         # for bar, label in zip(g.patches, xai_methods_per_word):
-    #         #     height = bar.get_height()
-    #         #     g.text(
-    #         #         bar.get_x()
-    #         #         + bar.get_width() / 2,  # X position is the center of the bar
-    #         #         height + 0.04,  # Y position is at the top of the bar
-    #         #         label,  # The text to display (name of XAI method)
-    #         #         ha='center',  # Center the text horizontally
-    #         #         va='bottom',  # Position the text above the bar
-    #         #         rotation=90,
-    #         #     )
-
-    #         plt.yticks(np.arange(0, 1.1, 0.1))
-    #         folder_path = join(base_output_dir, 'xai_attributions_per_word')
-    #         Path(folder_path).mkdir(parents=True, exist_ok=True)
-    #         file_path = join(
-    #             folder_path, f'{str(word_idx)}_attributions_word_{sentence[word]}.png'
-    #         )
-    #         image_paths.append(file_path)
-
-    #         plt.savefig(file_path, dpi=300)
-    #         plt.close()
-
-    #         word_idx += 1
-
-    #     # GPT4-generated code
-    #     html_content = '''
-    #     <!DOCTYPE html>
-    #     <html lang="en">
-    #     <head>
-    #         <meta charset="UTF-8">
-    #         <title>Concatenated Images</title>
-    #         <style>
-    #             .image-container{
-    #                 display: inline-flex;
-    #                 flex-direction: row;
-    #                 justify-content: flex-start;
-    #                 align-items: center;
-    #             }
-    #             .legend-plot{
-    #                 display: flex; /* Use flexbox to center the content */
-    #                 justify-content: left; /* Center horizontally */
-    #                 align-items: left; /* Center vertically */
-    #                 margin-top: 20px; /* Add some space above the vertical image row */
-    #             }
-    #             .image-box {
-    #                 margin-right: -15px; /* Adjust spacing between image-text blocks */
-    #             }
-    #             .image-box img {
-    #                 max-width: 120px; /* Set a maximum width for each image */
-    #                 max-height: 120px; /* Set a maximum height for each image */
-    #                 object-fit: contain; /* Ensure the aspect ratio of images is maintained */
-    #                 display: block; /* Makes the image a block-level element */
-    #                 margin-bottom: 0px; /* Spacing between image and text */
-    #             }
-    #             .image-one img{
-    #                 max-width: 120px; /* Set a maximum width for each image */
-    #                 max-height: 120px; /* Set a maximum height for each image */
-    #                 object-fit: contain; /* Ensure the aspect ratio of images is maintained */
-    #                 display: block; /* Makes the image a block-level element */
-    #                 margin-bottom: 0px; /* Spacing between image and text */
-    #             }
-    #             .image-text {
-    #                 text-align: center; /* Center-aligns the text below the image */
-    #             }
-    #             .highlight {
-    #                 background-color: lightgrey; /* Highlight color */
-    #                 border-radius: 0px;
-    #             }
-    #             .legend-plot img {
-    #                 max-width: 800px; /* Adjust max width as needed */
-    #                 max-height: 800px; /* Adjust max height for vertical image */
-    #                 object-fit: contain;
-    #             }
-    #         </style>
-    #     </head>
-    #     <body>
-    #         <div class="image-container">
-    #     '''
-        
-    #     for img_path, (text, highlight) in zip(image_paths, sentences_w_ground_truths):
-    #         if exists(img_path):
-    #             highlight_class = 'highlight' if highlight else ''
-    #             html_content += f'''
-    #             <div class="image-box">
-    #                 <div class="image-one">
-    #                     <img src="{img_path}" alt="Image">
-    #                 </div>
-    #                  <div class="image-two">
-    #                     <img src="{img_path}" alt="Image">
-    #                 </div>
-    #                 <div class="image-text {highlight_class}">{text}</div>
-    #             </div>
-    #             '''
-    #         else:
-    #             print(f"Warning: Image {img_path} not found.")
-
-    #     if exists(file_path_legend_plot):
-    #         html_content += f'''
-    #             </div> <!-- Closing image-container -->
-
-    #             <!-- New container for the vertical image -->
-    #             <div class="legend-plot">
-    #                 <img src="{file_path_legend_plot}" alt="Legend Plot">
-    #             </div>
-    #         </body>
-    #         </html>
-    #         '''
-    #     else:
-    #        print(f"Warning: Image {file_path_legend_plot} not found.") 
-
-    #     file_path = join(base_output_dir, 'xai_sentence_html_plot.html')
-    #     with open(file_path, 'w') as file:
-    #         file.write(html_content)
-
-    #     break
-
-    # print("")
-
     # Using islice for selecting a specific sentence
     for i, dataframe in islice(data, 4, None):
         sentence = ast.literal_eval(dataframe['sentence'].iloc[0])
         break
 
     # Search for corresponding samples with above properties but from different pre-trained models
-    # TODO: Model types should not be hardcoded
     pre_trained_models = ['bert_all', 'bert_only_embedding_classification', 'bert_only_classification', 'bert_only_embedding']
     df_explanations_sentence_different_models = pd.DataFrame()
     for key, group in data:
@@ -615,8 +385,6 @@ def create_xai_sentence_html_plots(
             for model in pre_trained_models:
                 if row['model_name'] == model and row['model_repetition_number'] == 0 and row['sentence'] == str(sentence):
                     df_explanations_sentence_different_models = df_explanations_sentence_different_models.append(row, ignore_index=True)
-
-    #print(df_explanations_sentence_different_models.head(6))
 
     model_image_paths = []
     for model in pre_trained_models:
@@ -629,7 +397,6 @@ def create_xai_sentence_html_plots(
         sentences_w_ground_truths = list(zip(sentence, ground_truth_per_sentence))
 
         word_idx = 0
-
         image_paths = []
         for word in range(len(sentence)):
             attribution_scores_per_word = []
@@ -641,8 +408,6 @@ def create_xai_sentence_html_plots(
                 )
                 xai_methods_per_word.append(xai_methods_per_sentence.iloc[method])
 
-
-            # TODO: Make that a separate function
             # Save only plot legend as separte figure to be appended in HTML file at the bottom
             folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
             Path(folder_path).mkdir(parents=True, exist_ok=True)
@@ -696,7 +461,6 @@ def create_xai_sentence_html_plots(
             # Call the function to trim whitespace
             trim_whitespace(file_path_legend_plot)
             
-
             # Barplots for each word
             g = sns.barplot(
                 x=xai_methods_per_word,
@@ -738,8 +502,6 @@ def create_xai_sentence_html_plots(
             word_idx += 1
         model_image_paths.append(image_paths)
     
-    #print(model_image_paths[0])
-
     # GPT4-generated code
     html_content = '''
     <!DOCTYPE html>
@@ -796,9 +558,7 @@ def create_xai_sentence_html_plots(
     <body>
         <div class="image-container">
     '''
-
-    # pre_trained_models = ['bert_all', 'bert_only_embedding_classification', 'bert_only_classification', 'bert_only_embedding']
-
+    
     model01 = ["" for _ in range(len(sentences_w_ground_truths))]
     model01[0] = "All "
     model02 = ["" for _ in range(len(sentences_w_ground_truths))]
@@ -887,7 +647,6 @@ def create_xai_sentence_html_plots(
     if exists(file_path_legend_plot):
         html_content += f'''
             </div> <!-- Closing image-container -->
-
             <!-- New container for the vertical image -->
             <div class="legend-plot">
                 <img src="{file_path_legend_plot}" alt="Legend Plot">
@@ -898,7 +657,7 @@ def create_xai_sentence_html_plots(
     else:
         print(f"Warning: Image {file_path_legend_plot} not found.") 
 
-    file_path = join(base_output_dir, 'MODELS_xai_sentence_html_plot.html')
+    file_path = join(base_output_dir, 'models_xai_sentence_html_plot.html')
     with open(file_path, 'w') as file:
         file.write(html_content)
 
