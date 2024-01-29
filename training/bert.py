@@ -271,14 +271,18 @@ def train_model(
     return [(dataset_name, output_params, model_path, history_path)]
 
 
+def get_bert_tokenizer(config: dict) -> BertTokenizer:
+    return BertTokenizer.from_pretrained(
+        pretrained_model_name_or_path='bert-base-uncased',
+        revision=config['training']['bert_revision'],
+    )
+
+
 def train_bert(
     dataset: DataSet, dataset_name: str, params: Dict, config: Dict
 ) -> List[Tuple]:
     output = list()
-    bert_tokenizer = BertTokenizer.from_pretrained(
-        pretrained_model_name_or_path='bert-base-uncased',
-        revision=config['training']['bert_revision'],
-    )
+    bert_tokenizer = get_bert_tokenizer(config=config)
     bert_ids_train = create_bert_ids(data=dataset.x_train, tokenizer=bert_tokenizer)
     bert_ids_val = create_bert_ids(data=dataset.x_test, tokenizer=bert_tokenizer)
     train_data = create_tensor_dataset(

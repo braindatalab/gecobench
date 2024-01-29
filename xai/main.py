@@ -16,6 +16,7 @@ from training.bert import (
     create_tensor_dataset,
     create_bert_ids,
     get_bert_ids,
+    get_bert_tokenizer,
 )
 from utils import (
     generate_training_dir,
@@ -107,13 +108,6 @@ def create_xai_results(
             )
         ]
     return results
-
-
-def get_bert_tokenizer(config: dict) -> BertTokenizer:
-    return BertTokenizer.from_pretrained(
-        pretrained_model_name_or_path='bert-base-uncased',
-        revision=config['training']['bert_revision'],
-    )
 
 
 def map_bert_attributions_to_original_tokens(
