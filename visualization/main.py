@@ -748,7 +748,7 @@ def create_xai_sentence_html_plots(
         <title>Concatenated Images</title>
         <style>
             .image-container{
-                display: inline-flex;
+                display: flex;
                 flex-direction: row;
                 justify-content: flex-start;
                 align-items: center;
@@ -769,13 +769,6 @@ def create_xai_sentence_html_plots(
                 display: block; /* Makes the image a block-level element */
                 margin-bottom: 0px; /* Spacing between image and text */
             }
-            .image-one img{
-                max-width: 120px; /* Set a maximum width for each image */
-                max-height: 120px; /* Set a maximum height for each image */
-                object-fit: contain; /* Ensure the aspect ratio of images is maintained */
-                display: block; /* Makes the image a block-level element */
-                margin-bottom: 0px; /* Spacing between image and text */
-            }
             .image-text {
                 text-align: center; /* Center-aligns the text below the image */
             }
@@ -788,6 +781,18 @@ def create_xai_sentence_html_plots(
                 max-height: 800px; /* Adjust max height for vertical image */
                 object-fit: contain;
             }
+            .image-with-caption {
+                display: flex;
+                align-items: center; /* Vertically center the flex items */
+            }
+            .text-container {
+                width: 50px; /* Fixed width for the text container */
+                text-align: right; /* Align text to the right */
+                margin-right: 5px; /* Consistent margin to the right of the text */
+            }
+            .image-model-one {
+                /* Your existing styles for .image-model-one */
+            }
         </style>
     </head>
     <body>
@@ -796,14 +801,14 @@ def create_xai_sentence_html_plots(
 
     # pre_trained_models = ['bert_all', 'bert_only_embedding_classification', 'bert_only_classification', 'bert_only_embedding']
 
-    model01 = ["&nbsp;" for _ in range(len(sentences_w_ground_truths))]
-    model01[0] = "(a) Layers: All"
-    model02 = ["&nbsp; &nbsp;" for _ in range(len(sentences_w_ground_truths))]
-    model02[0] = "(b) Layers: EmdC"
-    model03 = ["&nbsp; &nbsp;" for _ in range(len(sentences_w_ground_truths))]
-    model03[0] = "(c) Layers: C"
-    model04 = ["&nbsp; &nbsp;" for _ in range(len(sentences_w_ground_truths))]
-    model04[0] = "(d) Layers: Emd"
+    model01 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model01[0] = "All "
+    model02 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model02[0] = "EmdC"
+    model03 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model03[0] = "C   "
+    model04 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model04[0] = "Emd "
 
     image_model_captions_zipped = zip(model01, model02, model03, model04)
     image_model_captions_zipped = [list(group) for group in image_model_captions_zipped]
@@ -814,37 +819,70 @@ def create_xai_sentence_html_plots(
         if exists(img_path[0]) and exists(img_path[1] and exists(img_path[2]) and exists(img_path[3])):
             print(index)
             print(model_name_caption)
-            highlight_class = 'highlight' if highlight else ''
-            html_content += f'''
-            <div class="image-box">
-                <div class="image-model-one">
-                    <img src="{img_path[0]}" alt="Image">
-                </div>
-                <div class="image-text {highlight_class}">{text}</div>
-                <div class="image-text">{model_name_caption[0]}</div>
+            
+            if index == 0:
+                highlight_class = 'highlight' if highlight else ''
+                html_content += f'''
+                <div class="image-box">
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[0]}</div>
+                            <div class="image-model-one">
+                                <img src="{img_path[0]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[1]}</div>
+                            <div class="image-model-two">
+                                <img src="{img_path[1]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
+                                    
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[2]}</div>
+                            <div class="image-model-two">
+                                <img src="{img_path[2]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
 
-                
-                <div class="image-model-two">
-                    <img src="{img_path[1]}" alt="Image">
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[3]}</div>
+                            <div class="image-model-two">
+                                <img src="{img_path[3]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="image-text {highlight_class}">{text}</div>
-                <div class="image-text">{model_name_caption[1]}</div>
+                '''
                 
-                
-                <div class="image-model-three">
-                    <img src="{img_path[2]}" alt="Image">
+            else:
+                highlight_class = 'highlight' if highlight else ''
+                html_content += f'''
+                <div class="image-box">
+                    <div class="image-model-one">
+                        <img src="{img_path[0]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
+
+                    <div class="image-model-two">
+                        <img src="{img_path[1]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
+                                    
+                    <div class="image-model-three">
+                        <img src="{img_path[2]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
+                                    
+                    <div class="image-model-fourth">
+                        <img src="{img_path[3]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
                 </div>
-                <div class="image-text {highlight_class}">{text}</div>
-                <div class="image-text">{model_name_caption[2]}</div>
-                
-                
-                <div class="image-model-fourth">
-                    <img src="{img_path[3]}" alt="Image">
-                </div>
-                <div class="image-text {highlight_class}">{text}</div>
-                <div class="image-text">{model_name_caption[3]}</div>
-            </div>
-            '''
+                '''
         else:
             print(f"Warning: Image Path not found.")
 
