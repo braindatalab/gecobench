@@ -731,6 +731,7 @@ def create_xai_sentence_html_plots(
             )
             image_paths.append(file_path)
 
+            plt.tight_layout()
             plt.savefig(file_path, dpi=300)
             plt.close()
 
@@ -760,7 +761,7 @@ def create_xai_sentence_html_plots(
                 margin-top: 20px; /* Add some space above the vertical image row */
             }
             .image-box {
-                margin-right: -15px; /* Adjust spacing between image-text blocks */
+                margin-right: -5px; /* Adjust spacing between image-text blocks */
             }
             .image-box img {
                 max-width: 120px; /* Set a maximum width for each image */
@@ -789,9 +790,6 @@ def create_xai_sentence_html_plots(
                 width: 50px; /* Fixed width for the text container */
                 text-align: right; /* Align text to the right */
                 margin-right: 5px; /* Consistent margin to the right of the text */
-            }
-            .image-model-one {
-                /* Your existing styles for .image-model-one */
             }
         </style>
     </head>
