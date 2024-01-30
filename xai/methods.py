@@ -98,7 +98,7 @@ def get_captum_attributions(
                 target=target,
             )
 
-        attributions[method_name] = normalize_attributions(a=a.detach().numpy())
+        attributions[method_name] = normalize_attributions(a=a.detach().cpu().numpy())
 
     return attributions
 

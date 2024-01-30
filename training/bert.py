@@ -5,16 +5,17 @@ from typing import Tuple, Dict, List, Any
 
 import torch
 from loguru import logger
+from tqdm import tqdm
 from torch import Tensor
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
 from transformers import BertForSequenceClassification, BertTokenizer
+import wandb
 
 from common import DataSet
 from utils import (
     set_random_states,
-    create_train_val_split,
     generate_training_dir,
     dump_as_pickle,
 )
@@ -25,63 +26,115 @@ BERT_SEPARATION = '[SEP]'
 NUM_SPECIAL_BERT_TOKENS = 2
 
 
-def train_epoch(
-    model: BertForSequenceClassification,
-    data_loader: DataLoader,
-    loss: CrossEntropyLoss,
-    optimizer: torch.optim.Optimizer,
-    device: str,
-) -> Tuple:
-    train_loss, train_acc = 0.0, 0
+class Trainer:
+    def __init__(
+        self,
+        config: Dict,
+        model: BertForSequenceClassification,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        loss: CrossEntropyLoss,
+        optimizer: torch.optim.Optimizer,
+        device: str,
+    ):
+        self.config = config
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.loss = loss
+        self.optimizer = optimizer
+        self.device = device
+        self.logger_enabled = "wandb" in self.config['general']
 
-    for step, batch in enumerate(data_loader):
-        input_ids = batch[0].to(torch.long).to(device)
-        attention_mask = batch[1].to(device)
-        labels = batch[2].to(torch.long).to(device)
+    def log_dict(self, log_dict):
+        if self.logger_enabled:
+            wandb.log(log_dict)
 
-        output = model(input_ids, token_type_ids=None, attention_mask=attention_mask)
-        logits = output.logits
-        l = loss(logits, labels)
+    def log_val(self, step):
+        if (
+            self.logger_enabled
+            and step % self.config['general']['wandb']['validate_every_n_steps'] == 0
+            and step > 0
+        ):
+            val_loss, val_acc = self.validate_epoch()
+            self.log_dict(
+                {
+                    'val_loss': val_loss,
+                    'val_acc': val_acc,
+                }
+            )
 
-        l.backward()
-        optimizer.step()
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(), 1.0
-        )  # for exploding gradients
+    def train_epoch(self) -> Tuple:
+        train_loss, train_acc = 0.0, 0
 
-        train_loss += l.item()
-        scores, predictions = torch.max(logits, 1)
-        train_acc += torch.sum(
-            (predictions == labels), dtype=torch.float
-        ).item() / float(labels.shape[0])
+        bar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
+        for step, batch in bar:
+            input_ids = batch[0].to(torch.long).to(self.device)
+            attention_mask = batch[1].to(self.device)
+            labels = batch[2].to(torch.long).to(self.device)
 
-    return train_loss, train_acc
+            output = self.model(
+                input_ids, token_type_ids=None, attention_mask=attention_mask
+            )
+            logits = output.logits
+            l = self.loss(logits, labels)
 
+            l.backward()
+            self.optimizer.step()
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), 1.0
+            )  # for exploding gradients
 
-def validate_epoch(
-    model: BertForSequenceClassification,
-    data_loader: DataLoader,
-    loss: CrossEntropyLoss,
-    device: str,
-) -> Tuple:
-    val, val_correct = 0.0, 0
-    model.eval()
-    for step, batch in enumerate(data_loader):
-        input_ids = batch[0].to(torch.long).to(device)
-        attention_mask = batch[1].to(device)
-        lables = batch[2].to(torch.long).to(device)
+            train_loss += l.item()
+            scores, predictions = torch.max(logits, 1)
+            train_acc += torch.sum(
+                (predictions == labels), dtype=torch.float
+            ).item() / float(labels.shape[0])
 
-        output = model(input_ids, token_type_ids=None, attention_mask=attention_mask)
-        logits = output.logits
-        l = loss(logits, lables)
+            self.log_dict(
+                {
+                    'train_loss': train_loss,
+                    'train_acc': train_acc,
+                }
+            )
 
-        val += l.item()
-        scores, predictions = torch.max(logits, 1)
-        val_correct += torch.sum(
-            (predictions == lables), dtype=torch.float
-        ).item() / float(lables.shape[0])
+            # Validate every n steps, as specified in the config
+            self.log_val(step)
 
-    return val, val_correct
+            bar.set_description(
+                f"Train Loss:{train_loss / float(step + 1):.2f}, "
+                f"Train Acc:{train_acc / float(step + 1):.2f}"
+            )
+
+        return train_loss, train_acc
+
+    def validate_epoch(self) -> Tuple:
+        val, val_correct = 0.0, 0
+        self.model.eval()
+        bar = tqdm(enumerate(self.val_loader), total=len(self.val_loader))
+        for step, batch in bar:
+            input_ids = batch[0].to(torch.long).to(self.device)
+            attention_mask = batch[1].to(self.device)
+            lables = batch[2].to(torch.long).to(self.device)
+
+            output = self.model(
+                input_ids, token_type_ids=None, attention_mask=attention_mask
+            )
+            logits = output.logits
+            l = self.loss(logits, lables)
+
+            val += l.item()
+            scores, predictions = torch.max(logits, 1)
+            val_correct += torch.sum(
+                (predictions == lables), dtype=torch.float
+            ).item() / float(lables.shape[0])
+
+            bar.set_description(
+                f"Val Loss:{val / float(step + 1):.2f}, "
+                f"Val Acc:{val_correct / float(step + 1):.2f}"
+            )
+
+        return val, val_correct
 
 
 def get_bert_ids(tokenizer: BertTokenizer, token: str) -> Tensor:
@@ -164,7 +217,7 @@ def dump_history(history: Dict, output_dir: str, history_name: str) -> str:
 
 def create_bert_ids(data: List, tokenizer: BertTokenizer) -> List:
     bert_ids = list()
-    for k, sentence in enumerate(data):
+    for k, sentence in tqdm(enumerate(data), total=len(data)):
         bert_ids += [
             create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
         ]
@@ -199,13 +252,21 @@ def train_model(
         'val_acc': list(),
     }
 
+    if "wandb" in config['general']:
+        wandb.init(
+            project=config['general']['wandb']['project'],
+            entity=config['general']['wandb']['entity'],
+            name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
+            config=config,
+        )
+
     num_epochs = training_params['epochs']
     learning_rate = training_params['learning_rate']
 
     model = BertForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path="bert-base-uncased",
         revision=config['training']['bert_revision'],
-        num_labels=2,  # binary classification
+        num_labels=config["data"]["datasets"][dataset_name]["num_labels"],
         output_attentions=False,
         output_hidden_states=False,
     )
@@ -225,21 +286,20 @@ def train_model(
     if 'bert_randomly_init_embedding_classification' == training_params['model_name']:
         model.apply(initialize_embedding)
 
+    trainer = Trainer(
+        config=config,
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        loss=loss,
+        optimizer=optimizer,
+        device=config['training']['device'],
+    )
     lowest_loss_so_far = 1e7
     for epoch in range(num_epochs):
-        train_loss, train_acc = train_epoch(
-            model=model,
-            data_loader=train_loader,
-            loss=loss,
-            optimizer=optimizer,
-            device=config['training']['device'],
-        )
-        val_loss, val_acc = validate_epoch(
-            model=model,
-            data_loader=val_loader,
-            loss=loss,
-            device=config['training']['device'],
-        )
+        train_loss, train_acc = trainer.train_epoch()
+        val_loss, val_acc = trainer.validate_epoch()
+
         training_history['train_loss'] += [train_loss / float(len(train_loader))]
         training_history['train_acc'] += [train_acc / float(len(train_loader))]
         training_history['val_loss'] += [val_loss / float(len(val_loader))]
@@ -251,6 +311,15 @@ def train_model(
             f"AVG Val Loss:{training_history['val_loss'][-1]:.2f}, "
             f"AVG Training Acc {training_history['train_acc'][-1]:.2f}, "
             f"AVG Val Acc {training_history['val_acc'][-1]:.2f}"
+        )
+
+        trainer.log_dict(
+            {
+                'train_loss': training_history['train_loss'][-1],
+                'val_loss': training_history['val_loss'][-1],
+                'train_acc': training_history['train_acc'][-1],
+                'val_acc': training_history['val_acc'][-1],
+            }
         )
 
         if lowest_loss_so_far > val_loss:
@@ -275,12 +344,15 @@ def train_bert(
     dataset: DataSet, dataset_name: str, params: Dict, config: Dict
 ) -> List[Tuple]:
     output = list()
+    logger.info(f'Loading BERT tokenizer')
     bert_tokenizer = BertTokenizer.from_pretrained(
         pretrained_model_name_or_path='bert-base-uncased',
         revision=config['training']['bert_revision'],
     )
+    logger.info(f'Creating BERT ids')
     bert_ids_train = create_bert_ids(data=dataset.x_train, tokenizer=bert_tokenizer)
     bert_ids_val = create_bert_ids(data=dataset.x_test, tokenizer=bert_tokenizer)
+    logger.info(f'Creating BERT datasets')
     train_data = create_tensor_dataset(
         data=bert_ids_train, target=dataset.y_train, tokenizer=bert_tokenizer
     )
@@ -288,8 +360,11 @@ def train_bert(
         data=bert_ids_val, target=dataset.y_test, tokenizer=bert_tokenizer
     )
 
+    logger.info(f'Creating BERT data loaders')
     train_loader = DataLoader(train_data, shuffle=True, batch_size=params['batch_size'])
     val_loader = DataLoader(val_data, shuffle=True, batch_size=params['batch_size'])
+
+    logger.info(f'Begin training BERT model')
     for k in range(config['training']['num_training_repetitions']):
         output += train_model(
             config=config,

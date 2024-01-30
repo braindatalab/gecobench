@@ -1,6 +1,6 @@
 from typing import Dict
 from os.path import join
-import shutil
+import os
 import pandas as pd
 from data.utils.kaggle import download_kaggle
 from common import DatasetKeys
@@ -48,5 +48,5 @@ def prepare_twitter_sentiment_data(config: Dict, data_output_dir: str):
     )
 
     # Remove raw data
-    shutil.rmtree(join(dataset_output_dir, RAW_TRAIN))
-    shutil.rmtree(join(dataset_output_dir, RAW_TEST))
+    os.remove(join(dataset_output_dir, RAW_TRAIN))
+    os.remove(join(dataset_output_dir, RAW_TEST))

@@ -19,6 +19,11 @@ class DatasetKeys(Enum):
     sentiment_imdb = "sentiment_imdb"
 
 
+def validate_dataset_key(dataset_key: str):
+    if dataset_key not in DatasetKeys.__members__:
+        raise ValueError(f'Invalid dataset key: {dataset_key}')
+
+
 # XAIResult = namedtuple(
 #     'XAIResult',
 #     'model_name dataset_name sentence target '
