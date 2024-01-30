@@ -81,7 +81,7 @@
     ],
     "models": {
       "bert_randomly_init_embedding_classification": {
-        "batch_size": 32,
+        "batch_size": 16,
         "epochs": 4,
         "learning_rate": 0.0001,
         "model_name": "bert_randomly_init_embedding_classification",
@@ -92,7 +92,7 @@
         ]
       },
       "bert_only_classification": {
-        "batch_size": 32,
+        "batch_size": 16,
         "epochs": 4,
         "learning_rate": 0.0001,
         "model_name": "bert_only_classification",
@@ -102,7 +102,7 @@
         ]
       },
       "bert_only_embedding_classification": {
-        "batch_size": 32,
+        "batch_size": 16,
         "epochs": 4,
         "learning_rate": 0.0001,
         "model_name": "bert_only_embedding_classification",
@@ -113,7 +113,7 @@
         ]
       },
       "bert_all": {
-        "batch_size": 32,
+        "batch_size": 16,
         "epochs": 4,
         "learning_rate": 0.0001,
         "model_name": "bert_all",
@@ -121,7 +121,7 @@
         "layers_to_train": []
       },
       "bert_only_embedding": {
-        "batch_size": 32,
+        "batch_size": 16,
         "epochs": 4,
         "learning_rate": 0.0001,
         "model_name": "bert_only_embedding",
