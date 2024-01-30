@@ -76,8 +76,8 @@ class Trainer:
             val_loss, val_acc = self.validate_epoch()
             self.log_dict(
                 {
-                    'val_loss': val_loss,
-                    'val_acc': val_acc,
+                    'val_loss': val_loss / len(self.val_loader),
+                    'val_acc': val_acc / len(self.val_loader),
                 }
             )
 

@@ -17,4 +17,4 @@ export WORKDIR=$1/$2 # e.g. /home/space/uniml/rick/xai-nlp-benchmark-2024-01-01-
 cd $WORKDIR
 ls -l
 apptainer build --fakeroot --force $WORKDIR/nlp-apptainerfile.sif nlp-apptainerfile.def
-apptainer run --nv --bind $DATADIR:/mnt --bind $WORKDIR:/workdir $WORKDIR/nlp-apptainerfile.sif "$3" "$4"
+apptainer run --env "WANDB_API_KEY=$WANDB_API_KEY" --nv --bind $DATADIR:/mnt --bind $WORKDIR:/workdir $WORKDIR/nlp-apptainerfile.sif "$3" "$4"
