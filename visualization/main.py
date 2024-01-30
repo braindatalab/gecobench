@@ -570,14 +570,10 @@ def create_xai_sentence_html_plots(
 
     image_model_captions_zipped = zip(model01, model02, model03, model04)
     image_model_captions_zipped = [list(group) for group in image_model_captions_zipped]
-    print(image_model_captions_zipped)
 
     model_image_paths_zipped = [list(group) for group in zip(*model_image_paths)]
     for index, (model_name_caption, img_path, (text, highlight)) in enumerate(zip(image_model_captions_zipped, model_image_paths_zipped, sentences_w_ground_truths)):
-        if exists(img_path[0]) and exists(img_path[1] and exists(img_path[2]) and exists(img_path[3])):
-            print(index)
-            print(model_name_caption)
-            
+        if exists(img_path[0]) and exists(img_path[1] and exists(img_path[2]) and exists(img_path[3])):            
             if index == 0:
                 highlight_class = 'highlight' if highlight else ''
                 html_content += f'''
@@ -615,7 +611,6 @@ def create_xai_sentence_html_plots(
                     </div>
                 </div>
                 '''
-                
             else:
                 highlight_class = 'highlight' if highlight else ''
                 html_content += f'''
@@ -742,10 +737,8 @@ def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     file_path = join(xai_dir, config['xai']['xai_records'])
     paths_to_xai_records = load_pickle(file_path=file_path)
-    # Temporary fix for running locally
-    paths_to_xai_records = [s.strip('/mnt/') for s in paths_to_xai_records]
     data_list = list()
-    for p in tqdm(paths_to_xai_records[:40]):
+    for p in tqdm(paths_to_xai_records):
         results = load_pickle(file_path=p)
         for xai_records in results:
             data_list += [asdict(xai_records)]
