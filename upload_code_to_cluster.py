@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import subprocess
 import tarfile
@@ -7,17 +6,30 @@ from os.path import basename, join
 from time import sleep
 from paramiko.client import SSHClient
 
+from dotenv import load_dotenv
+
 from utils import append_date
+
+load_dotenv()
+
+hydra_base_dir = os.environ.get('HYDRA_BASE_DIR') or '/home/space/uniml/rick'
+hpc_base_dir = os.environ.get('HPC_BASE_DIR') or '/home/users/r/rick'
+known_hosts_path = os.environ.get('KNOWN_HOSTS') or '/home/rick/.ssh/known_hosts'
+user_name = os.environ.get('HYDRA_SSH_USER') or 'rick'
+
+print("User name: ", user_name)
 
 CLUSTER_NAMES = ['hydra', 'hpc']
 CLUSTER_DOMAINS = dict(hydra='hydra.ml.tu-berlin.de', hpc='gateway.hpc.tu-berlin.de')
+CLUSTER_BASE_DIRS = dict(hydra=hydra_base_dir, hpc=hpc_base_dir)
 
-CLUSTER_BASE_DIRS = dict(hydra='/home/space/uniml/rick', hpc='/home/users/r/rick')
+ignore_list = [".pkl", "artifacts", ".git", ".venv", ".env", "__pycache__", "wandb"]
 
 
 def create_tarfile(source_dir: str, output_filename: str) -> None:
     def filter_function(tarinfo):
-        if '.pkl' in tarinfo.name or 'artifacts' in tarinfo.name:
+        print(tarinfo.name)
+        if any([ignore in tarinfo.name for ignore in ignore_list]):
             return None
         else:
             return tarinfo
@@ -26,9 +38,7 @@ def create_tarfile(source_dir: str, output_filename: str) -> None:
         tar.add(name=source_dir, arcname=basename(source_dir), filter=filter_function)
 
 
-def copy_file_to_cluster(
-    cluster_name: str, source_path: str, target_path: str, user_name: str = 'rick'
-) -> None:
+def copy_file_to_cluster(cluster_name: str, source_path: str, target_path: str) -> None:
     command = ['scp', source_path, f'{user_name}@{cluster_name}:{target_path}']
     _ = subprocess.run(command, stdout=subprocess.PIPE)
 
@@ -45,8 +55,8 @@ def pause_script(seconds: int):
 
 def get_ssh_connection_to_cluster(cluster_name: str) -> SSHClient:
     client = SSHClient()
-    client.load_host_keys(filename='/home/rick/.ssh/known_hosts')
-    client.connect(CLUSTER_DOMAINS[cluster_name])
+    client.load_host_keys(filename=known_hosts_path)
+    client.connect(CLUSTER_DOMAINS[cluster_name], username=user_name)
     return client
 
 
