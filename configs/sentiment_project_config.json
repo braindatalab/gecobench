@@ -3,7 +3,12 @@
     "seed": 43532791,
     "apptainer_data_dir": "/mnt",
     "base_dir": "artifacts",
-    "data_scenario": "nlp-benchmark"
+    "data_scenario": "nlp-benchmark",
+    "wandb": {
+      "project": "xai-nlp-benchmark-gender",
+      "entity": "venondev",
+      "validate_every_n_steps": 300
+    }
   },
   "data": {
     "output_dir": "data",
@@ -136,6 +141,7 @@
       "gender_all",
       "gender_subj"
     ],
+    "num_workers": 4,
     "class_of_interest": 1,
     "methods": [
       "Saliency",

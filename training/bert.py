@@ -36,6 +36,7 @@ class Trainer:
         loss: CrossEntropyLoss,
         optimizer: torch.optim.Optimizer,
         device: str,
+        run_name: str,
     ):
         self.config = config
         self.model = model
@@ -45,6 +46,22 @@ class Trainer:
         self.optimizer = optimizer
         self.device = device
         self.logger_enabled = "wandb" in self.config['general']
+        self.run_name = run_name
+
+        self.init_logger()
+
+    def init_logger(self):
+        if self.logger_enabled:
+            wandb.init(
+                project=self.config['general']['wandb']['project'],
+                entity=self.config['general']['wandb']['entity'],
+                name=self.run_name,
+                config=self.config,
+            )
+
+    def finish_run(self):
+        if self.logger_enabled:
+            wandb.finish()
 
     def log_dict(self, log_dict):
         if self.logger_enabled:
@@ -87,14 +104,16 @@ class Trainer:
 
             train_loss += l.item()
             scores, predictions = torch.max(logits, 1)
-            train_acc += torch.sum(
+            batch_train_acc = torch.sum(
                 (predictions == labels), dtype=torch.float
             ).item() / float(labels.shape[0])
 
+            train_acc += batch_train_acc
+
             self.log_dict(
                 {
-                    'train_loss': train_loss,
-                    'train_acc': train_acc,
+                    'train_loss': l.item(),
+                    'train_acc': batch_train_acc,
                 }
             )
 
@@ -252,14 +271,6 @@ def train_model(
         'val_acc': list(),
     }
 
-    if "wandb" in config['general']:
-        wandb.init(
-            project=config['general']['wandb']['project'],
-            entity=config['general']['wandb']['entity'],
-            name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
-            config=config,
-        )
-
     num_epochs = training_params['epochs']
     learning_rate = training_params['learning_rate']
 
@@ -294,6 +305,7 @@ def train_model(
         loss=loss,
         optimizer=optimizer,
         device=config['training']['device'],
+        run_name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
     )
     lowest_loss_so_far = 1e7
     for epoch in range(num_epochs):
@@ -337,6 +349,9 @@ def train_model(
             )
     output_params = deepcopy(training_params)
     output_params['repetition'] = idx
+
+    trainer.finish_run()
+
     return [(dataset_name, output_params, model_path, history_path)]
 
 
