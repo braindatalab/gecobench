@@ -461,12 +461,15 @@ def create_xai_sentence_html_plots(
             # Call the function to trim whitespace
             trim_whitespace(file_path_legend_plot)
             
+            # Set the size of the figure (width, height)
+            plt.figure(figsize=(3, 2))
+
             # Barplots for each word
             g = sns.barplot(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
                 hue=xai_methods_per_word,
-                #width=0.8
+                width=0.8
             )
 
             sns.despine(left=True, bottom=True)
@@ -737,8 +740,10 @@ def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     file_path = join(xai_dir, config['xai']['xai_records'])
     paths_to_xai_records = load_pickle(file_path=file_path)
+    # Temporary fix for running locally
+    paths_to_xai_records = [s.strip('/mnt/') for s in paths_to_xai_records]
     data_list = list()
-    for p in tqdm(paths_to_xai_records):
+    for p in tqdm(paths_to_xai_records[:40]):
         results = load_pickle(file_path=p)
         for xai_records in results:
             data_list += [asdict(xai_records)]
