@@ -7,9 +7,9 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --output=logs/xai-nlp-benchmark-job-%j.out
 
-# $1 base_dir e.g. /home/space/uniml/rick
+# $1 root_dir e.g. /home/space/uniml/rick
 # $2 name of the code folder e.g. xai-nlp-benchmark-2024-01-01-01-01-01
-# $3 mode e.g. training, evaluation, xai
+# $3 mode e.g. training, visualization, evaluation, xai
 # $4 config file
 
 export DATADIR=$1/data # e.g. /home/space/uniml/rick/data
