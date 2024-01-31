@@ -539,7 +539,7 @@ def create_xai_sentence_html_plots(
                 text-align: center; /* Center-aligns the text below the image */
             }
             .highlight {
-                background-color: lightgrey; /* Highlight color */
+                background-color: lightgreen; /* Highlight color */
                 border-radius: 0px;
             }
             .legend-plot img {
