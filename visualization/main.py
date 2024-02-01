@@ -372,24 +372,31 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
 def create_xai_sentence_html_plots(
     data: DataFrameGroupBy, plot_type: str, base_output_dir: str
 ) -> None:
-    # islice for selecting a specific sample
+    # Using islice for selecting a specific sentence
     for i, dataframe in islice(data, 4, None):
         sentence = ast.literal_eval(dataframe['sentence'].iloc[0])
-        xai_methods_per_sentence = dataframe['attribution_method']
-        attribution_scores_per_sentence = dataframe['attribution']
-        ground_truth_per_sentence = dataframe['ground_truth']
+        break
 
-        # sanity check
-        assert len(sentence) == len(attribution_scores_per_sentence[:6].iloc[0])
+    # Search for corresponding samples with above properties but from different pre-trained models
+    pre_trained_models = ['bert_all', 'bert_only_embedding_classification', 'bert_only_classification', 'bert_only_embedding']
+    df_explanations_sentence_different_models = pd.DataFrame()
+    for key, group in data:
+        for index, row in group.iterrows():
+            for model in pre_trained_models:
+                if row['model_name'] == model and row['model_repetition_number'] == 0 and row['sentence'] == str(sentence):
+                    df_explanations_sentence_different_models = df_explanations_sentence_different_models.append(row, ignore_index=True)
 
-        # pick one model (model repition number)
-        attribution_scores_per_sentence = attribution_scores_per_sentence[:6]
-        xai_methods_per_sentence = xai_methods_per_sentence[:6]
-        ground_truth_per_sentence = ground_truth_per_sentence[:6].iloc[0]
+    model_image_paths = []
+    for model in pre_trained_models:
+        df_model = df_explanations_sentence_different_models[df_explanations_sentence_different_models['model_name'] == model]
+        sentence = ast.literal_eval(df_model['sentence'].iloc[0])
+        xai_methods_per_sentence = df_model['attribution_method']
+        attribution_scores_per_sentence = df_model['attribution']
+        ground_truth_per_sentence = df_model['ground_truth'].iloc[0]
 
         sentences_w_ground_truths = list(zip(sentence, ground_truth_per_sentence))
-        word_idx = 0
 
+        word_idx = 0
         image_paths = []
         for word in range(len(sentence)):
             attribution_scores_per_word = []
@@ -402,7 +409,7 @@ def create_xai_sentence_html_plots(
                 xai_methods_per_word.append(xai_methods_per_sentence.iloc[method])
 
             # Save only plot legend as separte figure to be appended in HTML file at the bottom
-            folder_path = join(base_output_dir, 'xai_attributions_per_word')
+            folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
             Path(folder_path).mkdir(parents=True, exist_ok=True)
             file_path_legend_plot = join(
                 folder_path, f'plot_legend.png'
@@ -453,13 +460,16 @@ def create_xai_sentence_html_plots(
 
             # Call the function to trim whitespace
             trim_whitespace(file_path_legend_plot)
+            
+            # Set the size of the figure (width, height)
+            plt.figure(figsize=(3, 2))
 
             # Barplots for each word
             g = sns.barplot(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
                 hue=xai_methods_per_word,
-                #width=0.8
+                width=0.8
             )
 
             sns.despine(left=True, bottom=True)
@@ -481,98 +491,173 @@ def create_xai_sentence_html_plots(
             #     )
 
             plt.yticks(np.arange(0, 1.1, 0.1))
-            folder_path = join(base_output_dir, 'xai_attributions_per_word')
+            folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
             Path(folder_path).mkdir(parents=True, exist_ok=True)
             file_path = join(
                 folder_path, f'{str(word_idx)}_attributions_word_{sentence[word]}.png'
             )
             image_paths.append(file_path)
 
+            plt.tight_layout()
             plt.savefig(file_path, dpi=300)
             plt.close()
 
             word_idx += 1
+        model_image_paths.append(image_paths)
+    
+    # GPT4-generated code
+    html_content = '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Concatenated Images</title>
+        <style>
+            .image-container{
+                display: flex;
+                flex-direction: row;
+                justify-content: flex-start;
+                align-items: center;
+            }
+            .legend-plot{
+                display: flex; /* Use flexbox to center the content */
+                justify-content: left; /* Center horizontally */
+                align-items: left; /* Center vertically */
+                margin-top: 20px; /* Add some space above the vertical image row */
+            }
+            .image-box {
+                margin-right: -5px; /* Adjust spacing between image-text blocks */
+            }
+            .image-box img {
+                max-width: 120px; /* Set a maximum width for each image */
+                max-height: 120px; /* Set a maximum height for each image */
+                object-fit: contain; /* Ensure the aspect ratio of images is maintained */
+                display: block; /* Makes the image a block-level element */
+                margin-bottom: 0px; /* Spacing between image and text */
+            }
+            .image-text {
+                text-align: center; /* Center-aligns the text below the image */
+            }
+            .highlight {
+                background-color: lightgreen; /* Highlight color */
+                border-radius: 0px;
+            }
+            .legend-plot img {
+                max-width: 800px; /* Adjust max width as needed */
+                max-height: 800px; /* Adjust max height for vertical image */
+                object-fit: contain;
+            }
+            .image-with-caption {
+                display: flex;
+                align-items: center; /* Vertically center the flex items */
+            }
+            .text-container {
+                width: 50px; /* Fixed width for the text container */
+                text-align: right; /* Align text to the right */
+                margin-right: 5px; /* Consistent margin to the right of the text */
+            }
+        </style>
+    </head>
+    <body>
+        <div class="image-container">
+    '''
+    
+    model01 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model01[0] = "All "
+    model02 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model02[0] = "EmdC"
+    model03 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model03[0] = "C   "
+    model04 = ["" for _ in range(len(sentences_w_ground_truths))]
+    model04[0] = "Emd "
 
-        # GPT4-generated code
-        html_content = '''
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>Concatenated Images</title>
-            <style>
-                .image-container{
-                    display: inline-flex;
-                    flex-direction: row;
-                    justify-content: flex-start;
-                    align-items: center;
-                }
-                .legend-plot{
-                    display: flex; /* Use flexbox to center the content */
-                    justify-content: left; /* Center horizontally */
-                    align-items: left; /* Center vertically */
+    image_model_captions_zipped = zip(model01, model02, model03, model04)
+    image_model_captions_zipped = [list(group) for group in image_model_captions_zipped]
 
-                    margin-top: 20px; /* Add some space above the vertical image row */
-                }
-                .image-box {
-                    margin-right: -15px; /* Adjust spacing between image-text blocks */
-                }
-                .image-box img {
-                    max-width: 120px; /* Set a maximum width for each image */
-                    max-height: 120px; /* Set a maximum height for each image */
-                    object-fit: contain; /* Ensure the aspect ratio of images is maintained */
-                    display: block; /* Makes the image a block-level element */
-                    margin-bottom: 0px; /* Spacing between image and text */
-                }
-                .image-text {
-                    text-align: center; /* Center-aligns the text below the image */
-                }
-                .highlight {
-                    background-color: lightgrey; /* Highlight color */
-                    border-radius: 0px;
-                }
-                .legend-plot img {
-                    max-width: 800px; /* Adjust max width as needed */
-                    max-height: 800px; /* Adjust max height for vertical image */
-                    object-fit: contain;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="image-container">
-        '''
-        
-        for img_path, (text, highlight) in zip(image_paths, sentences_w_ground_truths):
-            if exists(img_path):
+    model_image_paths_zipped = [list(group) for group in zip(*model_image_paths)]
+    for index, (model_name_caption, img_path, (text, highlight)) in enumerate(zip(image_model_captions_zipped, model_image_paths_zipped, sentences_w_ground_truths)):
+        if exists(img_path[0]) and exists(img_path[1] and exists(img_path[2]) and exists(img_path[3])):            
+            if index == 0:
                 highlight_class = 'highlight' if highlight else ''
                 html_content += f'''
                 <div class="image-box">
-                    <img src="{img_path}" alt="Image">
-                    <div class="image-text {highlight_class}">{text}</div>
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[0]}</div>
+                            <div class="image-model-one">
+                                <img src="{img_path[0]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[1]}</div>
+                            <div class="image-model-two">
+                                <img src="{img_path[1]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
+                                    
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[2]}</div>
+                            <div class="image-model-two">
+                                <img src="{img_path[2]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
+
+                    <div class="image-with-caption">
+                        <div class="text-container">{model_name_caption[3]}</div>
+                            <div class="image-model-two">
+                                <img src="{img_path[3]}" alt="Image">
+                            <div class="image-text {highlight_class}">{text}</div>
+                        </div>
+                    </div>
                 </div>
                 '''
             else:
-                print(f"Warning: Image {img_path} not found.")
+                highlight_class = 'highlight' if highlight else ''
+                html_content += f'''
+                <div class="image-box">
+                    <div class="image-model-one">
+                        <img src="{img_path[0]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
 
-        if exists(file_path_legend_plot):
-            html_content += f'''
-                </div> <!-- Closing image-container -->
-
-                <!-- New container for the vertical image -->
-                <div class="legend-plot">
-                    <img src="{file_path_legend_plot}" alt="Legend Plot">
+                    <div class="image-model-two">
+                        <img src="{img_path[1]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
+                                    
+                    <div class="image-model-three">
+                        <img src="{img_path[2]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
+                                    
+                    <div class="image-model-fourth">
+                        <img src="{img_path[3]}" alt="Image">
+                    </div>
+                    <div class="image-text {highlight_class}">{text}</div>
                 </div>
-            </body>
-            </html>
-            '''
+                '''
         else:
-           print(f"Warning: Image {file_path_legend_plot} not found.") 
+            print(f"Warning: Image Path not found.")
 
-        file_path = join(base_output_dir, 'xai_sentence_html_plot.html')
-        with open(file_path, 'w') as file:
-            file.write(html_content)
+    if exists(file_path_legend_plot):
+        html_content += f'''
+            </div> <!-- Closing image-container -->
+            <!-- New container for the vertical image -->
+            <div class="legend-plot">
+                <img src="{file_path_legend_plot}" alt="Legend Plot">
+            </div>
+        </body>
+        </html>
+        '''
+    else:
+        print(f"Warning: Image {file_path_legend_plot} not found.") 
 
-        break
+    file_path = join(base_output_dir, 'models_xai_sentence_html_plot.html')
+    with open(file_path, 'w') as file:
+        file.write(html_content)
 
 
 def create_dataset_for_xai_plot(
