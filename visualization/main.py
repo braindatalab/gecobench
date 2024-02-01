@@ -5,6 +5,7 @@ from pathlib import Path
 from dataclasses import asdict
 from itertools import islice
 import ast
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from pandas.core.groupby.generic import DataFrameGroupBy
+from sklearn.feature_extraction.text import TfidfVectorizer
 
+from training.bert import get_bert_tokenizer, get_bert_ids
 from utils import (
     generate_visualization_dir,
     generate_evaluation_dir,
@@ -21,6 +24,7 @@ from utils import (
     generate_training_dir,
     generate_xai_dir,
     dump_as_pickle,
+    generate_data_dir,
 )
 
 MODEL_NAME_MAP = dict(
@@ -31,6 +35,7 @@ MODEL_NAME_MAP = dict(
     bert_randomly_init_embedding_classification='newly initialized embedding,\nclassification',
 )
 
+DATASET_NAME_MAP = dict(all='$\mathcal{D}_{SO}$', subject='$\mathcal{D}_{S}$')
 
 GENDER = {0.0: 'female', 1.0: 'male'}
 
@@ -404,30 +409,37 @@ def create_xai_sentence_html_plots(
             # Save only plot legend as separte figure to be appended in HTML file at the bottom
             folder_path = join(base_output_dir, 'xai_attributions_per_word')
             Path(folder_path).mkdir(parents=True, exist_ok=True)
-            file_path_legend_plot = join(
-                folder_path, f'plot_legend.png'
-            )
+            file_path_legend_plot = join(folder_path, f'plot_legend.png')
 
             h = sns.barplot(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
                 hue=xai_methods_per_word,
-                #width=0.8
+                # width=0.8
             )
 
             # GPT4-generated code to create legend of barplot and save it as a figure used in the final plot
-            # Previous approach: handles, labels = h.get_legend_handles_labels() with 
+            # Previous approach: handles, labels = h.get_legend_handles_labels() with
             # ax_legend.legend(handles, labels,...) stopped working
-            
+
             # Get the unique colors of the bars
             colors = [p.get_facecolor() for p in h.patches]
             # Create custom legend
-            legend_patches = [plt.Rectangle((0,0),1,1, facecolor=colors[i]) for i in range(len(xai_methods_per_word))]
-            
+            legend_patches = [
+                plt.Rectangle((0, 0), 1, 1, facecolor=colors[i])
+                for i in range(len(xai_methods_per_word))
+            ]
+
             # Create a new figure for the legend
-            fig_legend = plt.figure(figsize=(3,3))
+            fig_legend = plt.figure(figsize=(3, 3))
             ax_legend = fig_legend.add_subplot(111)
-            ax_legend.legend(handles=legend_patches, labels=xai_methods_per_word, loc='center', ncol=len(legend_patches), frameon=False)
+            ax_legend.legend(
+                handles=legend_patches,
+                labels=xai_methods_per_word,
+                loc='center',
+                ncol=len(legend_patches),
+                frameon=False,
+            )
             ax_legend.axis('off')  # Hide the axes
             # Save the legend as a figure
             fig_legend.savefig(file_path_legend_plot, bbox_inches='tight', dpi=300)
@@ -437,6 +449,7 @@ def create_xai_sentence_html_plots(
             # Makes border handling with the respect to the whole html file easier and
             # Ensures a tighter layout
             from PIL import Image
+
             def trim_whitespace(image_path):
                 with Image.open(image_path) as img:
                     # Convert to a NumPy array for image processing
@@ -444,8 +457,12 @@ def create_xai_sentence_html_plots(
                     # Find non-white pixels
                     non_white_pix = np.where(img_array < 255)
                     # Get the bounding box of non-white pixels
-                    bbox = [np.min(non_white_pix[1]), np.min(non_white_pix[0]), 
-                            np.max(non_white_pix[1]), np.max(non_white_pix[0])]
+                    bbox = [
+                        np.min(non_white_pix[1]),
+                        np.min(non_white_pix[0]),
+                        np.max(non_white_pix[1]),
+                        np.max(non_white_pix[0]),
+                    ]
                     # Crop the image according to the bounding box
                     trimmed_img = img.crop(bbox)
                     # Save the trimmed image
@@ -459,13 +476,13 @@ def create_xai_sentence_html_plots(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
                 hue=xai_methods_per_word,
-                #width=0.8
+                # width=0.8
             )
 
             sns.despine(left=True, bottom=True)
             g.set_yticklabels([])
             g.tick_params(left=False)
-            
+
             # GPT4-generated code
             g.set_xticklabels([])
             # for bar, label in zip(g.patches, xai_methods_per_word):
@@ -541,7 +558,7 @@ def create_xai_sentence_html_plots(
         <body>
             <div class="image-container">
         '''
-        
+
         for img_path, (text, highlight) in zip(image_paths, sentences_w_ground_truths):
             if exists(img_path):
                 highlight_class = 'highlight' if highlight else ''
@@ -566,7 +583,7 @@ def create_xai_sentence_html_plots(
             </html>
             '''
         else:
-           print(f"Warning: Image {file_path_legend_plot} not found.") 
+            print(f"Warning: Image {file_path_legend_plot} not found.")
 
         file_path = join(base_output_dir, 'xai_sentence_html_plot.html')
         with open(file_path, 'w') as file:
@@ -702,6 +719,144 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
         v(data, plot_type, base_output_dir)
 
 
+def calculate_correlation_between_words_and_labels(
+    sentences: list, labels: list, mode: str = 'tfidf'
+) -> Tuple[np.ndarray, np.ndarray]:
+    vectorizer = TfidfVectorizer() if 'tfidf' == mode else None
+    x = vectorizer.fit_transform(sentences)
+    y = 2 * np.array(labels) - 1
+    x_binary = (x.todense()).astype(float)
+    xy = np.concatenate((x_binary, y[:, np.newaxis]), axis=1)
+    correlation_xy = np.corrcoef(xy, rowvar=False)[-1, :-1]
+
+    sorted_indices = np.argsort(correlation_xy)
+    sorted_feature_names = np.array(vectorizer.get_feature_names_out())[sorted_indices]
+    sorted_correlations = correlation_xy[sorted_indices]
+
+    return sorted_correlations, sorted_feature_names
+
+
+def plot_correlation_between_words_and_labels(
+    data: dict, plot_type: str, output_dir: str, config: dict
+) -> None:
+    dataset_types = list(data.keys())
+    top_k = 10
+    ranks = np.arange(start=0, stop=top_k, step=1)
+    fig, axs = plt.subplots(
+        nrows=1,
+        ncols=len(dataset_types),
+        sharex=True,
+        sharey=True,
+        # layout='constrained',
+        gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
+        figsize=(4, 2),
+    )
+
+    for k, c in enumerate(dataset_types):
+        df = data[c]
+        sentences = df['sentence'].map(lambda x: ' '.join(map(str, x))).to_list()
+        y = df['target'].to_list()
+        correlations, words = calculate_correlation_between_words_and_labels(
+            sentences=sentences,
+            labels=y,
+            mode='tfidf',
+        )
+
+        for g in ['female', 'male']:
+            if 'female' == g:
+                topk_correlations = np.abs(correlations[:top_k])
+                topk_words = words[:top_k]
+                colors = sns.color_palette('muted', len(topk_words))
+            else:
+                topk_correlations = (-1) * np.abs(correlations[::-1][:top_k])
+                topk_words = words[::-1][:top_k]
+                colors = sns.color_palette('pastel', len(topk_words))
+
+            plot_df = pd.DataFrame(
+                {'correlations': topk_correlations, 'words': topk_words, 'ranks': ranks}
+            )
+
+            g = sns.barplot(
+                data=plot_df,
+                x='correlations',
+                y='ranks',
+                order=ranks,
+                hue='words',
+                orient='y',
+                ax=axs[k],
+                width=0.8,
+                native_scale=False,
+                palette=colors,
+                legend=False,
+            )
+
+            start = 0 if len(topk_words) == len(g.containers) else len(topk_words)
+            for container, word in zip(g.containers[start:], topk_words):
+                g.bar_label(container, labels=[word], fontsize=3)
+            axs[k].legend(
+                loc='lower right',
+                ncols=1,
+                # fontsize='xx-small',
+                prop={'size': 2},
+            )
+
+            for label in axs[k].get_xticklabels() + axs[k].get_yticklabels():
+                label.set_fontsize(4)
+            axs[k].set_box_aspect(1)
+            axs[k].axvline(x=0, color='black', linestyle='-', linewidth=0.5)
+            # axs[k].set_xticks([-1, -0.5, 0], [0, 0.5, 1])
+            axs[k].set_xticks([-1, -0.5, 0, 0.5, 1], [1, 0.5, 0, 0.5, 1])
+            axs[k].set_yticks(ranks, ranks + 1)
+            axs[k].set_xlabel(
+                'Absolute Pearson correlation for male/female', fontsize=4
+            )
+            axs[k].xaxis.set_label_coords(0.5, -0.11)
+            axs[k].set_ylabel('Rank', fontsize=4)
+            axs[k].spines['top'].set_linewidth(0.5)
+            axs[k].spines['right'].set_linewidth(0.5)
+            axs[k].spines['bottom'].set_linewidth(0.5)
+            axs[k].spines['left'].set_linewidth(0.5)
+            axs[k].grid(linewidth=0.1)
+            axs[k].set_title(
+                f'Dataset: {DATASET_NAME_MAP[c]}',
+                fontsize=4,
+            )
+
+    fig.suptitle('Correlation between Tfidf represented words and labels', fontsize=4)
+    file_path = join(output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    # plt.tight_layout()
+    plt.savefig(file_path, dpi=300)
+    plt.close()
+
+
+def create_data_plots(base_output_dir: str, config: dict) -> None:
+    data_dir = generate_data_dir(config=config)
+    filename_all = config['data']['output_filenames']['test_all']
+    filename_subject = config['data']['output_filenames']['test_subject']
+    columns_of_interest = [
+        'sentence',
+        'ground_truth',
+        'target',
+        'gender',
+        'dataset_type',
+    ]
+    dataset_all = load_pickle(file_path=join(data_dir, filename_all))
+    dataset_subject = load_pickle(file_path=join(data_dir, filename_subject))
+    data = dict(all=dataset_all, subject=dataset_subject)
+    visualization_methods = dict(
+        correlation_plot=plot_correlation_between_words_and_labels,
+    )
+
+    plot_types = config['visualization']['visualizations']['data']
+    for plot_type in plot_types:
+        logger.info(f'Type of plot: {plot_type}')
+        v = visualization_methods.get(plot_type, None)
+        if v is None:
+            continue
+        v(data, plot_type, base_output_dir, config)
+
+
 def visualize_results(base_output_dir: str, config: dict) -> None:
     for visualization, _ in config['visualization']['visualizations'].items():
         v = VISUALIZATIONS.get(visualization, None)
@@ -710,10 +865,10 @@ def visualize_results(base_output_dir: str, config: dict) -> None:
 
 
 VISUALIZATIONS = dict(
-    # data=create_data_plots,
+    data=create_data_plots,
     xai=create_xai_plots,
-    # evaluation=create_evaluation_plots,
-    # model=create_model_performance_plots,
+    evaluation=create_evaluation_plots,
+    model=create_model_performance_plots,
 )
 
 
