@@ -33,7 +33,7 @@ MODEL_NAME_MAP = dict(
     bert_randomly_init_embedding_classification='newly initialized embedding,\nclassification',
 )
 
-
+DATASET_NAME_MAP = dict(subject='$\mathcal{D}_{S}$', all='$\mathcal{D}_{SO}$')
 GENDER = {0.0: 'female', 1.0: 'male'}
 
 
@@ -380,17 +380,32 @@ def create_xai_sentence_html_plots(
         break
 
     # Search for corresponding samples with above properties but from different pre-trained models
-    pre_trained_models = ['bert_all', 'bert_only_embedding_classification', 'bert_only_classification', 'bert_only_embedding']
+    pre_trained_models = [
+        'bert_all',
+        'bert_only_embedding_classification',
+        'bert_only_classification',
+        'bert_only_embedding',
+    ]
     df_explanations_sentence_different_models = pd.DataFrame()
     for key, group in data:
         for index, row in group.iterrows():
             for model in pre_trained_models:
-                if row['model_name'] == model and row['model_repetition_number'] == 0 and row['sentence'] == str(sentence):
-                    df_explanations_sentence_different_models = df_explanations_sentence_different_models.append(row, ignore_index=True)
+                if (
+                    row['model_name'] == model
+                    and row['model_repetition_number'] == 0
+                    and row['sentence'] == str(sentence)
+                ):
+                    df_explanations_sentence_different_models = (
+                        df_explanations_sentence_different_models.append(
+                            row, ignore_index=True
+                        )
+                    )
 
     model_image_paths = []
     for model in pre_trained_models:
-        df_model = df_explanations_sentence_different_models[df_explanations_sentence_different_models['model_name'] == model]
+        df_model = df_explanations_sentence_different_models[
+            df_explanations_sentence_different_models['model_name'] == model
+        ]
         sentence = ast.literal_eval(df_model['sentence'].iloc[0])
         xai_methods_per_sentence = df_model['attribution_method']
         attribution_scores_per_sentence = df_model['attribution']
@@ -413,30 +428,37 @@ def create_xai_sentence_html_plots(
             # Save only plot legend as separte figure to be appended in HTML file at the bottom
             folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
             Path(folder_path).mkdir(parents=True, exist_ok=True)
-            file_path_legend_plot = join(
-                folder_path, f'plot_legend.png'
-            )
+            file_path_legend_plot = join(folder_path, f'plot_legend.png')
 
             h = sns.barplot(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
                 hue=xai_methods_per_word,
-                #width=0.8
+                # width=0.8
             )
 
             # GPT4-generated code to create legend of barplot and save it as a figure used in the final plot
-            # Previous approach: handles, labels = h.get_legend_handles_labels() with 
+            # Previous approach: handles, labels = h.get_legend_handles_labels() with
             # ax_legend.legend(handles, labels,...) stopped working
-            
+
             # Get the unique colors of the bars
             colors = [p.get_facecolor() for p in h.patches]
             # Create custom legend
-            legend_patches = [plt.Rectangle((0,0),1,1, facecolor=colors[i]) for i in range(len(xai_methods_per_word))]
-            
+            legend_patches = [
+                plt.Rectangle((0, 0), 1, 1, facecolor=colors[i])
+                for i in range(len(xai_methods_per_word))
+            ]
+
             # Create a new figure for the legend
-            fig_legend = plt.figure(figsize=(3,3))
+            fig_legend = plt.figure(figsize=(3, 3))
             ax_legend = fig_legend.add_subplot(111)
-            ax_legend.legend(handles=legend_patches, labels=xai_methods_per_word, loc='center', ncol=len(legend_patches), frameon=False)
+            ax_legend.legend(
+                handles=legend_patches,
+                labels=xai_methods_per_word,
+                loc='center',
+                ncol=len(legend_patches),
+                frameon=False,
+            )
             ax_legend.axis('off')  # Hide the axes
             # Save the legend as a figure
             fig_legend.savefig(file_path_legend_plot, bbox_inches='tight', dpi=300)
@@ -446,6 +468,7 @@ def create_xai_sentence_html_plots(
             # Makes border handling with the respect to the whole html file easier and
             # Ensures a tighter layout
             from PIL import Image
+
             def trim_whitespace(image_path):
                 with Image.open(image_path) as img:
                     # Convert to a NumPy array for image processing
@@ -453,8 +476,12 @@ def create_xai_sentence_html_plots(
                     # Find non-white pixels
                     non_white_pix = np.where(img_array < 255)
                     # Get the bounding box of non-white pixels
-                    bbox = [np.min(non_white_pix[1]), np.min(non_white_pix[0]), 
-                            np.max(non_white_pix[1]), np.max(non_white_pix[0])]
+                    bbox = [
+                        np.min(non_white_pix[1]),
+                        np.min(non_white_pix[0]),
+                        np.max(non_white_pix[1]),
+                        np.max(non_white_pix[0]),
+                    ]
                     # Crop the image according to the bounding box
                     trimmed_img = img.crop(bbox)
                     # Save the trimmed image
@@ -471,13 +498,13 @@ def create_xai_sentence_html_plots(
                 x=xai_methods_per_word,
                 y=attribution_scores_per_word,
                 hue=xai_methods_per_word,
-                width=0.8
+                width=0.8,
             )
 
             sns.despine(left=True, bottom=True)
             g.set_yticklabels([])
             g.tick_params(left=False)
-            
+
             # GPT4-generated code
             g.set_xticklabels([])
             # for bar, label in zip(g.patches, xai_methods_per_word):
@@ -577,8 +604,16 @@ def create_xai_sentence_html_plots(
     image_model_captions_zipped = [list(group) for group in image_model_captions_zipped]
 
     model_image_paths_zipped = [list(group) for group in zip(*model_image_paths)]
-    for index, (model_name_caption, img_path, (text, highlight)) in enumerate(zip(image_model_captions_zipped, model_image_paths_zipped, sentences_w_ground_truths)):
-        if exists(img_path[0]) and exists(img_path[1] and exists(img_path[2]) and exists(img_path[3])):
+    for index, (model_name_caption, img_path, (text, highlight)) in enumerate(
+        zip(
+            image_model_captions_zipped,
+            model_image_paths_zipped,
+            sentences_w_ground_truths,
+        )
+    ):
+        if exists(img_path[0]) and exists(
+            img_path[1] and exists(img_path[2]) and exists(img_path[3])
+        ):
             if index == 0:
                 highlight_class = 'highlight' if highlight else ''
                 html_content += f'''
