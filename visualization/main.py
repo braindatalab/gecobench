@@ -828,10 +828,9 @@ def calculate_correlation_between_words_and_labels(
     sentences: list, labels: list, mode: str = 'tfidf'
 ) -> Tuple[np.ndarray, np.ndarray]:
     vectorizer = TfidfVectorizer() if 'tfidf' == mode else None
-    x = vectorizer.fit_transform(sentences)
-    y = 2 * np.array(labels) - 1
-    x_binary = (x.todense()).astype(float)
-    xy = np.concatenate((x_binary, y[:, np.newaxis]), axis=1)
+    x = vectorizer.fit_transform(sentences).todense()
+    y = np.array(labels)
+    xy = np.concatenate((x, y[:, np.newaxis]), axis=1)
     correlation_xy = np.corrcoef(xy, rowvar=False)[-1, :-1]
 
     sorted_indices = np.argsort(correlation_xy)
@@ -913,7 +912,7 @@ def plot_correlation_between_words_and_labels(
             axs[k].set_xticks([-1, -0.5, 0, 0.5, 1], [1, 0.5, 0, 0.5, 1])
             axs[k].set_yticks(ranks, ranks + 1)
             axs[k].set_xlabel(
-                'Absolute Pearson correlation for male/female', fontsize=4
+                '$\mathrm{Corr}(x_{TFidf}, y_{male})$ vs. $\mathrm{Corr}(x_{TFidf}, y_{female})$', fontsize=4
             )
             axs[k].xaxis.set_label_coords(0.5, -0.11)
             axs[k].set_ylabel('Rank', fontsize=4)
@@ -927,11 +926,11 @@ def plot_correlation_between_words_and_labels(
                 fontsize=4,
             )
 
-    fig.suptitle('Correlation between Tfidf represented words and labels', fontsize=4)
+    # fig.suptitle('Correlation between Tfidf represented words and labels', fontsize=4)
     file_path = join(output_dir, f'{plot_type}.png')
     logger.info(file_path)
     # plt.tight_layout()
-    plt.savefig(file_path, dpi=300)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
     plt.close()
 
 
