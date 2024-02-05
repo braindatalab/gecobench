@@ -26,6 +26,7 @@ openpyxl = "^3.1.2"
 selenium = "^4.15.2"
 lxml = "^4.9.3"
 xlsxwriter = "^3.1.9"
+lime = "^0.2.0.1"
 
 
 [tool.poetry.group.dev.dependencies]

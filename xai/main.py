@@ -32,6 +32,7 @@ from xai.methods import get_captum_attributions
 
 DEVICE = 'cpu'
 BERT_MODEL_TYPE = 'bert'
+ALL_BUT_CLS_SEP = slice(1, -1)
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -123,7 +124,7 @@ def map_bert_attributions_to_original_tokens(
 
     bert_token_to_attribution_mapping = dict()
     for word, attribution in zip(
-        list(token_mapping[0].keys()), result.raw_attribution[1:-1]
+        list(token_mapping[0].keys()), result.raw_attribution[ALL_BUT_CLS_SEP]
     ):
         bert_token_to_attribution_mapping[word] = attribution
 
@@ -175,6 +176,7 @@ def apply_xai_methods_on_sentence(
         baseline=reference_tokens,
         methods=config['xai']['methods'],
         target=row['target'],
+        tokenizer= tokenizer,
     )
 
     results = create_xai_results(

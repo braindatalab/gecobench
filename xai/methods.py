@@ -1,9 +1,10 @@
-from typing import List, Dict, Tuple, Callable
+from typing import Dict, Callable
 
+import lime
 import numpy as np
 import torch
+from captum._utils.models.linear_model import SkLearnLasso
 from captum.attr import (
-    IntegratedGradients,
     Saliency,
     DeepLift,
     DeepLiftShap,
@@ -18,10 +19,18 @@ from captum.attr import (
     LayerIntegratedGradients,
     InputXGradient,
 )
-from sklearn import linear_model
+from lime.lime_text import LimeTextExplainer
 from loguru import logger
 from torch import Tensor
-import copy
+from torch.utils.data import TensorDataset
+from tqdm import tqdm
+from transformers import BertTokenizer
+
+from training.bert import (
+    create_bert_ids,
+    add_padding_if_necessary,
+    create_attention_mask_from_bert_ids,
+)
 
 BERT = 'bert'
 
@@ -65,14 +74,19 @@ def get_captum_attributions(
     baseline: Tensor,
     methods: list,
     target: list,
+    tokenizer: BertTokenizer,
 ) -> Dict:
     attributions = dict()
     check_availability_of_xai_methods(methods=methods)
 
     if BERT in model_type:
 
-        def forward_function(inputs: Tensor) -> Tensor:
-            output = model(inputs)
+        def forward_function(inputs: Tensor, attention_mask: Tensor = None) -> Tensor:
+            output = (
+                model(inputs)
+                if attention_mask is None
+                else model(inputs, attention_mask)
+            )
             forward_function_output = torch.softmax(output.logits, dim=1)
             return forward_function_output
 
@@ -96,6 +110,7 @@ def get_captum_attributions(
                 data=x,
                 model=model if 'Gradient SHAP' == method_name else bert_embeddings,
                 target=target,
+                tokenizer=tokenizer,
             )
 
         attributions[method_name] = normalize_attributions(a=a.detach().numpy())
@@ -109,6 +124,7 @@ def get_integrated_gradients_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
+        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     explainer = LayerIntegratedGradients(forward_function, model)
     explanations = explainer.attribute(
@@ -164,6 +180,7 @@ def get_deepshap_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
+        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     # Will throw the same error w.r.t. shape of baseline vs input as with gradient shap
     return DeepLiftShap(model, multiply_by_inputs=None).attribute(
@@ -177,6 +194,7 @@ def get_gradient_shap_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
+        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     return GradientShap(forward_function).attribute(inputs=data, baselines=baseline)
 
@@ -187,6 +205,7 @@ def get_guided_backprop_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
+        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     # UserWarning: Setting backward hooks on ReLU activations.The hooks will be removed after the attribution is finished
     explainer = GuidedBackprop(forward_function)
@@ -216,6 +235,7 @@ def get_shapley_sampling_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
+        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     explainer = ShapleyValueSampling(forward_function)
     return explainer.attribute(
@@ -230,73 +250,162 @@ def get_shapley_sampling_attributions(
     )
 
 
+def create_tensor_dataset(data: list, tokenizer: BertTokenizer) -> TensorDataset:
+    max_sentence_length = max([ids.shape[0] for ids in data])
+    tokens = torch.zeros(size=(len(data), max_sentence_length))
+    attention_mask = torch.zeros(size=(len(data), max_sentence_length))
+    for k, ids in enumerate(data):
+        tokens[k, :] = add_padding_if_necessary(
+            tokenizer=tokenizer, ids=ids, max_sentence_length=max_sentence_length
+        )
+        attention_mask[k, :] = create_attention_mask_from_bert_ids(
+            tokenizer=tokenizer,
+            ids=tokens[k, :],
+        )
+
+    return TensorDataset(tokens.type(torch.long), attention_mask)
+
+
+def assemble_lime_explanations(
+    explanation: lime.explanation.Explanation, x: np.ndarray, tokenizer: BertTokenizer
+) -> Tensor:
+    explanations_per_word = [
+        (
+            explanation.domain_mapper.indexed_string.word(exp[0]),
+            explanation.domain_mapper.indexed_string.string_position(exp[0]),
+            exp[1],
+        )
+        for exp in explanation.local_exp[1]
+    ]
+
+    explanations = np.zeros(x.shape[0])
+    for k, bert_id in enumerate(x):
+        word = tokenizer.decode(bert_id).replace(' ', '')
+        for exp_word in explanations_per_word:
+            if word in exp_word[0]:
+                explanations[k] = exp_word[2]
+                break
+
+    return torch.tensor(explanations).unsqueeze(0)
+
+
 def get_lime_attributions(
     data: torch.Tensor,
     baseline: Tensor,
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
-    # encode text indices into latent representations & calculate cosine similarity
-    # Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
-    def exp_embedding_cosine_distance(original_inp, perturbed_inp, _, **kwargs):
-        print("")
-        print("exp_embedding_cosine_distance():")
-        print("original", original_inp, original_inp.shape)
-        print("perturbed", perturbed_inp, perturbed_inp.shape)
-        embedding_model = model
-        original_emb = embedding_model(original_inp)
-        perturbed_emb = embedding_model(perturbed_inp)
-        print("original_emb", original_emb.shape)
-        print("perturbed_emb", perturbed_emb.shape)
+    def new_forward_function(text_input: list) -> np.ndarray:
+        output = list()
+        list_of_bert_ids = list()
+        for sentence in text_input:
+            bert_ids = create_bert_ids(data=[sentence.split()], tokenizer=tokenizer)[0]
+            list_of_bert_ids += [bert_ids]
 
+        dataset = create_tensor_dataset(data=list_of_bert_ids, tokenizer=tokenizer)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=100)
+        for batch in tqdm(dataloader):
+            output += [forward_function(*batch).detach().numpy()]
+
+        return np.concatenate(output)
+
+    x = data.flatten().detach().numpy()
+    text = tokenizer.decode(x[1:-1])
+    explainer = LimeTextExplainer(class_names=['0', '1'], char_level=False)
+    lime_explanation = explainer.explain_instance(
+        text,
+        new_forward_function,
+        num_features=x.shape[0],
+        num_samples=int(1e2),
+    )
+
+    explanations = assemble_lime_explanations(
+        explanation=lime_explanation,
+        x=x,
+        tokenizer=tokenizer,
+    )
+
+    return explanations
+
+
+def get_lime_attributions2(
+    data: torch.Tensor,
+    baseline: Tensor,
+    model: torch.nn.Module,
+    forward_function: Callable,
+    target: list,
+    tokenizer: BertTokenizer,
+) -> torch.tensor:
+    # Adopted from: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
+    def exponential_cosine_similarity(
+        original_input: Tensor, perturbed_input: Tensor, _, **kwargs
+    ):
+        embedding_model = model
+        average_embedding = torch.mean(embedding_model.word_embeddings.weight, dim=0)
+        mask = 0 == perturbed_input
+        # perturbed_input[mask] = 0
+        # original_emb = embedding_model(original_input)
+        original_emb = 1 * (0 != original_input).float()
+        # perturbed_emb = embedding_model(perturbed_input)
+        perturbed_emb = 1 * (0 != perturbed_input).float()
+        # perturbed_emb[mask] = average_embedding
         distance = 1 - torch.nn.functional.cosine_similarity(
             original_emb, perturbed_emb, dim=1
         )
-        return torch.exp(-1 * (distance**2) / 2)
+        # similarity = torch.exp(-1 * (distance**2) / 2)
+        similarity = distance
+        # return torch.mean(similarity, axis=1)
+        return similarity
 
-    # binary vector where each word is selected independently and uniformly at random
-    # Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
-    def bernoulli_perturb(text, **kwargs):
-        print("")
-        print("bernoulli_perturb():")
-        print("text:")
-        print(text, text.shape)
-        probs = torch.ones_like(text) * 0.5
+    def bernoulli_perturbation(x: Tensor, **kwargs):
+        probs = torch.ones_like(x) * 0.5
         output = torch.bernoulli(probs).long()
-        print("bernoulli", output, output.shape)
+        return output
 
-        return torch.bernoulli(probs).long()
+    def interpretable_to_input(
+        interpretable_sample: Tensor, original_input: Tensor, **kwargs
+    ):
+        # m = torch.sum(interpretable_sample.bool()).int()
+        output = torch.zeros_like(original_input)
+        output[interpretable_sample.bool()] = original_input[
+            interpretable_sample.bool()
+        ]
+        # ].view(original_input.size(0), -1)
+        return output
 
-    # remove absenst token based on the intepretable representation sample
-    # Source: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
-    def interp_to_input(interp_sample, original_input, **kwargs):
-        print("")
-        print("interp_to_input()")
-        print("interp_sample", interp_sample, interp_sample.shape)
-        print("original_input", original_input, original_input.shape)
-        output = original_input[interp_sample.bool()].view(original_input.size(0), -1)
-        print("output", output, output.shape)
-        return original_input[interp_sample.bool()].view(original_input.size(0), -1)
+    def new_forward_function(inputs: Tensor) -> Tensor:
+        return torch.argmax(forward_function(inputs)).unsqueeze(-1).unsqueeze(-1)
 
     lasso_lime_base = LimeBase(
-        forward_function,
-        interpretable_model=linear_model.Lasso(alpha=0.08),
-        similarity_func=exp_embedding_cosine_distance,
-        perturb_func=bernoulli_perturb,
-        perturb_interpretable_space=False,
-        from_interp_rep_transform=interp_to_input,
+        new_forward_function,
+        interpretable_model=SkLearnLasso(alpha=0.08),
+        # interpretable_model=SkLearnLasso(),
+        similarity_func=exponential_cosine_similarity,
+        perturb_func=bernoulli_perturbation,
+        perturb_interpretable_space=True,
+        from_interp_rep_transform=interpretable_to_input,
         to_interp_rep_transform=None,
     )
-    print("data", data)
     explanations = lasso_lime_base.attribute(
         # test_text.unsqueeze(0), # add batch dimension for Captum
         data,
         target=int(target),
         # additional_forward_args=(test_offsets,),
-        # n_samples=,
+        n_samples=int(1e2),
         show_progress=True,
-    ).squeeze(0)
+    )
+
+    # l = Lime(forward_function)
+    # explanations = l.attribute(
+    #     inputs=data,
+    #     target=int(target),
+    #     n_samples=25,
+    #     perturbations_per_eval=1,
+    #     return_input_shape=True,
+    #     show_progress=True,
+    # )
 
     return explanations
 
@@ -307,6 +416,7 @@ def get_kernel_shap_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
     explainer = KernelShap(forward_function)
     return explainer.attribute(
@@ -327,6 +437,7 @@ def get_lrp_attributions(
     baseline: Tensor,
     model: torch.nn.Module,
     forward_function: Callable,
+        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     return LayerLRP(forward_function, model).attribute(inputs=data)
 
@@ -343,6 +454,7 @@ def get_uniform_random_attributions(
     model: torch.nn.Module,
     baseline: Tensor,
     forward_function: Callable,
+        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     return torch.rand(data.shape)
 
