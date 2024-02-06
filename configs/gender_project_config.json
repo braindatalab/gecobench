@@ -142,9 +142,7 @@
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
       "_data": [
-        "contourplot",
-        "_pairplot",
-        "_sankey"
+        "correlation_plot"
       ],
       "_model": [
         "model_performance"
