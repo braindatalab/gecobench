@@ -18,6 +18,8 @@ from utils import (
     set_random_states,
     generate_training_dir,
     dump_as_pickle,
+    load_from_cache,
+    save_to_cache,
 )
 
 BERT_PADDING = '[PAD]'
@@ -234,12 +236,23 @@ def dump_history(history: Dict, output_dir: str, history_name: str) -> str:
     return join(output_dir, history_name)
 
 
-def create_bert_ids(data: List, tokenizer: BertTokenizer) -> List:
+def create_bert_ids(
+    data: List, tokenizer: BertTokenizer, type: str, config: dict
+) -> List:
+
+    cache_key = f"bert_ids_{type}"
+    cache_entry = load_from_cache(cache_key, config)
+    if cache_entry is not None:
+        return cache_entry
+
     bert_ids = list()
     for k, sentence in tqdm(enumerate(data), total=len(data)):
         bert_ids += [
             create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
         ]
+
+    save_to_cache(cache_key, bert_ids, config)
+
     return bert_ids
 
 
@@ -367,8 +380,12 @@ def train_bert(
 ) -> List[Tuple]:
     output = list()
     bert_tokenizer = get_bert_tokenizer(config=config)
-    bert_ids_train = create_bert_ids(data=dataset.x_train, tokenizer=bert_tokenizer)
-    bert_ids_val = create_bert_ids(data=dataset.x_test, tokenizer=bert_tokenizer)
+    bert_ids_train = create_bert_ids(
+        data=dataset.x_train, tokenizer=bert_tokenizer, type="train", config=config
+    )
+    bert_ids_val = create_bert_ids(
+        data=dataset.x_test, tokenizer=bert_tokenizer, type="test", config=config
+    )
     logger.info(f'Creating BERT datasets')
     train_data = create_tensor_dataset(
         data=bert_ids_train, target=dataset.y_train, tokenizer=bert_tokenizer
