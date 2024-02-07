@@ -55,7 +55,7 @@ def load_gender_dataset(config: Dict, dataset_key: str) -> DataSet:
     return dataset
 
 
-def load_sentiment_datset(config: Dict, dataset_key: str) -> DataSet:
+def load_sentiment_dataset(config: Dict, dataset_key: str) -> DataSet:
     logger.info(f'Loading dataset {dataset_key}')
     data_dir = generate_data_dir(config=config)
     path = join(
@@ -88,8 +88,8 @@ TrainModel = {
 DatasetHandler = {
     DatasetKeys.gender_all.value: load_gender_dataset,
     DatasetKeys.gender_subj.value: load_gender_dataset,
-    DatasetKeys.sentiment_twitter.value: load_sentiment_datset,
-    DatasetKeys.sentiment_imdb.value: load_sentiment_datset,
+    DatasetKeys.sentiment_twitter.value: load_sentiment_dataset,
+    DatasetKeys.sentiment_imdb.value: load_sentiment_dataset,
 }
 
 
