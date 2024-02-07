@@ -26,6 +26,8 @@ openpyxl = "^3.1.2"
 selenium = "^4.15.2"
 lxml = "^4.9.3"
 xlsxwriter = "^3.1.9"
+wandb = "^0.16.2"
+python-dotenv = "^1.0.1"
 lime = "^0.2.0.1"
 
 

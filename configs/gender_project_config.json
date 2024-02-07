@@ -1,0 +1,164 @@
+{
+  "general": {
+    "seed": 43532791,
+    "apptainer_data_dir": "/mnt",
+    "base_dir": "artifacts",
+    "data_scenario": "nlp-benchmark",
+    "_wandb": {
+      "project": "xai-nlp-benchmark-gender",
+      "entity": "venondev",
+      "validate_every_n_steps": 50
+    }
+  },
+  "data": {
+    "output_dir": "data",
+    "datasets": {
+      "gender_all": {
+        "num_labels": 2,
+        "raw_data": {
+          "train": "data/training_df_all.pkl",
+          "test_female": "data/df_validation_female_all.pkl",
+          "test_male": "data/df_validation_male_all.pkl",
+          "ground_truth": "data/gt_all_val.pkl"
+        },
+        "output_filenames": {
+          "train": "training_all.pkl",
+          "test_female": "test_female_all.pkl",
+          "test_male": "test_male_all.pkl",
+          "test": "test_all.pkl"
+        }
+      },
+      "gender_subj": {
+        "num_labels": 2,
+        "raw_data": {
+          "train": "data/training_df_subj.pkl",
+          "test_female": "data/df_validation_female_subj.pkl",
+          "test_male": "data/df_validation_male_subj.pkl",
+          "ground_truth": "data/gt_subj_val.pkl"
+        },
+        "output_filenames": {
+          "train": "training_subject.pkl",
+          "test_female": "test_female_subject.pkl",
+          "test_male": "test_male_subject.pkl",
+          "test": "test_subject.pkl"
+        }
+      }
+    }
+  },
+  "training": {
+    "output_dir": "training",
+    "num_workers": 4,
+    "val_size": 0.2,
+    "num_training_repetitions": 10,
+    "device": "cuda",
+    "training_records": "training_records.pkl",
+    "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
+    "datasets": [
+      "gender_all",
+      "gender_subj"
+    ],
+    "models": {
+      "bert_randomly_init_embedding_classification": {
+        "batch_size": 32,
+        "epochs": 20,
+        "learning_rate": 0.0001,
+        "model_name": "bert_randomly_init_embedding_classification",
+        "model_performance": "bert_only_embedding_history",
+        "layers_to_train": [
+          "bert.embeddings",
+          "classifier"
+        ]
+      },
+      "bert_only_classification": {
+        "batch_size": 32,
+        "epochs": 20,
+        "learning_rate": 0.0001,
+        "model_name": "bert_only_classification",
+        "model_performance": "bert_only_classification_history",
+        "layers_to_train": [
+          "classifier"
+        ]
+      },
+      "bert_only_embedding_classification": {
+        "batch_size": 32,
+        "epochs": 20,
+        "learning_rate": 0.0001,
+        "model_name": "bert_only_embedding_classification",
+        "model_performance": "bert_only_embedding_classification_history",
+        "layers_to_train": [
+          "bert.embeddings",
+          "classification"
+        ]
+      },
+      "bert_all": {
+        "batch_size": 32,
+        "epochs": 20,
+        "learning_rate": 0.0001,
+        "model_name": "bert_all",
+        "model_performance": "bert_all_history",
+        "layers_to_train": []
+      },
+      "bert_only_embedding": {
+        "batch_size": 32,
+        "epochs": 20,
+        "learning_rate": 0.0001,
+        "model_name": "bert_only_embedding",
+        "model_performance": "bert_only_embedding_history",
+        "layers_to_train": [
+          "bert.embeddings"
+        ]
+      }
+    }
+  },
+  "xai": {
+    "output_dir": "xai",
+    "intermediate_xai_result_prefix": "intermediate_xai_result",
+    "intermediate_raw_xai_result_prefix": "intermediate_raw_xai_result",
+    "xai_records": "xai_records.pkl",
+    "num_workers": 4,
+    "datasets": [
+      "gender_all",
+      "gender_subj"
+    ],
+    "class_of_interest": 1,
+    "methods": [
+      "Saliency",
+      "InputXGradient",
+      "Guided Backprop",
+      "Deconvolution",
+      "DeepLift",
+      "Kernel SHAP",
+      "Uniform random",
+      "Integrated Gradients"
+    ]
+  },
+  "evaluation": {
+    "output_dir": "evaluation",
+    "num_workers": 4,
+    "evaluation_records": "evaluation_records.pkl"
+  },
+  "visualization": {
+    "output_dir": "visualization",
+    "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
+    "visualizations": {
+      "_data": [
+        "correlation_plot"
+      ],
+      "_model": [
+        "model_performance"
+      ],
+      "_xai": [
+        "_most_common_xai_attributions",
+        "sentence_html_plot"
+      ],
+      "evaluation": [
+        "roc_auc",
+        "_precision_recall_auc",
+        "_avg_precision",
+        "_precision_specificity",
+        "_top_k_precision",
+        "_mass_accuracy"
+      ]
+    }
+  }
+}

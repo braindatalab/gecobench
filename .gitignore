@@ -140,3 +140,10 @@ artifacts/
 
 # generated data
 data/dataset_generation/data
+
+# logging
+wandb
+logs
+
+#container
+*apptainerfile.sif
