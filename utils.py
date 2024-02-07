@@ -82,7 +82,8 @@ def load_from_cache(key: str, config: dict):
 
 def save_to_cache(key: str, data: Any, config: dict):
     path = get_cache_path(key, config)
-    dump_as_pickle(data, path)
+    with open(path, 'wb') as file:
+        pickle.dump(data, file)
 
 
 def generate_cache_dir(config: Dict) -> str:

@@ -381,10 +381,10 @@ def train_bert(
     output = list()
     bert_tokenizer = get_bert_tokenizer(config=config)
     bert_ids_train = create_bert_ids(
-        data=dataset.x_train, tokenizer=bert_tokenizer, type="train", config=config
+        data=dataset.x_train, tokenizer=bert_tokenizer, type=f"train_{dataset_name}", config=config
     )
     bert_ids_val = create_bert_ids(
-        data=dataset.x_test, tokenizer=bert_tokenizer, type="test", config=config
+        data=dataset.x_test, tokenizer=bert_tokenizer, type=f"test_{dataset_name}", config=config
     )
     logger.info(f'Creating BERT datasets')
     train_data = create_tensor_dataset(

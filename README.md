@@ -105,3 +105,8 @@ The machine the code is run on and the timeslot can be configured in `cluster_jo
 Further details can be found in the hydra documentation: https://git.tu-berlin.de/ml-group/hydra/documentation
 
 The logger outputs of the container can be found in the code directory under logs.
+
+## Step 4. View and cancel jobs
+
+To view your current jobs: run e.g. `squeue --user=hjalmar`
+To cancel a job run `scancel job_id` with the job id you get from the command above.
