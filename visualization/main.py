@@ -372,35 +372,13 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
 def create_xai_sentence_html_plots(
     data: DataFrameGroupBy, plot_type: str, base_output_dir: str
 ) -> None:
-    sentence_lengths = []
-    for index, (i, dataframe) in enumerate(data):
-        sentence_lengths.append([index, i, ast.literal_eval(dataframe['sentence'].iloc[0])])
-
-    # Calculate the lengths of all second elements in each list
-    lengths = [len(item[2]) for item in sentence_lengths]
-
-    # Find the shortest length
-    shortest_length = min(lengths)
-    other_length = 10
-
-    # Find the list(s) with the second element of the shortest length
-    shortest_list = [item for item in sentence_lengths if len(item[2]) == other_length]
-    for sen in shortest_list:
-        print(sen)
-
-    print("")
-    sample_index = 1179
     # Using islice for selecting a specific sentence
+    sample_index = 1179
     for i, dataframe in islice(data, sample_index, None):
-        print(dataframe)
         sentence = ast.literal_eval(dataframe['sentence'].iloc[0])
         selected_sentence_length = len(sentence)
-        print(i)
-        print(dataframe['ground_truth'].iloc[0])
         break
-    
     dataset_type = i[1]
-    print(dataset_type)
 
     # Search for corresponding samples with above properties but from different pre-trained models
     pre_trained_models = ['bert_all', 'bert_only_embedding_classification', 'bert_only_classification', 'bert_only_embedding']
