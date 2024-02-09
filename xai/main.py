@@ -11,38 +11,28 @@ from torch import Tensor
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-from common import DATASET_ALL, DATASET_SUBJECT, XAIResult
+from common import XAIResult
 from training.bert import (
-    create_tensor_dataset,
     create_bert_ids,
     get_bert_ids,
+    get_bert_tokenizer,
 )
 from utils import (
     generate_training_dir,
     load_pickle,
-    generate_data_dir,
     dump_as_pickle,
     generate_xai_dir,
     append_date,
-    determine_dataset_type,
     load_model,
+    load_test_data,
 )
 from xai.methods import get_captum_attributions
 
 DEVICE = 'cpu'
 BERT_MODEL_TYPE = 'bert'
+ALL_BUT_CLS_SEP = slice(1, -1)
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
-def load_test_data(config: dict) -> dict[pd.DataFrame]:
-    data = dict()
-    data_dir = generate_data_dir(config=config)
-    filename_all = config['data']['output_filenames']['test_all']
-    filename_subject = config['data']['output_filenames']['test_subject']
-    data[DATASET_ALL] = load_pickle(file_path=join(data_dir, filename_all))
-    data[DATASET_SUBJECT] = load_pickle(file_path=join(data_dir, filename_subject))
-    return data
 
 
 def create_bert_to_original_token_mapping_from_sentence(
@@ -109,13 +99,6 @@ def create_xai_results(
     return results
 
 
-def get_bert_tokenizer(config: dict) -> BertTokenizer:
-    return BertTokenizer.from_pretrained(
-        pretrained_model_name_or_path='bert-base-uncased',
-        revision=config['training']['bert_revision'],
-    )
-
-
 def map_bert_attributions_to_original_tokens(
     model_type: str, result: XAIResult, config: dict
 ) -> list:
@@ -129,7 +112,7 @@ def map_bert_attributions_to_original_tokens(
 
     bert_token_to_attribution_mapping = dict()
     for word, attribution in zip(
-        list(token_mapping[0].keys()), result.raw_attribution[1:-1]
+        list(token_mapping[0].keys()), result.raw_attribution[ALL_BUT_CLS_SEP]
     ):
         bert_token_to_attribution_mapping[word] = attribution
 
@@ -171,16 +154,19 @@ def apply_xai_methods_on_sentence(
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
     tokenizer = get_tokenizer[model_type](config)
-    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)
-    num_ids = token_ids[0].shape[0]
+    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0]
+    token_ids = token_ids.to(DEVICE)
+    num_ids = token_ids.shape[0]
     reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
+
     attributions = get_captum_attributions(
         model=model,
         model_type=model_type,
-        x=token_ids[0].unsqueeze(0),
+        x=token_ids.unsqueeze(0),
         baseline=reference_tokens,
         methods=config['xai']['methods'],
         target=row['target'],
+        tokenizer= tokenizer,
     )
 
     results = create_xai_results(
@@ -203,7 +189,7 @@ def apply_xai_methods(
     results = list()
     num_samples = dataset.shape[0]
 
-    results = Parallel(n_jobs=4)(
+    results = Parallel(n_jobs=config["xai"]["num_workers"])(
         delayed(apply_xai_methods_on_sentence)(
             model, row, dataset_type, model_params, config, num_samples, k
         )
@@ -219,15 +205,15 @@ def loop_over_training_records(
     output = list()
     torch.set_num_threads(1)
     for dataset_name, model_params, model_path, _ in tqdm(training_records):
-        dataset_type = determine_dataset_type(dataset_name=dataset_name)
-        dataset = data[dataset_type]
-        model = load_model(path=model_path)
+        logger.info(f'Processing {dataset_name} with {model_params["model_name"]}')
+        dataset = data[dataset_name]
+        model = load_model(path=model_path).to(DEVICE)
 
         result = apply_xai_methods(
             model=model,
             dataset=dataset,
             config=config,
-            dataset_type=dataset_type,
+            dataset_type=dataset_name,
             model_params=model_params,
         )
 

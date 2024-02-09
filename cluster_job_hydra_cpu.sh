@@ -14,4 +14,4 @@ cd $WORKDIR
 ls -l
 apptainer build --fakeroot --force /home/rick/nlp-apptainerfile.sif nlp-apptainerfile.def
 #apptainer run --nv --bind $DATADIR:/mnt --bind $WORKDIR:/workdir /home/rick/nlp-apptainerfile.sif "$2" "$3"
-apptainer run --bind $DATADIR:/mnt --bind $WORKDIR:/workdir /home/rick/nlp-apptainerfile.sif "$2" "$3"
+apptainer run --env "WANDB_API_KEY=$WANDB_API_KEY" --bind $DATADIR:/mnt --bind $WORKDIR:/workdir /home/rick/nlp-apptainerfile.sif "$2" "$3"

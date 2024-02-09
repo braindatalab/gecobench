@@ -4,13 +4,10 @@ import json
 import warnings
 from dataclasses import asdict
 from os.path import join
-from pathlib import Path
-from typing import Dict, Tuple, List
-from uuid import uuid4
+from typing import Dict
 
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
 from loguru import logger
 from sklearn.metrics import auc, roc_curve
 from sklearn.metrics._ranking import _binary_clf_curve, average_precision_score
@@ -18,7 +15,7 @@ from tqdm import tqdm
 from transformers import BertTokenizer
 import torch
 
-from common import EvaluationResult, XAIResult, DATASET_ALL, DATASET_SUBJECT
+from common import EvaluationResult
 from training.bert import create_bert_ids, create_tensor_dataset
 from utils import (
     load_pickle,
@@ -26,9 +23,8 @@ from utils import (
     generate_xai_dir,
     generate_evaluation_dir,
     generate_training_dir,
-    generate_data_dir,
-    determine_dataset_type,
     load_model,
+    load_test_data,
 )
 
 
@@ -150,16 +146,6 @@ def evaluate(data: pd.DataFrame) -> list[dict]:
     return results
 
 
-def load_test_data(config: dict) -> dict:
-    data = dict()
-    data_dir = generate_data_dir(config=config)
-    filename_all = config['data']['output_filenames']['test_all']
-    filename_subject = config['data']['output_filenames']['test_subject']
-    data[DATASET_ALL] = load_pickle(file_path=join(data_dir, filename_all))
-    data[DATASET_SUBJECT] = load_pickle(file_path=join(data_dir, filename_subject))
-    return data
-
-
 def create_bert_tensor_data(data: dict, config: dict) -> dict:
     output = dict(tensors=dict(), sentences=dict())
     for name, dataset in data.items():
@@ -192,19 +178,18 @@ def create_dataset_with_predictions(data: dict, records: list, config: dict) -> 
     }
     tensor_data = create_bert_tensor_data(data=data, config=config)
     for dataset_name, model_params, model_path, _ in tqdm(records):
-        dataset_type = determine_dataset_type(dataset_name=dataset_name)
-        x, attention_mask, target = tensor_data['tensors'][dataset_type]
+        x, attention_mask, target = tensor_data['tensors'][dataset_name]
         model = load_model(path=model_path)
         prediction = torch.argmax(model(x, attention_mask=attention_mask).logits, dim=1)
         n = target.shape[0]
         data_dict['model_repetition_number'] += n * [model_params['repetition']]
         data_dict['model_name'] += n * [model_params['model_name']]
         data_dict['sentence'] += [
-            str(sentence) for sentence in tensor_data['sentences'][dataset_type]
+            str(sentence) for sentence in tensor_data['sentences'][dataset_name]
         ]
         data_dict['target'] += target.detach().numpy().tolist()
         data_dict['prediction'] += prediction.detach().numpy().tolist()
-        data_dict['dataset_type'] += n * [dataset_type]
+        data_dict['dataset_type'] += n * [dataset_name]
 
     return data_dict
 

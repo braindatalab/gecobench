@@ -7,12 +7,16 @@ import random
 from typing import Any, Dict, List
 import pickle
 
+import pandas as pd
 import numpy as np
 import torch
 from numpy.random import Generator
 from torch.utils.data import TensorDataset, random_split
+import json
+import hashlib
+import os
 
-from common import DATASET_ALL, DATASET_SUBJECT
+from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 
 LOCAL_PLATFORM_NAME = '22.04.1-Ubuntu'
 LOCAL_DIR = ''
@@ -51,6 +55,39 @@ def on_local_platform() -> bool:
         if LOCAL_PLATFORM_NAME in platform.version().split(' ')[0].split('~')[-1]
         else False
     )
+
+
+def dict_hash(dictionary) -> str:
+    """MD5 hash of a dictionary."""
+    dhash = hashlib.md5()
+    encoded = json.dumps(dictionary, sort_keys=True).encode()
+    dhash.update(encoded)
+    return dhash.hexdigest()
+
+
+def get_cache_path(key: str, config: dict) -> str:
+    cache_dir = generate_cache_dir(config)
+    os.makedirs(cache_dir, exist_ok=True)
+    dhash = dict_hash(config)
+    return join(cache_dir, f'{key}-{dhash}.pkl')
+
+
+def load_from_cache(key: str, config: dict):
+    path = get_cache_path(key, config)
+    if os.path.exists(path):
+        return load_pickle(path)
+    else:
+        return None
+
+
+def save_to_cache(key: str, data: Any, config: dict):
+    path = get_cache_path(key, config)
+    with open(path, 'wb') as file:
+        pickle.dump(data, file)
+
+
+def generate_cache_dir(config: Dict) -> str:
+    return join(config['general']['base_dir'], "cache")
 
 
 def generate_data_dir(config: Dict) -> str:
@@ -92,6 +129,17 @@ def generate_visualization_dir(config: Dict) -> str:
         config['general']['data_scenario'],
         config['visualization']['output_dir'],
     )
+
+
+def load_test_data(config: dict) -> dict[pd.DataFrame]:
+    data = dict()
+    data_dir = generate_data_dir(config=config)
+    for dataset in config["xai"]["datasets"]:
+        validate_dataset_key(dataset_key=dataset)
+        filename_all = config['data']["datasets"][dataset]['output_filenames']['test']
+        data[dataset] = load_pickle(file_path=join(data_dir, dataset, filename_all))
+
+    return data
 
 
 def set_random_states(seed: int) -> Generator:
