@@ -393,17 +393,9 @@ def create_xai_sentence_html_plots(
     for key, group in data:
         for index, row in group.iterrows():
             for model in pre_trained_models:
-                if (
-                    row['model_name'] == model
-                    and row['model_repetition_number'] == 0
-                    and row['sentence'] == str(sentence)
-                ):
-                    df_explanations_sentence_different_models = (
-                        df_explanations_sentence_different_models.append(
-                            row, ignore_index=True
-                        )
-                    )
-                  
+                if row['model_name'] == model and row['model_repetition_number'] == 0 and row['sentence'] == str(sentence) and row['dataset_type'] == str(dataset_type):
+                    df_explanations_sentence_different_models = df_explanations_sentence_different_models.append(row, ignore_index=True)
+                    
     model_image_paths = []
     for model in pre_trained_models:
         df_model = df_explanations_sentence_different_models[
@@ -802,7 +794,7 @@ def get_correctly_classified_records(records: list) -> list:
 
 def create_xai_plots(base_output_dir: str, config: dict) -> None:
     xai_records = load_xai_records(config=config)
-    filtered_xai_records = get_correctly_classified_records(records=xai_records)
+    #filtered_xai_records = get_correctly_classified_records(records=xai_records)
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
         sentence_html_plot=create_xai_sentence_html_plots,
@@ -824,7 +816,7 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
                 config['visualization']['absolute_dir_to_project'], base_output_dir
             )
         data = create_dataset_for_xai_plot(
-            plot_type=plot_type, xai_records=filtered_xai_records
+            plot_type=plot_type, xai_records=xai_records
         )
         v(data, plot_type, base_output_dir)
 
