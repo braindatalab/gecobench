@@ -375,9 +375,12 @@ def create_xai_sentence_html_plots(
     data: DataFrameGroupBy, plot_type: str, base_output_dir: str
 ) -> None:
     # Using islice for selecting a specific sentence
-    for i, dataframe in islice(data, 4, None):
+    sample_index = 1179
+    for i, dataframe in islice(data, sample_index, None):
         sentence = ast.literal_eval(dataframe['sentence'].iloc[0])
+        selected_sentence_length = len(sentence)
         break
+    dataset_type = i[1]
 
     # Search for corresponding samples with above properties but from different pre-trained models
     pre_trained_models = [
@@ -390,17 +393,9 @@ def create_xai_sentence_html_plots(
     for key, group in data:
         for index, row in group.iterrows():
             for model in pre_trained_models:
-                if (
-                    row['model_name'] == model
-                    and row['model_repetition_number'] == 0
-                    and row['sentence'] == str(sentence)
-                ):
-                    df_explanations_sentence_different_models = (
-                        df_explanations_sentence_different_models.append(
-                            row, ignore_index=True
-                        )
-                    )
-
+                if row['model_name'] == model and row['model_repetition_number'] == 0 and row['sentence'] == str(sentence) and row['dataset_type'] == str(dataset_type):
+                    df_explanations_sentence_different_models = df_explanations_sentence_different_models.append(row, ignore_index=True)
+                    
     model_image_paths = []
     for model in pre_trained_models:
         df_model = df_explanations_sentence_different_models[
@@ -692,7 +687,7 @@ def create_xai_sentence_html_plots(
     else:
         print(f"Warning: Image {file_path_legend_plot} not found.")
 
-    file_path = join(base_output_dir, 'models_xai_sentence_html_plot.html')
+    file_path = join(base_output_dir, f'{sample_index}_{dataset_type}_{selected_sentence_length}_models_xai_sentence_html_plot.html')
     with open(file_path, 'w') as file:
         file.write(html_content)
 
@@ -777,6 +772,8 @@ def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     file_path = join(xai_dir, config['xai']['xai_records'])
     paths_to_xai_records = load_pickle(file_path=file_path)
+    # Temporary fix for running locally
+    paths_to_xai_records = [s.strip('/mnt/') for s in paths_to_xai_records]
     data_list = list()
     for p in tqdm(paths_to_xai_records):
         results = load_pickle(file_path=p)
@@ -797,7 +794,7 @@ def get_correctly_classified_records(records: list) -> list:
 
 def create_xai_plots(base_output_dir: str, config: dict) -> None:
     xai_records = load_xai_records(config=config)
-    filtered_xai_records = get_correctly_classified_records(records=xai_records)
+    #filtered_xai_records = get_correctly_classified_records(records=xai_records)
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
         sentence_html_plot=create_xai_sentence_html_plots,
@@ -819,7 +816,7 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
                 config['visualization']['absolute_dir_to_project'], base_output_dir
             )
         data = create_dataset_for_xai_plot(
-            plot_type=plot_type, xai_records=filtered_xai_records
+            plot_type=plot_type, xai_records=xai_records
         )
         v(data, plot_type, base_output_dir)
 
