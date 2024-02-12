@@ -167,7 +167,9 @@ def create_bert_tensor_data(data: dict, config: dict) -> dict:
     return output
 
 
-def create_dataset_with_predictions(data: dict, records: list, config: dict) -> dict:
+def create_dataset_with_predictions(
+    data: dict, records: list, config: dict
+) -> pd.DataFrame:
     data_dict = {
         'model_repetition_number': list(),
         'model_name': list(),
@@ -191,7 +193,7 @@ def create_dataset_with_predictions(data: dict, records: list, config: dict) -> 
         data_dict['prediction'] += prediction.detach().numpy().tolist()
         data_dict['dataset_type'] += n * [dataset_name]
 
-    return data_dict
+    return pd.DataFrame(data_dict)
 
 
 def load_xai_results(config: dict) -> list:
@@ -207,7 +209,27 @@ def load_xai_results(config: dict) -> list:
     return output
 
 
-def create_evaluation_data(config: dict) -> pd.DataFrame:
+def get_correctly_classified_samples(
+    xai_data: pd.DataFrame, predication_data: pd.DataFrame
+) -> pd.DataFrame:
+    merge_columns = [
+        'model_repetition_number',
+        'model_name',
+        'sentence',
+        'target',
+        'dataset_type',
+    ]
+    data_for_evaluation = pd.merge(
+        xai_data, predication_data, how='outer', on=merge_columns
+    )
+
+    correctly_classified_mask = (
+        data_for_evaluation['target'] == data_for_evaluation['prediction']
+    )
+    return data_for_evaluation[correctly_classified_mask]
+
+
+def create_prediction_data(config: dict) -> pd.DataFrame:
     training_records_path = join(
         generate_training_dir(config=config), config['training']['training_records']
     )
@@ -215,40 +237,30 @@ def create_evaluation_data(config: dict) -> pd.DataFrame:
     test_data = load_test_data(config=config)
 
     logger.info(f'Compute prediction dataset.')
-    data_with_predictions = create_dataset_with_predictions(
+    data = create_dataset_with_predictions(
         data=test_data, records=training_records, config=config
     )
-    logger.info(f'Assemble XAI dataset.')
-    xai_results = load_xai_results(config=config)
+    return data
 
-    xai_df = pd.DataFrame(xai_results)
-    prediction_df = pd.DataFrame(data_with_predictions)
 
-    data_for_evaluation = pd.merge(
-        xai_df,
-        prediction_df,
-        how='outer',
-        on=[
-            'model_repetition_number',
-            'model_name',
-            'sentence',
-            'target',
-            'dataset_type',
-        ],
-    )
-
-    correctly_classified_mask = (
-        data_for_evaluation['target'] == data_for_evaluation['prediction']
-    )
-    correctly_classified = data_for_evaluation[correctly_classified_mask]
-    return correctly_classified
+def create_xai_data(config: dict) -> pd.DataFrame:
+    xai_df = pd.DataFrame(load_xai_results(config=config))
+    return xai_df
 
 
 def main(config: Dict) -> None:
-    evaluation_data = create_evaluation_data(config=config)
+    output_dir = generate_evaluation_dir(config=config)
+    data_with_predictions = create_prediction_data(config=config)
+    data_with_predictions.to_csv(join(output_dir, 'data_with_predictions.csv'))
+
+    xai_data = create_xai_data(config=config)
+    xai_data.to_csv(join(output_dir, 'xai_data.csv'))
+
+    evaluation_data = get_correctly_classified_samples(
+        xai_data=xai_data, predication_data=data_with_predictions
+    )
     logger.info(f"Calculate evaluation scores.")
     evaluation_results = evaluate(data=evaluation_data)
-    output_dir = generate_evaluation_dir(config=config)
     filename = config["evaluation"]["evaluation_records"]
     logger.info(f"Output path: {join(output_dir, filename)}")
     dump_as_pickle(data=evaluation_results, output_dir=output_dir, filename=filename)
