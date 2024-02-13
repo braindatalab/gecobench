@@ -37,7 +37,7 @@ def assemble_list_of_words(data: pd.DataFrame) -> List:
 
 def determine_gender(s: str) -> str:
     g = 'female'
-    if '_male_' in s:
+    if '_male' in s:
         g = 'male'
     return g
 
@@ -82,6 +82,7 @@ def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
     for data_name, file_path in dataset_config['raw_data'].items():
         if not data_name.startswith("test_"):
             continue
+        print(f'Processing {data_name}')
         gender = determine_gender(s=data_name)
         dataframe = load_pickle(file_path=file_path)
         word_list = assemble_list_of_words(data=dataframe.drop(['target'], axis=1))
@@ -97,8 +98,11 @@ def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
                 "sentence": word_list_item,
                 "ground_truth": ground_truth_item,
                 "gender": gender,
+                "target": target_item,
             }
-            for word_list_item, ground_truth_item in zip(word_list, ground_truth_list)
+            for word_list_item, ground_truth_item, target_item in zip(
+                word_list, ground_truth_list, dataframe['target'].tolist()
+            )
         ]
 
         filename = dataset_config['output_filenames'][data_name]

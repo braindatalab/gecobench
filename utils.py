@@ -56,6 +56,10 @@ def load_jsonl_as_dict(file_path: str) -> Dict:
     return {key: [obj[key] for obj in objects] for key in keys}
 
 
+def load_jsonl_as_df(file_path: str) -> pd.DataFrame:
+    return pd.DataFrame(load_jsonl(file_path))
+
+
 def load_json_file(file_path: str) -> Dict:
     with open(file_path, 'r') as f:
         file = json.load(f)
@@ -157,17 +161,6 @@ def generate_visualization_dir(config: Dict) -> str:
         config['general']['data_scenario'],
         config['visualization']['output_dir'],
     )
-
-
-def load_test_data(config: dict) -> dict[pd.DataFrame]:
-    data = dict()
-    data_dir = generate_data_dir(config=config)
-    for dataset in config["xai"]["datasets"]:
-        validate_dataset_key(dataset_key=dataset)
-        filename_all = config['data']["datasets"][dataset]['output_filenames']['test']
-        data[dataset] = load_pickle(file_path=join(data_dir, dataset, filename_all))
-
-    return data
 
 
 def set_random_states(seed: int) -> Generator:

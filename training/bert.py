@@ -237,13 +237,15 @@ def dump_history(history: Dict, output_dir: str, history_name: str) -> str:
 
 
 def create_bert_ids(
-    data: List, tokenizer: BertTokenizer, type: str, config: dict
+    data: List, tokenizer: BertTokenizer, type: str = "", config: dict = None
 ) -> List:
+    should_cache = type != "" and config is not None
 
-    cache_key = f"bert_ids_{type}"
-    cache_entry = load_from_cache(cache_key, config)
-    if cache_entry is not None:
-        return cache_entry
+    if should_cache:
+        cache_key = f"bert_ids_{type}"
+        cache_entry = load_from_cache(cache_key, config)
+        if cache_entry is not None:
+            return cache_entry
 
     bert_ids = list()
     for k, sentence in tqdm(enumerate(data), total=len(data)):
@@ -251,7 +253,8 @@ def create_bert_ids(
             create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
         ]
 
-    save_to_cache(cache_key, bert_ids, config)
+    if should_cache:
+        save_to_cache(cache_key, bert_ids, config)
 
     return bert_ids
 

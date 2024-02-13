@@ -124,7 +124,7 @@ def get_integrated_gradients_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-        tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
     explainer = LayerIntegratedGradients(forward_function, model)
     explanations = explainer.attribute(
@@ -180,7 +180,7 @@ def get_deepshap_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-        tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
     # Will throw the same error w.r.t. shape of baseline vs input as with gradient shap
     return DeepLiftShap(model, multiply_by_inputs=None).attribute(
@@ -194,7 +194,7 @@ def get_gradient_shap_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-        tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
     return GradientShap(forward_function).attribute(inputs=data, baselines=baseline)
 
@@ -205,7 +205,6 @@ def get_guided_backprop_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-        tokenizer: BertTokenizer,
 ) -> torch.tensor:
     # UserWarning: Setting backward hooks on ReLU activations.The hooks will be removed after the attribution is finished
     explainer = GuidedBackprop(forward_function)
@@ -235,7 +234,7 @@ def get_shapley_sampling_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-        tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
     explainer = ShapleyValueSampling(forward_function)
     return explainer.attribute(
@@ -437,7 +436,7 @@ def get_lrp_attributions(
     baseline: Tensor,
     model: torch.nn.Module,
     forward_function: Callable,
-        tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
     return LayerLRP(forward_function, model).attribute(inputs=data)
 
@@ -454,7 +453,7 @@ def get_uniform_random_attributions(
     model: torch.nn.Module,
     baseline: Tensor,
     forward_function: Callable,
-        tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer,
 ) -> torch.tensor:
     return torch.rand(data.shape)
 
