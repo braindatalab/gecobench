@@ -267,6 +267,7 @@ def train_model(
     training_params: dict,
     train_loader: DataLoader,
     val_loader: DataLoader,
+    num_labels: int,
     idx: int,
 ) -> list:
     set_random_states(seed=config['general']['seed'] + idx)
@@ -290,7 +291,7 @@ def train_model(
     model = BertForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path="bert-base-uncased",
         revision=config['training']['bert_revision'],
-        num_labels=config["data"]["datasets"][dataset_name]["num_labels"],
+        num_labels=num_labels,
         output_attentions=False,
         output_hidden_states=False,
     )
@@ -376,15 +377,21 @@ def get_bert_tokenizer(config: dict) -> BertTokenizer:
 
 
 def train_bert(
-    dataset: DataSet, dataset_name: str, params: Dict, config: Dict
+    dataset: DataSet, dataset_name: str, num_labels: int, params: Dict, config: Dict
 ) -> List[Tuple]:
     output = list()
     bert_tokenizer = get_bert_tokenizer(config=config)
     bert_ids_train = create_bert_ids(
-        data=dataset.x_train, tokenizer=bert_tokenizer, type=f"train_{dataset_name}", config=config
+        data=dataset.x_train,
+        tokenizer=bert_tokenizer,
+        type=f"train_{dataset_name}",
+        config=config,
     )
     bert_ids_val = create_bert_ids(
-        data=dataset.x_test, tokenizer=bert_tokenizer, type=f"test_{dataset_name}", config=config
+        data=dataset.x_test,
+        tokenizer=bert_tokenizer,
+        type=f"test_{dataset_name}",
+        config=config,
     )
     logger.info(f'Creating BERT datasets')
     train_data = create_tensor_dataset(
@@ -406,6 +413,7 @@ def train_bert(
             training_params=params,
             train_loader=train_loader,
             val_loader=val_loader,
+            num_labels=num_labels,
             idx=k,
         )
 

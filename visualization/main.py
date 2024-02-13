@@ -22,7 +22,6 @@ from utils import (
     load_pickle,
     generate_training_dir,
     generate_xai_dir,
-    generate_data_dir,
 )
 
 MODEL_NAME_MAP = dict(
@@ -254,11 +253,13 @@ def plot_most_common_xai_attributions(
                             width=0.8,
                             native_scale=False,
                             legend=True if 1 == s else False,
-                            palette=sns.color_palette(
-                                'pastel', len(attribution_methods)
-                            )
-                            if 1 == s
-                            else sns.color_palette('muted', len(attribution_methods)),
+                            palette=(
+                                sns.color_palette('pastel', len(attribution_methods))
+                                if 1 == s
+                                else sns.color_palette(
+                                    'muted', len(attribution_methods)
+                                )
+                            ),
                         )
                         start = (
                             0
@@ -912,7 +913,8 @@ def plot_correlation_between_words_and_labels(
             axs[k].set_xticks([-1, -0.5, 0, 0.5, 1], [1, 0.5, 0, 0.5, 1])
             axs[k].set_yticks(ranks, ranks + 1)
             axs[k].set_xlabel(
-                '$\mathrm{Corr}(x_{TFidf}, y_{male})$ vs. $\mathrm{Corr}(x_{TFidf}, y_{female})$', fontsize=4
+                '$\mathrm{Corr}(x_{TFidf}, y_{male})$ vs. $\mathrm{Corr}(x_{TFidf}, y_{female})$',
+                fontsize=4,
             )
             axs[k].xaxis.set_label_coords(0.5, -0.11)
             axs[k].set_ylabel('Rank', fontsize=4)
@@ -935,16 +937,11 @@ def plot_correlation_between_words_and_labels(
 
 
 def create_data_plots(base_output_dir: str, config: dict) -> None:
-    data_dir = generate_data_dir(config=config)
+    # TODO: Adjust
+    data_dir = "FOO"  # generate_data_dir(config=config)
     filename_all = config['data']['output_filenames']['test_all']
     filename_subject = config['data']['output_filenames']['test_subject']
-    columns_of_interest = [
-        'sentence',
-        'ground_truth',
-        'target',
-        'gender',
-        'dataset_type',
-    ]
+
     dataset_all = load_pickle(file_path=join(data_dir, filename_all))
     dataset_subject = load_pickle(file_path=join(data_dir, filename_subject))
     data = dict(all=dataset_all, subject=dataset_subject)

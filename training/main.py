@@ -8,7 +8,13 @@ from sklearn.model_selection import train_test_split
 from common import DataSet, DatasetKeys, validate_dataset_key
 from training.bert import train_bert
 from training.simple_model import train_simple_attention_model
-from utils import dump_as_pickle, load_pickle, generate_data_dir, generate_training_dir
+from utils import (
+    dump_as_pickle,
+    load_json_file,
+    load_jsonl_as_dict,
+    filter_train_datasets,
+    generate_training_dir,
+)
 
 
 def split_train_data_into_train_val_data(
@@ -30,48 +36,32 @@ def extract_name_of_dataset(s: str) -> str:
 
 def train_models(config: Dict) -> List:
     records = list()
-    for name in config['training']['datasets']:
+
+    dataset_config = load_json_file(
+        join(config["data"]["data_dir"], "data_config.json")
+    )
+
+    for name in filter_train_datasets(config):
         validate_dataset_key(name)
-        dataset = DatasetHandler[name](config=config, dataset_key=name)
+        dataset = load_dataset(config, dataset_config, name)
+        num_labels = dataset_config['datasets'][name]['num_labels']
         for model_name, params in config['training']['models'].items():
-            records += TrainModel[model_name](dataset, name, params, config)
+            records += TrainModel[model_name](dataset, name, num_labels, params, config)
 
     return records
 
 
-def load_gender_dataset(config: Dict, dataset_key: str) -> DataSet:
-    data_dir = generate_data_dir(config=config)
+def load_dataset(config: Dict, dataset_config: Dict, dataset_key: str) -> DataSet:
     path = join(
-        data_dir,
+        config["data"]["data_dir"],
         dataset_key,
-        config['data']['datasets'][dataset_key]['output_filenames']['train'],
+        dataset_config['datasets'][dataset_key]['output_filenames']['train'],
     )
 
-    raw_data = load_pickle(file_path=path)
+    raw_data = load_jsonl_as_dict(path)
     dataset = split_train_data_into_train_val_data(
-        x=raw_data.data, y=raw_data.target, config=config
+        x=raw_data["sentence"], y=raw_data["label"], config=config
     )
-
-    return dataset
-
-
-def load_sentiment_dataset(config: Dict, dataset_key: str) -> DataSet:
-    logger.info(f'Loading dataset {dataset_key}')
-    data_dir = generate_data_dir(config=config)
-    path = join(
-        data_dir,
-        dataset_key,
-        config['data']['datasets'][dataset_key]['output_filenames']['train'],
-    )
-
-    logger.info(f'Loading dataset from {path}')
-    df = pd.read_csv(path)
-    x = df['text'].apply(lambda x: x.split(" ")).tolist()
-    y = df['label'].tolist()
-
-    logger.info(f'Splitting dataset into train and val')
-    dataset = split_train_data_into_train_val_data(x=x, y=y, config=config)
-    logger.info(f'Dataset loaded')
 
     return dataset
 
@@ -83,13 +73,6 @@ TrainModel = {
     'bert_only_embedding': train_bert,
     'bert_randomly_init_embedding_classification': train_bert,
     'simple_model': train_simple_attention_model,
-}
-
-DatasetHandler = {
-    DatasetKeys.gender_all.value: load_gender_dataset,
-    DatasetKeys.gender_subj.value: load_gender_dataset,
-    DatasetKeys.sentiment_twitter.value: load_sentiment_dataset,
-    DatasetKeys.sentiment_imdb.value: load_sentiment_dataset,
 }
 
 

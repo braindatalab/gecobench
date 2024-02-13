@@ -11,38 +11,16 @@
     }
   },
   "data": {
-    "output_dir": "data",
-    "datasets": {
-      "gender_all": {
-        "num_labels": 2,
-        "raw_data": {
-          "train": "data/training_df_all.pkl",
-          "test_female": "data/df_validation_female_all.pkl",
-          "test_male": "data/df_validation_male_all.pkl",
-          "ground_truth": "data/gt_all_val.pkl"
-        },
-        "output_filenames": {
-          "train": "training_all.pkl",
-          "test_female": "test_female_all.pkl",
-          "test_male": "test_male_all.pkl",
-          "test": "test_all.pkl"
-        }
-      },
-      "gender_subj": {
-        "num_labels": 2,
-        "raw_data": {
-          "train": "data/training_df_subj.pkl",
-          "test_female": "data/df_validation_female_subj.pkl",
-          "test_male": "data/df_validation_male_subj.pkl",
-          "ground_truth": "data/gt_subj_val.pkl"
-        },
-        "output_filenames": {
-          "train": "training_subject.pkl",
-          "test_female": "test_female_subject.pkl",
-          "test_male": "test_male_subject.pkl",
-          "test": "test_subject.pkl"
-        }
-      }
+    "data_dir": "artifacts/data/nlp-benchmark_2024-02-13-19-29-07",
+    "tags": {
+      "gender_all": [
+        "train",
+        "xai"
+      ],
+      "gender_subj": [
+        "train",
+        "xai"
+      ]
     }
   },
   "training": {
@@ -53,10 +31,6 @@
     "device": "cuda",
     "training_records": "training_records.pkl",
     "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
-    "datasets": [
-      "gender_all",
-      "gender_subj"
-    ],
     "models": {
       "bert_randomly_init_embedding_classification": {
         "batch_size": 32,
@@ -116,10 +90,6 @@
     "intermediate_raw_xai_result_prefix": "intermediate_raw_xai_result",
     "xai_records": "xai_records.pkl",
     "num_workers": 4,
-    "datasets": [
-      "gender_all",
-      "gender_subj"
-    ],
     "class_of_interest": 1,
     "methods": [
       "Saliency",

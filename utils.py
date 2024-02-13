@@ -76,6 +76,16 @@ def append_date(s: str) -> str:
     return f'{s}-{date}'
 
 
+def filter_train_datasets(config: Dict) -> List[str]:
+    tags = config["data"]["tags"]
+    return [dataset for dataset in tags.keys() if "train" in tags[dataset]]
+
+
+def filter_xai_datasets(config: Dict) -> List[str]:
+    tags = config["data"]["tags"]
+    return [dataset for dataset in tags.keys() if "xai" in tags[dataset]]
+
+
 def on_local_platform() -> bool:
     return (
         True
@@ -115,15 +125,6 @@ def save_to_cache(key: str, data: Any, config: dict):
 
 def generate_cache_dir(config: Dict) -> str:
     return join(config['general']['base_dir'], "cache")
-
-
-def generate_data_dir(config: Dict) -> str:
-    return join(
-        LOCAL_DIR if on_local_platform() else config['general']['apptainer_data_dir'],
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
-        config['data']['output_dir'],
-    )
 
 
 def generate_training_dir(config: Dict) -> str:

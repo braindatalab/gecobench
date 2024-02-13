@@ -4,7 +4,7 @@ from os.path import join
 from typing import Dict
 
 from common import NAME_OF_DATA_CONFIG, NAME_OF_PROJECT_CONFIG, DatasetKeys
-from utils import generate_data_dir, dump_as_json_file, today_formatted
+from utils import dump_as_json_file, today_formatted
 
 from .handler.gender import prepare_gender_all_data, prepare_gender_subj_data
 from .handler.sentiment_twitter import prepare_twitter_sentiment_data
