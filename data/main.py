@@ -1,13 +1,10 @@
 from copy import deepcopy
+import os
 from os.path import join
 from typing import Dict
 
-from common import NAME_OF_PROJECT_CONFIG, DatasetKeys
-from utils import (
-    append_date,
-    generate_data_dir,
-    dump_as_json_file,
-)
+from common import NAME_OF_DATA_CONFIG, NAME_OF_PROJECT_CONFIG, DatasetKeys
+from utils import generate_data_dir, dump_as_json_file, today_formatted
 
 from .handler.gender import prepare_gender_all_data, prepare_gender_subj_data
 from .handler.sentiment_twitter import prepare_twitter_sentiment_data
@@ -21,26 +18,20 @@ HANDLERS = {
 }
 
 
-def add_date_to_data_scenario_name(config: Dict) -> Dict:
-    config_copy = deepcopy(config)
-    config_copy['general']['data_scenario'] = append_date(
-        s=config_copy['general']['data_scenario']
-    )
-    return config_copy
-
-
 def main(config: Dict) -> None:
-    config = add_date_to_data_scenario_name(config=config)
-    data_output_dir = generate_data_dir(config=config)
+    config["created"] = today_formatted()
+
+    data_output_dir = join(
+        config["output_dir"], f"{config['dataset_name']}_{config['created']}"
+    )
+    os.makedirs(data_output_dir, exist_ok=True)
 
     # Build every dataset specified in config
-    datasets = config["data"]["datasets"].keys()
+    datasets = config["datasets"].keys()
     for dataset in datasets:
         HANDLERS[dataset](config=config, data_output_dir=data_output_dir)
 
-    dump_as_json_file(
-        data=config, file_path=join(data_output_dir, NAME_OF_PROJECT_CONFIG)
-    )
+    dump_as_json_file(data=config, file_path=join(data_output_dir, NAME_OF_DATA_CONFIG))
 
 
 if __name__ == '__main__':

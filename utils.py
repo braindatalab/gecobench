@@ -33,6 +33,29 @@ def dump_as_pickle(data: Any, output_dir: str, filename: str) -> None:
         pickle.dump(data, file)
 
 
+def dump_as_jsonl(data: List[Dict], output_dir: str, filename: str) -> None:
+    assert filename.endswith('.jsonl')
+    assert isinstance(data, list)
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    with open(join(output_dir, f'{filename}'), 'w') as file:
+        for line in data:
+            file.write(json.dumps(line, ensure_ascii=False) + '\n')
+
+
+def load_jsonl(file_path: str) -> List[Dict]:
+    with open(file_path, 'r') as file:
+        return [json.loads(line) for line in file]
+
+
+def load_jsonl_as_dict(file_path: str) -> Dict:
+    objects = load_jsonl(file_path)
+
+    # Assume all objects have the same keys
+    keys = objects[0].keys()
+    return {key: [obj[key] for obj in objects] for key in keys}
+
+
 def load_json_file(file_path: str) -> Dict:
     with open(file_path, 'r') as f:
         file = json.load(f)
@@ -44,8 +67,12 @@ def dump_as_json_file(data: Dict, file_path: str) -> None:
         json.dump(obj=data, fp=f)
 
 
+def today_formatted() -> str:
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+
 def append_date(s: str) -> str:
-    date = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    date = today_formatted
     return f'{s}-{date}'
 
 

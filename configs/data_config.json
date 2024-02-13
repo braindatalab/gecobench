@@ -1,0 +1,60 @@
+{
+    "dataset_name": "nlp-benchmark",
+    "output_dir": "artifacts/data",
+    "seed": 42,
+    "datasets": {
+        "gender_all": {
+            "num_labels": 2,
+            "raw_data": {
+                "train": "data/raw/training_df_all.pkl",
+                "test_female": "data/raw/df_validation_female_all.pkl",
+                "test_male": "data/raw/df_validation_male_all.pkl",
+                "ground_truth": "data/raw/gt_all_val.pkl"
+            },
+            "output_filenames": {
+                "train": "training_all.jsonl",
+                "test_female": "test_female_all.jsonl",
+                "test_male": "test_male_all.jsonl",
+                "test": "test_all.jsonl"
+            }
+        },
+        "gender_subj": {
+            "num_labels": 2,
+            "raw_data": {
+                "train": "data/raw/training_df_subj.pkl",
+                "test_female": "data/raw/df_validation_female_subj.pkl",
+                "test_male": "data/raw/df_validation_male_subj.pkl",
+                "ground_truth": "data/raw/gt_subj_val.pkl"
+            },
+            "output_filenames": {
+                "train": "training_subject.jsonl",
+                "test_female": "test_female_subject.jsonl",
+                "test_male": "test_male_subject.jsonl",
+                "test": "test_all.jsonl"
+            }
+        },
+        "sentiment_twitter": {
+            "num_labels": 3,
+            "kaggle": {
+                "user": "jp797498e",
+                "name": "twitter-entity-sentiment-analysis"
+            },
+            "output_filenames": {
+                "train": "train.jsonl",
+                "test": "test.jsonl"
+            }
+        },
+        "sentiment_imdb": {
+            "num_labels": 2,
+            "test_split": 0.2,
+            "kaggle": {
+                "user": "yasserh",
+                "name": "imdb-movie-ratings-sentiment-analysis"
+            },
+            "output_filenames": {
+                "train": "train.jsonl",
+                "test": "test.jsonl"
+            }
+        }
+    }
+}

@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 NAME_OF_PROJECT_CONFIG = 'project_config.json'
+NAME_OF_DATA_CONFIG = 'data_config.json'
 CLUSTER_PLATFORM_NAME = '#102-Ubuntu'
 CLUSTER_DATA_DIR = '/mnt'
 DATASET_ALL = 'all'
