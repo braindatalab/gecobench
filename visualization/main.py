@@ -15,11 +15,13 @@ from loguru import logger
 from pandas.core.groupby.generic import DataFrameGroupBy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
+from common import DatasetKeys
 
 from utils import (
     generate_visualization_dir,
     generate_evaluation_dir,
     load_pickle,
+    load_jsonl_as_df,
     generate_training_dir,
     generate_xai_dir,
 )
@@ -789,6 +791,7 @@ def load_xai_records(config: dict) -> list:
 
 def get_correctly_classified_records(records: list) -> list:
     result = list()
+    # TODO: Where is the correct_classified_intersection field coming from?
     for r in records:
         if 0 == r['correct_classified_intersection']:
             continue
@@ -937,13 +940,16 @@ def plot_correlation_between_words_and_labels(
 
 
 def create_data_plots(base_output_dir: str, config: dict) -> None:
-    # TODO: Adjust
-    data_dir = "FOO"  # generate_data_dir(config=config)
-    filename_all = config['data']['output_filenames']['test_all']
-    filename_subject = config['data']['output_filenames']['test_subject']
+    filename_all = join(
+        config["data"]["data_dir"], DatasetKeys.gender_all.value, "test.jsonl"
+    )
+    filename_subj = join(
+        config["data"]["data_dir"], DatasetKeys.gender_subj.value, "test.jsonl"
+    )
 
-    dataset_all = load_pickle(file_path=join(data_dir, filename_all))
-    dataset_subject = load_pickle(file_path=join(data_dir, filename_subject))
+    dataset_all = load_jsonl_as_df(filename_all)
+    dataset_subject = load_jsonl_as_df(filename_subj)
+
     data = dict(all=dataset_all, subject=dataset_subject)
     visualization_methods = dict(
         correlation_plot=plot_correlation_between_words_and_labels,

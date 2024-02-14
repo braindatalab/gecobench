@@ -76,7 +76,7 @@ def today_formatted() -> str:
 
 
 def append_date(s: str) -> str:
-    date = today_formatted
+    date = today_formatted()
     return f'{s}-{date}'
 
 

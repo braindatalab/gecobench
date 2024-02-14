@@ -241,15 +241,10 @@ def loop_over_training_records(
 def load_test_data(config: dict) -> dict[pd.DataFrame]:
     data = dict()
 
-    dataset_config = load_json_file(
-        join(config["data"]["data_dir"], "data_config.json")
-    )
-
     for dataset in filter_xai_datasets(config):
         validate_dataset_key(dataset_key=dataset)
-        filename = dataset_config["datasets"][dataset]['output_filenames']['test']
         data[dataset] = load_jsonl_as_df(
-            file_path=join(config["data"]["data_dir"], dataset, filename)
+            file_path=join(config["data"]["data_dir"], dataset, "test.jsonl")
         )
 
     return data

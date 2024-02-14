@@ -12,25 +12,25 @@
                 "ground_truth": "data/raw/gt_all_val.pkl"
             },
             "output_filenames": {
-                "train": "training_all.jsonl",
-                "test_female": "test_female_all.jsonl",
-                "test_male": "test_male_all.jsonl",
-                "test": "test_all.jsonl"
+                "train": "train.jsonl",
+                "test_female": "test_female.jsonl",
+                "test_male": "test_male.jsonl",
+                "test": "test.jsonl"
             }
         },
         "gender_subj": {
             "num_labels": 2,
             "raw_data": {
                 "train": "data/raw/training_df_subj.pkl",
-                "test_female": "data/raw/df_validation_female_subj.pkl",
-                "test_male": "data/raw/df_validation_male_subj.pkl",
+                "test_female": "data/raw/df_validation_female.pkl",
+                "test_male": "data/raw/df_validation_male.pkl",
                 "ground_truth": "data/raw/gt_subj_val.pkl"
             },
             "output_filenames": {
-                "train": "training_subject.jsonl",
+                "train": "train.jsonl",
                 "test_female": "test_female_subject.jsonl",
                 "test_male": "test_male_subject.jsonl",
-                "test": "test_all.jsonl"
+                "test": "test.jsonl"
             }
         },
         "sentiment_twitter": {

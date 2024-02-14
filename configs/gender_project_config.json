@@ -11,7 +11,7 @@
     }
   },
   "data": {
-    "data_dir": "artifacts/data/nlp-benchmark_2024-02-13-19-29-07",
+    "data_dir": "artifacts/data/nlp-benchmark_2024-02-13-20-41-03",
     "tags": {
       "gender_all": [
         "train",
@@ -111,10 +111,10 @@
     "output_dir": "visualization",
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
-      "_data": [
+      "data": [
         "correlation_plot"
       ],
-      "_model": [
+      "model": [
         "model_performance"
       ],
       "_xai": [
@@ -123,11 +123,11 @@
       ],
       "evaluation": [
         "roc_auc",
-        "_precision_recall_auc",
-        "_avg_precision",
-        "_precision_specificity",
-        "_top_k_precision",
-        "_mass_accuracy"
+        "precision_recall_auc",
+        "avg_precision",
+        "precision_specificity",
+        "top_k_precision",
+        "mass_accuracy"
       ]
     }
   }
