@@ -83,7 +83,7 @@ Ssh into the cluster and navigate to the code directory.
 As mentioned above, this creates a timestamped folder for the artifacts and copies the config files to the folder.
 
 ```bash
-python setup_experiment.py
+python3 setup_experiment.py
 ```
 
 By default it will create the artifacts folder in the code directory.
@@ -93,13 +93,13 @@ By default it will create the artifacts folder in the code directory.
 To run the code we need to first build the container. This step only needs to be repeated if the dependencies change.
 
 ```bash
-python ./scripts/hydra/submit_hydra_job.py --mode build --config ./artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/sentiment_project_config.json
+python3 ./scripts/hydra/submit_hydra_job.py --mode build --config ./artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/sentiment_project_config.json
 ```
 
 Afterwards we can run the container with the following command:
 
 ```bash
-python ./scripts/hydra/submit_hydra_job.py --mode training --config ./artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/sentiment_project_config.json
+python3 ./scripts/hydra/submit_hydra_job.py --mode training --config ./artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/sentiment_project_config.json
 ```
 
 Again, the mode depends on the previous steps and has to be run in the order `training`, `xai`, `evaluation` and `visualization`.
