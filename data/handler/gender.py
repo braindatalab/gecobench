@@ -104,10 +104,6 @@ def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
                 word_list, ground_truth_list, dataframe['target'].tolist()
             )
         ]
-
-        filename = dataset_config['output_filenames'][data_name]
-        dump_as_jsonl(data=test_set, output_dir=output_dir, filename=filename)
-
         sets += test_set
 
     # Save full test set

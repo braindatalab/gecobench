@@ -15,25 +15,23 @@ if [ -z "$1" ]; then
 fi
 
 # ZIP the data
-cd artifacts
-zip -r temp_artifacts.zip $1/data
-cd ..
+# path e.g. nlp-benchmark_2024-02-15-09-58-06
+pushd artifacts/data
+zip -r temp_artifacts.zip $1/*
+popd
 
 HYDRA_SSH="$HYDRA_SSH_USER@hydra"
 
-echo "Copying data to $HYDRA_SSH_USER@hydra:$HYDRA_BASE_DIR/data/artifacts"
-
-# Create the artifacts folder on the cluster if it doesn't exist
-ssh $HYDRA_SSH "mkdir -p $HYDRA_BASE_DIR/data/artifacts"
+echo "Copying data to $HYDRA_SSH_USER@hydra:$HYDRA_DATA_DIR"
 
 # Copy the zip file to the cluster
-scp artifacts/temp_artifacts.zip $HYDRA_SSH:$HYDRA_BASE_DIR/data/artifacts/temp_artifacts.zip
+scp artifacts/data/temp_artifacts.zip $HYDRA_SSH:$HYDRA_DATA_DIR/temp_artifacts.zip
 
 # Unzip the data
-ssh $HYDRA_SSH "unzip $HYDRA_BASE_DIR/data/artifacts/temp_artifacts.zip -d $HYDRA_BASE_DIR/data/artifacts"
+ssh $HYDRA_SSH "unzip $HYDRA_DATA_DIR/temp_artifacts.zip -d $HYDRA_DATA_DIR"
 
 # Remove the zip file
-ssh $HYDRA_SSH "rm $HYDRA_BASE_DIR/data/artifacts/temp_artifacts.zip"
+ssh $HYDRA_SSH "rm $HYDRA_DATA_DIR/temp_artifacts.zip"
 
 # Remove the local zip file
-rm artifacts/temp_artifacts.zip
+rm artifacts/data/temp_artifacts.zip
