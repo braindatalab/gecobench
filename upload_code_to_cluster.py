@@ -12,7 +12,9 @@ from utils import append_date
 
 load_dotenv()
 
-hydra_base_dir = os.environ.get('HYDRA_BASE_DIR') or '/home/space/uniml/rick'
+hydra_base_dir = (
+    os.path.dirname(os.environ.get('HYDRA_PROJECT_DIR')) or '/home/space/uniml/rick'
+)
 hpc_base_dir = os.environ.get('HPC_BASE_DIR') or '/home/users/r/rick'
 known_hosts_path = os.environ.get('KNOWN_HOSTS') or '/home/rick/.ssh/known_hosts'
 user_name = os.environ.get('HYDRA_SSH_USER') or 'rick'
