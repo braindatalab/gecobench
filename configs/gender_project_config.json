@@ -10,7 +10,7 @@
     }
   },
   "data": {
-    "data_dir": "artifacts/data/nlp-benchmark_2024-02-13-20-41-03",
+    "data_dir": "/home/space/datasets/xai_nlp/nlp-benchmark_2024-02-15-10-14-37",
     "tags": {
       "gender_all": [
         "train",
@@ -23,7 +23,7 @@
     }
   },
   "training": {
-    "output_dir": "training",
+    "output_dir": "training_gender",
     "num_workers": 4,
     "val_size": 0.2,
     "num_training_repetitions": 10,
@@ -84,7 +84,7 @@
     }
   },
   "xai": {
-    "output_dir": "xai",
+    "output_dir": "xai_gender",
     "intermediate_xai_result_prefix": "intermediate_xai_result",
     "intermediate_raw_xai_result_prefix": "intermediate_raw_xai_result",
     "xai_records": "xai_records.pkl",
@@ -102,12 +102,12 @@
     ]
   },
   "evaluation": {
-    "output_dir": "evaluation",
+    "output_dir": "evaluation_gender",
     "num_workers": 4,
     "evaluation_records": "evaluation_records.pkl"
   },
   "visualization": {
-    "output_dir": "visualization",
+    "output_dir": "visualization_gender",
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
       "data": [

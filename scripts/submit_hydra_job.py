@@ -3,6 +3,10 @@ import os
 import sys
 import json
 
+SCRIPT_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), "hydra")
+BUILD_SCRIPT = os.path.join(SCRIPT_PATH, "cluster_job_hydra_build.sh")
+RUN_GPU_SCRIPT = os.path.join(SCRIPT_PATH, "cluster_job_hydra_gpu_run_prebuild.sh")
+RUN_CPU_SCRIPT = os.path.join(SCRIPT_PATH, "cluster_job_hydra_cpu_run_prebuild.sh")
 
 def main():
     parser = argparse.ArgumentParser(description='Submit a hydra job')
@@ -10,7 +14,7 @@ def main():
         '--config',
         dest='config',
         required=True,
-        help='File path to project config.',
+        help='File path to project config from folder created by setup_experiment.py',
         type=str,
         default=1,
     )
@@ -49,18 +53,21 @@ def main():
         data_dir = project_config["data"]["data_dir"]
         artifact_dir = project_config["general"]["artifacts_dir"]
         project_dir = project_config["general"]["project_dir"]
+    
+    config_file_name = args.config.split("/")[-1]
+    config_path = f"/mnt/artifacts/configs/{config_file_name}"
 
     if args.mode == "build":
         os.system(
-            f"sbatch --mail-user={args.mail} ./hydra/clust_job_hydra_build.sh {project_dir}"
+            f"sbatch --mail-user={args.mail} {BUILD_SCRIPT} {project_dir}"
         )
     elif args.device == "gpu":
         os.system(
-            f"sbatch --mail-user={args.mail} ./hydra/cluster_job_hydra_gpu_run_prebuild.sh {project_dir} {data_dir} {artifact_dir} {args.config} {args.mode}"
+            f"sbatch --mail-user={args.mail} {RUN_GPU_SCRIPT} {project_dir} {data_dir} {artifact_dir} {args.mode} {config_path} "
         )
     elif args.device == "cpu":
         os.system(
-            f"sbatch --mail-user={args.mail} ./hydra/cluster_job_hydra_cpu_run_prebuild.sh {project_dir} {data_dir} {artifact_dir} {args.config} {args.mode}"
+            f"sbatch --mail-user={args.mail} {RUN_CPU_SCRIPT} {project_dir} {data_dir} {artifact_dir} {args.mode} {config_path} "
         )
     else:
         print("Device not recognized. Please choose gpu or cpu.")

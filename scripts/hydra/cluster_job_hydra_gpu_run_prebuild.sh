@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 #SBATCH --job xai-nlp-benchmark
-#SBATCH --partition=gpu-5h
+#SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --output=logs/xai-nlp-benchmark-job-%j.out
 
-# $1 root_dir e.g. /home/space/uniml/rick
-# $2 name of the code folder e.g. xai-nlp-benchmark-2024-01-01-01-01-01
-# $3 mode e.g. training, visualization, evaluation, xai
-# $4 config file
+# $1 PROJECT_DIR
+# $2 DATA_DIR
+# $3 ARTIFACT_DIR
+# $4 mode
+# $5 CONFIG_PATH in mounted artifact dir
 
-export DATADIR=$1/data # e.g. /home/space/uniml/rick/data
-export WORKDIR=$1/$2 # e.g. /home/space/uniml/rick/xai-nlp-benchmark-2024-01-01-01-01-01
-cd $WORKDIR
+PROJECT_DIR=$1
+DATA_DIR=$2
+ARTIFACT_DIR=$3
+MODE=$4
+CONFIG=$5
+
+cd $PROJECT_DIR
 ls -l
-apptainer run --env "WANDB_API_KEY=$WANDB_API_KEY" --nv --bind $DATADIR:/mnt --bind $WORKDIR:/workdir $WORKDIR/nlp-apptainerfile.sif "$3" "$4"
+apptainer run \
+    --env "WANDB_API_KEY=$WANDB_API_KEY" --nv \
+    --bind "$DATA_DIR:/mnt/data" \
+    --bind "$ARTIFACT_DIR:/mnt/artifacts" \
+    --bind "$PROJECT_DIR:/workdir" \
+    $PROJECT_DIR/nlp-apptainerfile.sif "$MODE" "$CONFIG"

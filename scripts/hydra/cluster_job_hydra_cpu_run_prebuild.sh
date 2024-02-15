@@ -7,9 +7,23 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --output=logs/xai-nlp-benchmark-job-%j.out
 
+# $1 PROJECT_DIR
+# $2 DATA_DIR
+# $3 ARTIFACT_DIR
+# $4 mode
+# $5 CONFIG_PATH in mounted artifact dir
 
-export DATADIR=/home/space/uniml/rick/data
-export WORKDIR=/home/space/uniml/rick/$1
-cd $WORKDIR
+PROJECT_DIR=$1
+DATA_DIR=$2
+ARTIFACT_DIR=$3
+MODE=$4
+CONFIG=$5
+
+cd $PROJECT_DIR
 ls -l
-apptainer run --env "WANDB_API_KEY=$WANDB_API_KEY" --bind $DATADIR:/mnt --bind $WORKDIR:/workdir /home/rick/nlp-apptainerfile.sif "$2" "$3"
+apptainer run \
+    --env "WANDB_API_KEY=$WANDB_API_KEY" --nv \
+    --bind "$DATA_DIR:/mnt/data" \
+    --bind "$ARTIFACT_DIR:/mnt/artifacts" \
+    --bind "$PROJECT_DIR:/workdir" \
+    $PROJECT_DIR/nlp-apptainerfile.sif "$MODE" "$CONFIG"

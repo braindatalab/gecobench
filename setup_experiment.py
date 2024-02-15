@@ -5,7 +5,6 @@ import argparse
 from datetime import datetime
 import json
 
-
 class color:
     PURPLE = '\033[95m'
     CYAN = '\033[96m'
@@ -17,7 +16,6 @@ class color:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
     END = '\033[0m'
-
 
 def get_git_commit_hash():
     try:
@@ -76,7 +74,9 @@ def main():
         print(
             f"{color.GREEN}python run_experiments.py --config {config_path} --mode training{color.END}\n"
         )
-
+        print("or to run it on the cluster:")
+        print(f"{color.GREEN}python3 ./scripts/submit_hydra_job.py --mode build --config {config_path}{color.END}")
+        print(f"{color.GREEN}python3 ./scripts/submit_hydra_job.py --mode training --config {config_path}{color.END}\n")
 
 if __name__ == "__main__":
     main()

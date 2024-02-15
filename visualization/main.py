@@ -24,6 +24,8 @@ from utils import (
     load_jsonl_as_df,
     generate_training_dir,
     generate_xai_dir,
+    generate_project_dir,
+    generate_data_dir
 )
 
 MODEL_NAME_MAP = dict(
@@ -812,14 +814,14 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
         base_output_dir = (
-            join(config['general']['project_dir'], base_output_dir)
+            join(generate_project_dir(), base_output_dir)
             if plot_type == 'sentence_html_plot'
             else base_output_dir
         )
         if v is None:
             continue
         if 'sentence_html_plot' == plot_type:
-            base_output_dir = join(config['general']['project_dir'], base_output_dir)
+            base_output_dir = join(generate_project_dir(), base_output_dir)
         data = create_dataset_for_xai_plot(
             plot_type=plot_type, xai_records=filtered_xai_records
         )
@@ -939,10 +941,10 @@ def plot_correlation_between_words_and_labels(
 
 def create_data_plots(base_output_dir: str, config: dict) -> None:
     filename_all = join(
-        config["data"]["data_dir"], DatasetKeys.gender_all.value, "test.jsonl"
+        generate_data_dir(config), DatasetKeys.gender_all.value, "test.jsonl"
     )
     filename_subj = join(
-        config["data"]["data_dir"], DatasetKeys.gender_subj.value, "test.jsonl"
+        generate_data_dir(config), DatasetKeys.gender_subj.value, "test.jsonl"
     )
 
     dataset_all = load_jsonl_as_df(filename_all)

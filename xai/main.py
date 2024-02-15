@@ -28,6 +28,7 @@ from utils import (
     append_date,
     load_model,
     load_jsonl_as_dict,
+    generate_data_dir
 )
 from xai.methods import get_captum_attributions
 
@@ -244,7 +245,7 @@ def load_test_data(config: dict) -> dict[pd.DataFrame]:
     for dataset in filter_xai_datasets(config):
         validate_dataset_key(dataset_key=dataset)
         data[dataset] = load_jsonl_as_df(
-            file_path=join(config["data"]["data_dir"], dataset, "test.jsonl")
+            file_path=join(generate_data_dir(config), dataset, "test.jsonl")
         )
 
     return data

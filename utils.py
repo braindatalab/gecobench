@@ -6,7 +6,6 @@ from pathlib import Path
 import random
 from typing import Any, Dict, List
 import pickle
-
 import pandas as pd
 import numpy as np
 import torch
@@ -18,8 +17,7 @@ import os
 
 from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 
-LOCAL_PLATFORM_NAME = '22.04.1-Ubuntu'
-LOCAL_DIR = ''
+
 
 
 def load_pickle(file_path: str) -> Any:
@@ -90,14 +88,6 @@ def filter_xai_datasets(config: Dict) -> List[str]:
     return [dataset for dataset in tags.keys() if "xai" in tags[dataset]]
 
 
-def on_local_platform() -> bool:
-    return (
-        True
-        if LOCAL_PLATFORM_NAME in platform.version().split(' ')[0].split('~')[-1]
-        else False
-    )
-
-
 def dict_hash(dictionary) -> str:
     """MD5 hash of a dictionary."""
     dhash = hashlib.md5()
@@ -127,34 +117,58 @@ def save_to_cache(key: str, data: Any, config: dict):
         pickle.dump(data, file)
 
 
+def is_hydra():
+    return os.environ.get("SLURM_WORKING_CLUSTER", "").startswith("hydra")
+
+
+def generate_data_dir(config: Dict) -> str:
+    if is_hydra():
+        return "/mnt/data"
+    return config["data"]["data_dir"]
+
+
+def generate_artifacts_dir(config: Dict) -> str:
+    if is_hydra():
+        return "/mnt/artifacts"
+    
+    return config["general"]["artifacts_dir"]
+
+
+def generate_project_dir(config: Dict) -> str:
+    if is_hydra():
+        return "/workdir"
+    
+    return config["general"]["project_dir"]
+
+
 def generate_cache_dir(config: Dict) -> str:
-    return join(config['general']['artifacts_dir'], "cache")
+    return join(generate_artifacts_dir(config), "cache")
 
 
 def generate_training_dir(config: Dict) -> str:
     return join(
-        config['general']['artifacts_dir'],
+        generate_artifacts_dir(config),
         config['training']['output_dir'],
     )
 
 
 def generate_xai_dir(config: Dict) -> str:
     return join(
-        config['general']['artifacts_dir'],
+        generate_artifacts_dir(config),
         config['xai']['output_dir'],
     )
 
 
 def generate_evaluation_dir(config: Dict) -> str:
     return join(
-        config['general']['artifacts_dir'],
+        generate_artifacts_dir(config),
         config['evaluation']['output_dir'],
     )
 
 
 def generate_visualization_dir(config: Dict) -> str:
     return join(
-        config['general']['artifacts_dir'],
+        generate_artifacts_dir(config),
         config['visualization']['output_dir'],
     )
 

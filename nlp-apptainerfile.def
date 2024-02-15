@@ -9,6 +9,8 @@ From: python:3.10-slim
     apt-get update && apt-get install -y --no-install-recommends gcc
     /usr/local/bin/python -m pip install --upgrade pip
     pip install poetry
+    mkdir /mnt/artifacts
+    mkdir /mnt/data
     mkdir /workdir
     cd installdir
     poetry config virtualenvs.in-project true
