@@ -5,10 +5,19 @@ import tarfile
 from os.path import basename, join
 from time import sleep
 from paramiko.client import SSHClient
+from datetime import datetime
 
 from dotenv import load_dotenv
 
-from utils import append_date
+
+def today_formatted() -> str:
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+
+def append_date(s: str) -> str:
+    date = today_formatted()
+    return f'{s}-{date}'
+
 
 load_dotenv()
 

@@ -3,10 +3,11 @@ import os
 import sys
 import json
 
-SCRIPT_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), "hydra")
+SCRIPT_PATH = os.path.abspath(os.path.dirname(__file__))
 BUILD_SCRIPT = os.path.join(SCRIPT_PATH, "cluster_job_hydra_build.sh")
 RUN_GPU_SCRIPT = os.path.join(SCRIPT_PATH, "cluster_job_hydra_gpu_run_prebuild.sh")
 RUN_CPU_SCRIPT = os.path.join(SCRIPT_PATH, "cluster_job_hydra_cpu_run_prebuild.sh")
+
 
 def main():
     parser = argparse.ArgumentParser(description='Submit a hydra job')
@@ -53,14 +54,12 @@ def main():
         data_dir = project_config["data"]["data_dir"]
         artifact_dir = project_config["general"]["artifacts_dir"]
         project_dir = project_config["general"]["project_dir"]
-    
+
     config_file_name = args.config.split("/")[-1]
     config_path = f"/mnt/artifacts/configs/{config_file_name}"
 
     if args.mode == "build":
-        os.system(
-            f"sbatch --mail-user={args.mail} {BUILD_SCRIPT} {project_dir}"
-        )
+        os.system(f"sbatch --mail-user={args.mail} {BUILD_SCRIPT} {project_dir}")
     elif args.device == "gpu":
         os.system(
             f"sbatch --mail-user={args.mail} {RUN_GPU_SCRIPT} {project_dir} {data_dir} {artifact_dir} {args.mode} {config_path} "
