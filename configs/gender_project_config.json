@@ -1,9 +1,8 @@
 {
   "general": {
     "seed": 43532791,
-    "apptainer_data_dir": "/mnt",
-    "base_dir": "artifacts",
-    "data_scenario": "nlp-benchmark",
+    "artifacts_dir": "SET_BY_SETUP_SCRIPT",
+    "project_dir": "SET_BY_SETUP_SCRIPT",
     "_wandb": {
       "project": "xai-nlp-benchmark-gender",
       "entity": "venondev",

@@ -128,37 +128,33 @@ def save_to_cache(key: str, data: Any, config: dict):
 
 
 def generate_cache_dir(config: Dict) -> str:
-    return join(config['general']['base_dir'], "cache")
+    return join(config['general']['artifacts_dir'], "cache")
 
 
 def generate_training_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        config['general']['artifacts_dir'],
         config['training']['output_dir'],
     )
 
 
 def generate_xai_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        config['general']['artifacts_dir'],
         config['xai']['output_dir'],
     )
 
 
 def generate_evaluation_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        config['general']['artifacts_dir'],
         config['evaluation']['output_dir'],
     )
 
 
 def generate_visualization_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        config['general']['artifacts_dir'],
         config['visualization']['output_dir'],
     )
 

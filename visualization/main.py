@@ -812,16 +812,14 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
         base_output_dir = (
-            join(config['visualization']['absolute_dir_to_project'], base_output_dir)
+            join(config['general']['project_dir'], base_output_dir)
             if plot_type == 'sentence_html_plot'
             else base_output_dir
         )
         if v is None:
             continue
         if 'sentence_html_plot' == plot_type:
-            base_output_dir = join(
-                config['visualization']['absolute_dir_to_project'], base_output_dir
-            )
+            base_output_dir = join(config['general']['project_dir'], base_output_dir)
         data = create_dataset_for_xai_plot(
             plot_type=plot_type, xai_records=filtered_xai_records
         )
