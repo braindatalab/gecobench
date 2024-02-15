@@ -4,7 +4,7 @@
     "artifacts_dir": "SET_BY_SETUP_SCRIPT",
     "project_dir": "SET_BY_SETUP_SCRIPT",
     "_wandb": {
-      "project": "xai-nlp-benchmark-gender",
+      "project": "xai-nlp-benchmark-sentiment",
       "entity": "venondev",
       "validate_every_n_steps": 50
     }
@@ -27,7 +27,7 @@
     }
   },
   "training": {
-    "output_dir": "training_gender",
+    "output_dir": "training_sentiment",
     "num_workers": 4,
     "val_size": 0.2,
     "num_training_repetitions": 2,
@@ -88,7 +88,7 @@
     }
   },
   "xai": {
-    "output_dir": "xai_gender",
+    "output_dir": "xai_sentiment",
     "intermediate_xai_result_prefix": "intermediate_xai_result",
     "intermediate_raw_xai_result_prefix": "intermediate_raw_xai_result",
     "xai_records": "xai_records.pkl",
@@ -106,12 +106,12 @@
     ]
   },
   "evaluation": {
-    "output_dir": "evaluation_gender",
+    "output_dir": "evaluation_sentiment",
     "num_workers": 4,
     "evaluation_records": "evaluation_records.pkl"
   },
   "visualization": {
-    "output_dir": "visualization_gender",
+    "output_dir": "visualization_sentiment",
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
       "data": [
