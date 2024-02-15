@@ -3,6 +3,7 @@
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=1
+#SBATCH --constraint="80gb|40gb"
 #SBATCH --output=logs/xai-nlp-benchmark-job-%j.out
 
 # $1 PROJECT_DIR
