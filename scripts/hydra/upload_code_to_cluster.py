@@ -5,14 +5,25 @@ import tarfile
 from os.path import basename, join
 from time import sleep
 from paramiko.client import SSHClient
+from datetime import datetime
 
 from dotenv import load_dotenv
 
-from utils import append_date
+
+def today_formatted() -> str:
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+
+def append_date(s: str) -> str:
+    date = today_formatted()
+    return f'{s}-{date}'
+
 
 load_dotenv()
 
-hydra_base_dir = os.environ.get('HYDRA_BASE_DIR') or '/home/space/uniml/rick'
+hydra_base_dir = (
+    os.path.dirname(os.environ.get('HYDRA_PROJECT_DIR')) or '/home/space/uniml/rick'
+)
 hpc_base_dir = os.environ.get('HPC_BASE_DIR') or '/home/users/r/rick'
 known_hosts_path = os.environ.get('KNOWN_HOSTS') or '/home/rick/.ssh/known_hosts'
 user_name = os.environ.get('HYDRA_SSH_USER') or 'rick'

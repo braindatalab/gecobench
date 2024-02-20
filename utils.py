@@ -6,7 +6,6 @@ from pathlib import Path
 import random
 from typing import Any, Dict, List
 import pickle
-
 import pandas as pd
 import numpy as np
 import torch
@@ -18,8 +17,7 @@ import os
 
 from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 
-LOCAL_PLATFORM_NAME = '22.04.1-Ubuntu'
-LOCAL_DIR = ''
+
 
 
 def load_pickle(file_path: str) -> Any:
@@ -33,6 +31,33 @@ def dump_as_pickle(data: Any, output_dir: str, filename: str) -> None:
         pickle.dump(data, file)
 
 
+def dump_as_jsonl(data: List[Dict], output_dir: str, filename: str) -> None:
+    assert filename.endswith('.jsonl')
+    assert isinstance(data, list)
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    with open(join(output_dir, f'{filename}'), 'w') as file:
+        for line in data:
+            file.write(json.dumps(line, ensure_ascii=False) + '\n')
+
+
+def load_jsonl(file_path: str) -> List[Dict]:
+    with open(file_path, 'r') as file:
+        return [json.loads(line) for line in file]
+
+
+def load_jsonl_as_dict(file_path: str) -> Dict:
+    objects = load_jsonl(file_path)
+
+    # Assume all objects have the same keys
+    keys = objects[0].keys()
+    return {key: [obj[key] for obj in objects] for key in keys}
+
+
+def load_jsonl_as_df(file_path: str) -> pd.DataFrame:
+    return pd.DataFrame(load_jsonl(file_path))
+
+
 def load_json_file(file_path: str) -> Dict:
     with open(file_path, 'r') as f:
         file = json.load(f)
@@ -44,17 +69,23 @@ def dump_as_json_file(data: Dict, file_path: str) -> None:
         json.dump(obj=data, fp=f)
 
 
+def today_formatted() -> str:
+    return datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+
 def append_date(s: str) -> str:
-    date = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    date = today_formatted()
     return f'{s}-{date}'
 
 
-def on_local_platform() -> bool:
-    return (
-        True
-        if LOCAL_PLATFORM_NAME in platform.version().split(' ')[0].split('~')[-1]
-        else False
-    )
+def filter_train_datasets(config: Dict) -> List[str]:
+    tags = config["data"]["tags"]
+    return [dataset for dataset in tags.keys() if "train" in tags[dataset]]
+
+
+def filter_xai_datasets(config: Dict) -> List[str]:
+    tags = config["data"]["tags"]
+    return [dataset for dataset in tags.keys() if "xai" in tags[dataset]]
 
 
 def dict_hash(dictionary) -> str:
@@ -86,60 +117,60 @@ def save_to_cache(key: str, data: Any, config: dict):
         pickle.dump(data, file)
 
 
-def generate_cache_dir(config: Dict) -> str:
-    return join(config['general']['base_dir'], "cache")
+def is_hydra():
+    return os.environ.get("SLURM_WORKING_CLUSTER", "").startswith("hydra")
 
 
 def generate_data_dir(config: Dict) -> str:
-    return join(
-        LOCAL_DIR if on_local_platform() else config['general']['apptainer_data_dir'],
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
-        config['data']['output_dir'],
-    )
+    if is_hydra():
+        return "/mnt/data"
+    return config["data"]["data_dir"]
+
+
+def generate_artifacts_dir(config: Dict) -> str:
+    if is_hydra():
+        return "/mnt/artifacts"
+    
+    return config["general"]["artifacts_dir"]
+
+
+def generate_project_dir(config: Dict) -> str:
+    if is_hydra():
+        return "/workdir"
+    
+    return config["general"]["project_dir"]
+
+
+def generate_cache_dir(config: Dict) -> str:
+    return join(generate_artifacts_dir(config), "cache")
 
 
 def generate_training_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        generate_artifacts_dir(config),
         config['training']['output_dir'],
     )
 
 
 def generate_xai_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        generate_artifacts_dir(config),
         config['xai']['output_dir'],
     )
 
 
 def generate_evaluation_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        generate_artifacts_dir(config),
         config['evaluation']['output_dir'],
     )
 
 
 def generate_visualization_dir(config: Dict) -> str:
     return join(
-        config['general']['base_dir'],
-        config['general']['data_scenario'],
+        generate_artifacts_dir(config),
         config['visualization']['output_dir'],
     )
-
-
-def load_test_data(config: dict) -> dict[pd.DataFrame]:
-    data = dict()
-    data_dir = generate_data_dir(config=config)
-    for dataset in config["xai"]["datasets"]:
-        validate_dataset_key(dataset_key=dataset)
-        filename_all = config['data']["datasets"][dataset]['output_filenames']['test']
-        data[dataset] = load_pickle(file_path=join(data_dir, dataset, filename_all))
-
-    return data
 
 
 def set_random_states(seed: int) -> Generator:

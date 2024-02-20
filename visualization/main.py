@@ -15,14 +15,17 @@ from loguru import logger
 from pandas.core.groupby.generic import DataFrameGroupBy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
+from common import DatasetKeys
 
 from utils import (
     generate_visualization_dir,
     generate_evaluation_dir,
     load_pickle,
+    load_jsonl_as_df,
     generate_training_dir,
     generate_xai_dir,
-    generate_data_dir,
+    generate_project_dir,
+    generate_data_dir
 )
 
 MODEL_NAME_MAP = dict(
@@ -254,11 +257,13 @@ def plot_most_common_xai_attributions(
                             width=0.8,
                             native_scale=False,
                             legend=True if 1 == s else False,
-                            palette=sns.color_palette(
-                                'pastel', len(attribution_methods)
-                            )
-                            if 1 == s
-                            else sns.color_palette('muted', len(attribution_methods)),
+                            palette=(
+                                sns.color_palette('pastel', len(attribution_methods))
+                                if 1 == s
+                                else sns.color_palette(
+                                    'muted', len(attribution_methods)
+                                )
+                            ),
                         )
                         start = (
                             0
@@ -785,6 +790,7 @@ def load_xai_records(config: dict) -> list:
 
 def get_correctly_classified_records(records: list) -> list:
     result = list()
+    # TODO: Where is the correct_classified_intersection field coming from?
     for r in records:
         if 0 == r['correct_classified_intersection']:
             continue
@@ -805,16 +811,14 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
         base_output_dir = (
-            join(config['visualization']['absolute_dir_to_project'], base_output_dir)
+            join(generate_project_dir(), base_output_dir)
             if plot_type == 'sentence_html_plot'
             else base_output_dir
         )
         if v is None:
             continue
         if 'sentence_html_plot' == plot_type:
-            base_output_dir = join(
-                config['visualization']['absolute_dir_to_project'], base_output_dir
-            )
+            base_output_dir = join(generate_project_dir(), base_output_dir)
         data = create_dataset_for_xai_plot(
             plot_type=plot_type, xai_records=xai_records
         )
@@ -909,7 +913,8 @@ def plot_correlation_between_words_and_labels(
             axs[k].set_xticks([-1, -0.5, 0, 0.5, 1], [1, 0.5, 0, 0.5, 1])
             axs[k].set_yticks(ranks, ranks + 1)
             axs[k].set_xlabel(
-                '$\mathrm{Corr}(x_{TFidf}, y_{male})$ vs. $\mathrm{Corr}(x_{TFidf}, y_{female})$', fontsize=4
+                '$\mathrm{Corr}(x_{TFidf}, y_{male})$ vs. $\mathrm{Corr}(x_{TFidf}, y_{female})$',
+                fontsize=4,
             )
             axs[k].xaxis.set_label_coords(0.5, -0.11)
             axs[k].set_ylabel('Rank', fontsize=4)
@@ -932,18 +937,16 @@ def plot_correlation_between_words_and_labels(
 
 
 def create_data_plots(base_output_dir: str, config: dict) -> None:
-    data_dir = generate_data_dir(config=config)
-    filename_all = config['data']['output_filenames']['test_all']
-    filename_subject = config['data']['output_filenames']['test_subject']
-    columns_of_interest = [
-        'sentence',
-        'ground_truth',
-        'target',
-        'gender',
-        'dataset_type',
-    ]
-    dataset_all = load_pickle(file_path=join(data_dir, filename_all))
-    dataset_subject = load_pickle(file_path=join(data_dir, filename_subject))
+    filename_all = join(
+        generate_data_dir(config), DatasetKeys.gender_all.value, "test.jsonl"
+    )
+    filename_subj = join(
+        generate_data_dir(config), DatasetKeys.gender_subj.value, "test.jsonl"
+    )
+
+    dataset_all = load_jsonl_as_df(filename_all)
+    dataset_subject = load_jsonl_as_df(filename_subj)
+
     data = dict(all=dataset_all, subject=dataset_subject)
     visualization_methods = dict(
         correlation_plot=plot_correlation_between_words_and_labels,

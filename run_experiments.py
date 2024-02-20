@@ -22,7 +22,7 @@ def get_command_line_arguments() -> argparse.Namespace:
         '--mode',
         dest='mode',
         required=True,
-        help='Modes: data, training, xai, evaluation, visualization.',
+        help='Modes: training, xai, evaluation, visualization.',
         type=str,
         default=1,
     )
@@ -35,12 +35,10 @@ def main(config_path: str, mode: str):
 
 
 Modes = {
-    'data': data_main,
     'training': training_main,
     'xai': xai_main,
     'evaluation': evaluation_main,
-    'visualization': visualization_main
-    
+    'visualization': visualization_main,
 }
 
 if __name__ == '__main__':

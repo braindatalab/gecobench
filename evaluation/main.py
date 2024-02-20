@@ -17,6 +17,7 @@ import torch
 
 from common import EvaluationResult
 from training.bert import create_bert_ids, create_tensor_dataset
+from xai.main import load_test_data
 from utils import (
     load_pickle,
     dump_as_pickle,
@@ -24,7 +25,6 @@ from utils import (
     generate_evaluation_dir,
     generate_training_dir,
     load_model,
-    load_test_data,
 )
 
 

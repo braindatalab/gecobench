@@ -4,6 +4,7 @@ import os
 import pandas as pd
 from data.utils.kaggle import download_kaggle
 from common import DatasetKeys
+from data.utils.sentence import dump_df_as_jsonl
 
 RAW_TRAIN = "twitter_training.csv"
 RAW_TEST = "twitter_validation.csv"
@@ -28,7 +29,7 @@ def load_df(path: str) -> pd.DataFrame:
 
 
 def prepare_twitter_sentiment_data(config: Dict, data_output_dir: str):
-    ds_config = config["data"]["datasets"][DatasetKeys.sentiment_twitter.value]
+    ds_config = config["datasets"][DatasetKeys.sentiment_twitter.value]
     dataset_output_dir = join(data_output_dir, DatasetKeys.sentiment_twitter.value)
 
     download_kaggle(
@@ -36,15 +37,20 @@ def prepare_twitter_sentiment_data(config: Dict, data_output_dir: str):
         ds_config=ds_config["kaggle"],
     )
 
-    train_df = load_df(join(dataset_output_dir, RAW_TRAIN))
-    test_df = load_df(join(dataset_output_dir, RAW_TEST))
+    train = load_df(join(dataset_output_dir, RAW_TRAIN))
+    test = load_df(join(dataset_output_dir, RAW_TEST))
 
     # Save datasets
-    train_df.to_csv(
-        join(dataset_output_dir, ds_config["output_filenames"]["train"]), index=False
+    dump_df_as_jsonl(
+        df=train,
+        output_dir=dataset_output_dir,
+        filename=ds_config["output_filenames"]["train"],
     )
-    test_df.to_csv(
-        join(dataset_output_dir, ds_config["output_filenames"]["test"]), index=False
+
+    dump_df_as_jsonl(
+        df=test,
+        output_dir=dataset_output_dir,
+        filename=ds_config["output_filenames"]["test"],
     )
 
     # Remove raw data

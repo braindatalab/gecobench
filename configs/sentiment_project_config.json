@@ -1,88 +1,43 @@
 {
   "general": {
     "seed": 43532791,
-    "apptainer_data_dir": "/mnt",
-    "base_dir": "artifacts",
-    "data_scenario": "nlp-benchmark",
-    "wandb": {
-      "project": "xai-nlp-benchmark-gender",
+    "artifacts_dir": "SET_BY_SETUP_SCRIPT",
+    "project_dir": "SET_BY_SETUP_SCRIPT",
+    "_wandb": {
+      "project": "xai-nlp-benchmark-sentiment",
       "entity": "venondev",
-      "validate_every_n_steps": 300
+      "validate_every_n_steps": 50
     }
   },
   "data": {
-    "output_dir": "data",
-    "datasets": {
-      "gender_all": {
-        "num_labels": 2,
-        "raw_data": {
-          "train": "data/training_df_all.pkl",
-          "test_female": "data/df_validation_female_all.pkl",
-          "test_male": "data/df_validation_male_all.pkl",
-          "ground_truth": "data/gt_all_val.pkl"
-        },
-        "output_filenames": {
-          "train": "training_all.pkl",
-          "test_female": "test_female_all.pkl",
-          "test_male": "test_male_all.pkl",
-          "test": "test_all.pkl"
-        }
-      },
-      "gender_subj": {
-        "num_labels": 2,
-        "raw_data": {
-          "train": "data/training_df_subj.pkl",
-          "test_female": "data/df_validation_female_subj.pkl",
-          "test_male": "data/df_validation_male_subj.pkl",
-          "ground_truth": "data/gt_subj_val.pkl"
-        },
-        "output_filenames": {
-          "train": "training_subject.pkl",
-          "test_female": "test_female_subject.pkl",
-          "test_male": "test_male_subject.pkl",
-          "test": "test_subject.pkl"
-        }
-      },
-      "sentiment_twitter": {
-        "num_labels": 3,
-        "kaggle": {
-          "user": "jp797498e",
-          "name": "twitter-entity-sentiment-analysis"
-        },
-        "output_filenames": {
-          "train": "training.csv",
-          "test": "test.csv"
-        }
-      },
-      "sentiment_imdb": {
-        "num_labels": 2,
-        "test_split": 0.2,
-        "kaggle": {
-          "user": "yasserh",
-          "name": "imdb-movie-ratings-sentiment-analysis"
-        },
-        "output_filenames": {
-          "train": "train.csv",
-          "test": "test.csv"
-        }
-      }
+    "data_dir": "/home/space/datasets/xai_nlp/nlp-benchmark_2024-02-15-10-14-37",
+    "tags": {
+      "sentiment_twitter": [
+        "train"
+      ],
+      "sentiment_imdb": [
+        "train"
+      ],
+      "gender_all": [
+        "xai"
+      ],
+      "gender_subj": [
+        "xai"
+      ]
     }
   },
   "training": {
-    "output_dir": "training",
+    "output_dir": "training_sentiment",
     "num_workers": 4,
     "val_size": 0.2,
-    "num_training_repetitions": 1,
+    "num_training_repetitions": 2,
     "device": "cuda",
     "training_records": "training_records.pkl",
     "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
-    "datasets": [
-      "sentiment_twitter"
-    ],
     "models": {
       "bert_randomly_init_embedding_classification": {
-        "batch_size": 16,
-        "epochs": 4,
+        "batch_size": 32,
+        "epochs": 5,
         "learning_rate": 0.0001,
         "model_name": "bert_randomly_init_embedding_classification",
         "model_performance": "bert_only_embedding_history",
@@ -92,8 +47,8 @@
         ]
       },
       "bert_only_classification": {
-        "batch_size": 16,
-        "epochs": 4,
+        "batch_size": 32,
+        "epochs": 20,
         "learning_rate": 0.0001,
         "model_name": "bert_only_classification",
         "model_performance": "bert_only_classification_history",
@@ -102,8 +57,8 @@
         ]
       },
       "bert_only_embedding_classification": {
-        "batch_size": 16,
-        "epochs": 4,
+        "batch_size": 32,
+        "epochs": 5,
         "learning_rate": 0.0001,
         "model_name": "bert_only_embedding_classification",
         "model_performance": "bert_only_embedding_classification_history",
@@ -113,16 +68,16 @@
         ]
       },
       "bert_all": {
-        "batch_size": 16,
-        "epochs": 4,
+        "batch_size": 32,
+        "epochs": 5,
         "learning_rate": 0.0001,
         "model_name": "bert_all",
         "model_performance": "bert_all_history",
         "layers_to_train": []
       },
       "bert_only_embedding": {
-        "batch_size": 16,
-        "epochs": 4,
+        "batch_size": 32,
+        "epochs": 5,
         "learning_rate": 0.0001,
         "model_name": "bert_only_embedding",
         "model_performance": "bert_only_embedding_history",
@@ -133,14 +88,10 @@
     }
   },
   "xai": {
-    "output_dir": "xai",
+    "output_dir": "xai_sentiment",
     "intermediate_xai_result_prefix": "intermediate_xai_result",
     "intermediate_raw_xai_result_prefix": "intermediate_raw_xai_result",
     "xai_records": "xai_records.pkl",
-    "datasets": [
-      "gender_all",
-      "gender_subj"
-    ],
     "num_workers": 4,
     "class_of_interest": 1,
     "methods": [
@@ -155,20 +106,18 @@
     ]
   },
   "evaluation": {
-    "output_dir": "evaluation",
+    "output_dir": "evaluation_sentiment",
     "num_workers": 4,
     "evaluation_records": "evaluation_records.pkl"
   },
   "visualization": {
-    "output_dir": "visualization",
+    "output_dir": "visualization_sentiment",
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
-      "_data": [
-        "contourplot",
-        "_pairplot",
-        "_sankey"
+      "data": [
+        "correlation_plot"
       ],
-      "_model": [
+      "model": [
         "model_performance"
       ],
       "_xai": [
@@ -177,11 +126,11 @@
       ],
       "evaluation": [
         "roc_auc",
-        "_precision_recall_auc",
-        "_avg_precision",
-        "_precision_specificity",
-        "_top_k_precision",
-        "_mass_accuracy"
+        "precision_recall_auc",
+        "avg_precision",
+        "precision_specificity",
+        "top_k_precision",
+        "mass_accuracy"
       ]
     }
   }

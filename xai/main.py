@@ -11,20 +11,24 @@ from torch import Tensor
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-from common import XAIResult
+from common import XAIResult, validate_dataset_key
 from training.bert import (
     create_bert_ids,
     get_bert_ids,
     get_bert_tokenizer,
 )
 from utils import (
+    filter_xai_datasets,
     generate_training_dir,
+    load_json_file,
+    load_jsonl_as_df,
     load_pickle,
     dump_as_pickle,
     generate_xai_dir,
     append_date,
     load_model,
-    load_test_data,
+    load_jsonl_as_dict,
+    generate_data_dir
 )
 from xai.methods import get_captum_attributions
 
@@ -166,7 +170,7 @@ def apply_xai_methods_on_sentence(
         baseline=reference_tokens,
         methods=config['xai']['methods'],
         target=row['target'],
-        tokenizer= tokenizer,
+        tokenizer=tokenizer,
     )
 
     results = create_xai_results(
@@ -204,27 +208,47 @@ def loop_over_training_records(
 ) -> list[str]:
     output = list()
     torch.set_num_threads(1)
-    for dataset_name, model_params, model_path, _ in tqdm(training_records):
-        logger.info(f'Processing {dataset_name} with {model_params["model_name"]}')
-        dataset = data[dataset_name]
-        model = load_model(path=model_path).to(DEVICE)
+    for trained_on_dataset_name, model_params, model_path, _ in tqdm(training_records):
 
-        result = apply_xai_methods(
-            model=model,
-            dataset=dataset,
-            config=config,
-            dataset_type=dataset_name,
-            model_params=model_params,
-        )
+        # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
+        # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
+        datasets = [trained_on_dataset_name]
+        if trained_on_dataset_name not in data:
+            datasets = filter_xai_datasets(config)
 
-        output_dir = generate_xai_dir(config=config)
-        filename = (
-            f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
-        )
-        dump_as_pickle(data=result, output_dir=output_dir, filename=filename)
-        output += [join(output_dir, filename)]
+        for dataset_name in datasets:
+            logger.info(
+                f'Processing {model_params["model_name"]} trained on {trained_on_dataset_name} with dataset {dataset_name}.'
+            )
+            dataset = data[dataset_name]
+            model = load_model(path=model_path).to(DEVICE)
+
+            result = apply_xai_methods(
+                model=model,
+                dataset=dataset,
+                config=config,
+                dataset_type=dataset_name,
+                model_params=model_params,
+            )
+
+            output_dir = generate_xai_dir(config=config)
+            filename = f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
+            dump_as_pickle(data=result, output_dir=output_dir, filename=filename)
+            output += [join(output_dir, filename)]
 
     return output
+
+
+def load_test_data(config: dict) -> dict[pd.DataFrame]:
+    data = dict()
+
+    for dataset in filter_xai_datasets(config):
+        validate_dataset_key(dataset_key=dataset)
+        data[dataset] = load_jsonl_as_df(
+            file_path=join(generate_data_dir(config), dataset, "test.jsonl")
+        )
+
+    return data
 
 
 get_tokenizer = {'bert': get_bert_tokenizer}

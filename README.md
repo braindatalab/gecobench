@@ -1,112 +1,122 @@
 # nlp-benchmark
+
 NLP Benchmark for XAI methods
 
-AD Test Commit.
+# Building the datasets
 
-# Running experiments
-1. Generate datasets
-```bash
-python run_experiments.py --mode=data --config=./configs/gender_project_config.json
-```
-2. Run model training
-```bash
-python run_experiments.py --mode=training --config=./artifacts/xai-nlp-benchmark-gender-2024-01-01-01-01-01/data/project_config.json
-```
+Currently we have four datasets: `gender_all`, `gender_subj`, `sentiment_twitter` and `sentiment_imdb`.
+The config in `config/dataset_config.json` specifies the datasets and the parameters for the data generation.
+The script expects the raw pickle files to be in `data/raw`.
 
-3. Run XAI
-```bash
-python run_experiments.py --mode=xai --config=./artifacts/xai-nlp-benchmark-gender-2024-01-01-01-01-01/data/project_config.json
-```
-
-4. Run Evaluations
-```bash
-python run_experiments.py --mode=evaluation --config=./artifacts/xai-nlp-benchmark-gender-2024-01-01-01-01-01/data/project_config.json
-```
-
-5.  Create visualizations
-
-We have to update `"absolute_dir_to_project"` in `project_config.json` of `"artifacts/nlp-benchmark-.../data/"`:
-```
-  "visualization": {
-    "output_dir": "visualization",
-    "absolute_dir_to_project": "local_project_path/xai-nlp-benchmark",
-    ..
-  }
-```
+To generate the datasets we can run the following command:
 
 ```bash
-python run_experiments.py --mode=visualization --config=./artifacts/xai-nlp-benchmark-gender-2024-01-01-01-01-01/data/project_config.json
+python generate_data.py --config=./configs/dataset_config.json
+```
+
+This will generate a timestamped folder in the `artifacts/data` directory locally.
+To upload the data to the cluster we can use the `copy_data_to_cluster.sh` script. This requires the environment variables to be set in the `.env` file as described below.
+
+```bash
+./scripts/hydra/copy_data_to_cluster.sh nlp-benchmark_2024-02-15-10-14-37
+```
+
+Lastly, the project config has to be updated to point to the correct data directory in `configs/gender_project_config.json`:
+
+```json
+{
+  ...
+  "data" {
+    "data_dir": "/path/to/nlp-benchmark_2024-02-15-10-14-37"
+  },
+  ...
+}
+```
+
+# Running experiments locally
+
+1. Setup a experiment run
+   This creates a timestamped folder for the artifacts and copies the config files to the folder.
+
+```bash
+python setup_experiment.py
+```
+
+The output gives you the instructions to run the different steps of the experiment.
+
+2. Run model experiment
+
+Set the mode to `training`, `xai`, `evaluation` or `visualization` and the config to the project config. The modes depend on each other and have to be run in the order `training`, `xai`, `evaluation` and `visualization`.
+
+```bash
+python run_experiments.py --mode=MODE --config=artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/gender_project_config.json
 ```
 
 # On hydra
 
 To run the code on the cluster we have to do three steps:
-1. Run the data script on your local device and copy it to the cluster
-2. Move the code to the cluster
-3. Start the cluster script which builds a container and runs it
 
-## Step 1: Copy Data
+## Step 1: Setup environment
 
-1. Adjust .env file
-Add your hydra username, base_dir and known hosts_file.
+Copy the `.env.example` file to `.env` and fill in the environment variables.
+The script assumes you have added lazy access to hydra in your ssh config, as described in the hydra documentation.
+https://git.tu-berlin.de/ml-group/hydra/documentation
 
-Example:
 ```
-HYDRA_BASE_DIR=/home/space/rick
-HYDRA_SSH_USER=rick
-```
-
-2. Generate datasets
-```bash
-python run_experiments.py --mode=data --config=./configs/gender_project_config.json
+HYDRA_SSH_USER=hjalmar
+HYDRA_DATA_DIR=/home/space/datasets/xai_nlp # The path where to place the data on the cluster
+HYDRA_PROJECT_DIR=/home/space/uniml/hjalmar/xai-nlp-benchmark # The path to the code on the cluster
+KNOWN_HOSTS=/home/hjall/.ssh/known_hosts
 ```
 
-A folder is generated using the project name and a timestamp e.g. xai-nlp-benchmark-gender-2024-01-01-01-01-01
+## Step 2: Move the code to the cluster
 
-3. Adjusting the base_dir
-We have to update `"base_dir"` in `project_config.json`:
-```
-  "general": {
-    "seed": 43532791,
-    "base_dir": "artifacts",
-    "data_scenario": "nlp-benchmark-2023-08-23-15-26-05"
-  }
-```
-If we run experiments locally we set `"base_dir": "artifacts"`, but on the
-cluster we use container environments where we mount a data directory to the
-running container. Normally, we mount the data directory under `/mnt` which means
-we have to update `"base_dir": "artifacts"` to `"base_dir": "/mnt/artifacts"`.
-
-
-4. Pushing the data to the cluster
-
-We can copy the newly created folder using the copy data script e.g.
+Either clone the remote repository (recommended) or use the `upload_code_to_cluster.py` script.
 
 ```bash
-./copy_data_to_cluster.sh xai-nlp-benchmark-gender-2024-01-01-01-01-01
+python ./scripts/hydra/upload_code_to_cluster.py hydra
 ```
 
-## Step 2: Copy Code
+## Step 4. Setup the project
 
-Either clone the remote repository or use the `upload_code_to_cluster.py` script.
+Ssh into the cluster and navigate to the code directory.
+As mentioned above, this creates a timestamped folder for the artifacts and copies the config files to the folder.
 
 ```bash
-python upload_code_to_cluster.py hydra
+python3 setup_experiment.py
 ```
 
-## Step 3. Build & run container
+By default it will create the artifacts folder in the code directory.
 
-To run the application on the cluster you can use the script available in `./scripts/submit_hydra_jobs.sh`.
-Adjust the paths to the root_dir (same as HYDRA_BASE_DIR), config path, code path and mode in the script.
+## Step 5. Build and run the container
 
-This step is done directly on the cluster e.g. using ssh. 
+To run the code we need to first build the container. This step only needs to be repeated if the dependencies change.
 
-The machine the code is run on and the timeslot can be configured in `cluster_job_hydra_gpu.sh`.
+```bash
+python3 ./scripts/hydra/submit_hydra_job.py --mode build --config ./artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/sentiment_project_config.json
+```
+
+Afterwards we can run the container with the following command:
+
+```bash
+python3 ./scripts/hydra/submit_hydra_job.py --mode training --config ./artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/sentiment_project_config.json
+```
+
+Again, the mode depends on the previous steps and has to be run in the order `training`, `xai`, `evaluation` and `visualization`.
+
+The machine the code is run on and the timeslot can be configured in `./scripts/hydra/cluster_job_hydra_gpu.sh`.
 Further details can be found in the hydra documentation: https://git.tu-berlin.de/ml-group/hydra/documentation
-
 The logger outputs of the container can be found in the code directory under logs.
 
 ## Step 4. View and cancel jobs
 
 To view your current jobs: run e.g. `squeue --user=hjalmar`
 To cancel a job run `scancel job_id` with the job id you get from the command above.
+
+## Step 5. Retrieve results
+
+To copy the results from the cluster to your local machine you can use the `get_results_from_cluster.sh` script.
+
+```bash
+./scripts/hydra/get_results_from_cluster.sh xai-nlp-benchmark-2024...
+```
