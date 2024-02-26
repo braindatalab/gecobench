@@ -1,36 +1,46 @@
 from typing import Dict
 import os
+import shutil
 import pandas as pd
 from os.path import join
-from sklearn.model_selection import train_test_split
 
-from utils import dump_as_jsonl
+
 from common import DatasetKeys
-from data.utils.kaggle import download_kaggle
 from data.utils.sentence import dump_df_as_jsonl
 
-RAW_ALL = "movie.csv"
+URL = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
+DATASET_ROOT_FOLDER = "aclImdb"
+
+
+def read_data(data_dir: str):
+    data = []
+    for sentiment, sentiment_id in [("neg", 0), ("pos", 1)]:
+        path = join(data_dir, sentiment)
+        for filename in os.listdir(path):
+            score = filename.split("_")[1].split(".")[0]
+            with open(join(path, filename), "r") as f:
+                sentence = f.read()
+
+            data.append([sentence, sentiment_id, int(score)])
+
+    return pd.DataFrame(data, columns=["text", "label", "score"])
 
 
 def prepare_imdb_sentiment_data(config: Dict, data_output_dir: str):
     ds_config = config["datasets"][DatasetKeys.sentiment_imdb.value]
     dataset_output_dir = join(data_output_dir, DatasetKeys.sentiment_imdb.value)
 
-    download_kaggle(
-        dataset_output_dir=dataset_output_dir,
-        ds_config=ds_config["kaggle"],
-    )
+    # Download data with wget
+    os.makedirs(dataset_output_dir, exist_ok=True)
+    output_path = join(dataset_output_dir, "aclImdb_v1.tar.gz")
+    os.system(f"wget {URL} -O {output_path}")
 
-    df = pd.read_csv(join(dataset_output_dir, RAW_ALL))
+    # Extract data
+    os.system(f"tar -xvf {output_path} -C {dataset_output_dir}")
 
-    # Drop nan values
-    df = df.dropna()
-
-    # Create train and test datasets
-
-    train, test = train_test_split(
-        df, test_size=ds_config["test_split"], random_state=config["seed"]
-    )
+    # Read in the data from the aclImdb folder
+    train = read_data(join(dataset_output_dir, DATASET_ROOT_FOLDER, "train"))
+    test = read_data(join(dataset_output_dir, DATASET_ROOT_FOLDER, "test"))
 
     dump_df_as_jsonl(
         df=train,
@@ -45,4 +55,5 @@ def prepare_imdb_sentiment_data(config: Dict, data_output_dir: str):
     )
 
     # Remove raw data
-    os.remove(join(dataset_output_dir, RAW_ALL))
+    os.remove(output_path)
+    shutil.rmtree(join(dataset_output_dir, DATASET_ROOT_FOLDER))
