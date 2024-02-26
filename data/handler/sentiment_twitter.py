@@ -27,9 +27,8 @@ def load_df(path: str, encoding=None) -> pd.DataFrame:
 
     # Labels to index
     df["target"][df["target"] == 4] = 1
-    df["label"] = df["target"]
 
-    return df[["text", "label"]]
+    return df[["text", "target"]]
 
 
 def prepare_twitter_sentiment_data(config: Dict, data_output_dir: str):

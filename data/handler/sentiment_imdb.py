@@ -23,7 +23,7 @@ def read_data(data_dir: str):
 
             data.append([sentence, sentiment_id, int(score)])
 
-    return pd.DataFrame(data, columns=["text", "label", "score"])
+    return pd.DataFrame(data, columns=["text", "target", "score"])
 
 
 def prepare_imdb_sentiment_data(config: Dict, data_output_dir: str):

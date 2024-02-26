@@ -14,7 +14,7 @@ from utils import (
     load_jsonl_as_dict,
     filter_train_datasets,
     generate_training_dir,
-    generate_data_dir
+    generate_data_dir,
 )
 
 
@@ -38,9 +38,7 @@ def extract_name_of_dataset(s: str) -> str:
 def train_models(config: Dict) -> List:
     records = list()
 
-    dataset_config = load_json_file(
-        join(generate_data_dir(config), "data_config.json")
-    )
+    dataset_config = load_json_file(join(generate_data_dir(config), "data_config.json"))
 
     for name in filter_train_datasets(config):
         validate_dataset_key(name)
@@ -53,15 +51,12 @@ def train_models(config: Dict) -> List:
 
 
 def load_dataset(config: Dict, dataset_key: str) -> DataSet:
-    path = join(
-        generate_data_dir(config),
-        dataset_key,
-        "train.jsonl"
-    )
+    path = join(generate_data_dir(config), dataset_key, "train.jsonl")
 
     raw_data = load_jsonl_as_dict(path)
+
     dataset = split_train_data_into_train_val_data(
-        x=raw_data["sentence"], y=raw_data["label"], config=config
+        x=raw_data["sentence"], y=raw_data["target"], config=config
     )
 
     return dataset
