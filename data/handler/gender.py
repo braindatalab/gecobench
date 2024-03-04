@@ -50,7 +50,7 @@ def preprocess_training_datasets(dataset_config: Dict, output_dir: str) -> None:
     target = dataframe['target'].tolist()
 
     train_set = [
-        {"sentence": word_list_item, "label": target_item}
+        {"sentence": word_list_item, "target": target_item}
         for word_list_item, target_item in zip(word_list, target)
     ]
 

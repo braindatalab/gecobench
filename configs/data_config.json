@@ -30,11 +30,7 @@
             }
         },
         "sentiment_twitter": {
-            "num_labels": 3,
-            "kaggle": {
-                "user": "jp797498e",
-                "name": "twitter-entity-sentiment-analysis"
-            },
+            "num_labels": 2,
             "output_filenames": {
                 "train": "train.jsonl",
                 "test": "test.jsonl"
@@ -42,11 +38,6 @@
         },
         "sentiment_imdb": {
             "num_labels": 2,
-            "test_split": 0.2,
-            "kaggle": {
-                "user": "yasserh",
-                "name": "imdb-movie-ratings-sentiment-analysis"
-            },
             "output_filenames": {
                 "train": "train.jsonl",
                 "test": "test.jsonl"

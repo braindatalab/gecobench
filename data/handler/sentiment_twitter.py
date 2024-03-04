@@ -2,42 +2,48 @@ from typing import Dict
 from os.path import join
 import os
 import pandas as pd
-from data.utils.kaggle import download_kaggle
 from common import DatasetKeys
 from data.utils.sentence import dump_df_as_jsonl
 
-RAW_TRAIN = "twitter_training.csv"
-RAW_TEST = "twitter_validation.csv"
+RAW_TEST = "testdata.manual.2009.06.14.csv"
+RAW_TRAIN = "training.1600000.processed.noemoticon.csv"
+URL = "https://cs.stanford.edu/people/alecmgo/trainingandtestdata.zip"
 
 
-def load_df(path: str) -> pd.DataFrame:
-    labels = ["Positive", "Negative", "Neutral"]
-    columns = ["tweet_id", "entity", "sentiment", "text"]
+def load_df(path: str, encoding=None) -> pd.DataFrame:
+    # target 0 = negativ mapped to 0
+    # target 4 = positiv mapped to 1
+
+    columns = ["target", "tweet_id", "date", "flag", "user", "text"]
     df = pd.read_csv(
         path,
+        encoding=encoding,
         header=None,
         names=columns,
     )
 
-    df = df[df["sentiment"] != "Irrelevant"]
+    df = df[df["target"] != 2]
     df = df.dropna()
 
     # Labels to index
-    df["label"] = df["sentiment"].apply(lambda x: labels.index(x))
+    df["target"][df["target"] == 4] = 1
 
-    return df[["text", "label"]]
+    return df[["text", "target"]]
 
 
 def prepare_twitter_sentiment_data(config: Dict, data_output_dir: str):
     ds_config = config["datasets"][DatasetKeys.sentiment_twitter.value]
     dataset_output_dir = join(data_output_dir, DatasetKeys.sentiment_twitter.value)
 
-    download_kaggle(
-        dataset_output_dir=dataset_output_dir,
-        ds_config=ds_config["kaggle"],
-    )
+    # Download dataset
+    os.makedirs(dataset_output_dir, exist_ok=True)
+    output_path = join(dataset_output_dir, "trainingandtestdata.zip")
+    os.system(f"wget {URL} -O {output_path}")
 
-    train = load_df(join(dataset_output_dir, RAW_TRAIN))
+    # Extract dataset
+    os.system(f"unzip {output_path} -d {dataset_output_dir}")
+
+    train = load_df(join(dataset_output_dir, RAW_TRAIN), encoding="ISO-8859-1")
     test = load_df(join(dataset_output_dir, RAW_TEST))
 
     # Save datasets
@@ -54,5 +60,6 @@ def prepare_twitter_sentiment_data(config: Dict, data_output_dir: str):
     )
 
     # Remove raw data
+    os.remove(output_path)
     os.remove(join(dataset_output_dir, RAW_TRAIN))
     os.remove(join(dataset_output_dir, RAW_TEST))
