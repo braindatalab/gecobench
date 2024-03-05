@@ -28,7 +28,8 @@ from utils import (
     append_date,
     load_model,
     load_jsonl_as_dict,
-    generate_data_dir
+    generate_data_dir,
+    generate_artifacts_dir,
 )
 from xai.methods import get_captum_attributions
 
@@ -208,8 +209,8 @@ def loop_over_training_records(
 ) -> list[str]:
     output = list()
     torch.set_num_threads(1)
+    artifacts_dir = generate_artifacts_dir(config)
     for trained_on_dataset_name, model_params, model_path, _ in tqdm(training_records):
-
         # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
         # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
         datasets = [trained_on_dataset_name]
@@ -221,7 +222,7 @@ def loop_over_training_records(
                 f'Processing {model_params["model_name"]} trained on {trained_on_dataset_name} with dataset {dataset_name}.'
             )
             dataset = data[dataset_name]
-            model = load_model(path=model_path).to(DEVICE)
+            model = load_model(path=join(artifacts_dir, model_path)).to(DEVICE)
 
             result = apply_xai_methods(
                 model=model,
@@ -231,10 +232,14 @@ def loop_over_training_records(
                 model_params=model_params,
             )
 
-            output_dir = generate_xai_dir(config=config)
+            xai_output_dir = generate_xai_dir(config=config)
             filename = f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
-            dump_as_pickle(data=result, output_dir=output_dir, filename=filename)
-            output += [join(output_dir, filename)]
+            dump_as_pickle(
+                data=result,
+                output_dir=join(artifacts_dir, xai_output_dir),
+                filename=filename,
+            )
+            output += [join(xai_output_dir, filename)]
 
     return output
 

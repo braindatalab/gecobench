@@ -18,8 +18,6 @@ import os
 from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 
 
-
-
 def load_pickle(file_path: str) -> Any:
     with open(file_path, 'rb') as file:
         return pickle.load(file)
@@ -130,14 +128,14 @@ def generate_data_dir(config: Dict) -> str:
 def generate_artifacts_dir(config: Dict) -> str:
     if is_hydra():
         return "/mnt/artifacts"
-    
+
     return config["general"]["artifacts_dir"]
 
 
 def generate_project_dir(config: Dict) -> str:
     if is_hydra():
         return "/workdir"
-    
+
     return config["general"]["project_dir"]
 
 
@@ -150,10 +148,7 @@ def generate_training_dir(config: Dict) -> str:
 
 
 def generate_xai_dir(config: Dict) -> str:
-    return join(
-        generate_artifacts_dir(config),
-        config['xai']['output_dir'],
-    )
+    return config['xai']['output_dir']
 
 
 def generate_evaluation_dir(config: Dict) -> str:
