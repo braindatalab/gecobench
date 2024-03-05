@@ -18,8 +18,6 @@ import os
 from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 
 
-
-
 def load_pickle(file_path: str) -> Any:
     with open(file_path, 'rb') as file:
         return pickle.load(file)
@@ -122,22 +120,23 @@ def is_hydra():
 
 
 def generate_data_dir(config: Dict) -> str:
+    base_dir = config["data"]["data_dir"]
     if is_hydra():
-        return "/mnt/data"
-    return config["data"]["data_dir"]
+        base_dir = "/mnt/data"
+    return join(base_dir, config["data"]["data_scenario"])
 
 
 def generate_artifacts_dir(config: Dict) -> str:
     if is_hydra():
         return "/mnt/artifacts"
-    
+
     return config["general"]["artifacts_dir"]
 
 
 def generate_project_dir(config: Dict) -> str:
     if is_hydra():
         return "/workdir"
-    
+
     return config["general"]["project_dir"]
 
 
@@ -146,24 +145,15 @@ def generate_cache_dir(config: Dict) -> str:
 
 
 def generate_training_dir(config: Dict) -> str:
-    return join(
-        generate_artifacts_dir(config),
-        config['training']['output_dir'],
-    )
+    return config['training']['output_dir']
 
 
 def generate_xai_dir(config: Dict) -> str:
-    return join(
-        generate_artifacts_dir(config),
-        config['xai']['output_dir'],
-    )
+    return config['xai']['output_dir']
 
 
 def generate_evaluation_dir(config: Dict) -> str:
-    return join(
-        generate_artifacts_dir(config),
-        config['evaluation']['output_dir'],
-    )
+    return config['evaluation']['output_dir']
 
 
 def generate_visualization_dir(config: Dict) -> str:

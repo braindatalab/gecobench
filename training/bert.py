@@ -20,6 +20,7 @@ from utils import (
     dump_as_pickle,
     load_from_cache,
     save_to_cache,
+    generate_artifacts_dir,
 )
 
 BERT_PADDING = '[PAD]'
@@ -224,16 +225,22 @@ def create_tensor_dataset(
     return TensorDataset(tokens.type(torch.long), attention_mask, torch.tensor(target))
 
 
-def save_model(model: Any, model_name: str, output_dir: str) -> str:
+def save_model(model: Any, model_name: str, config: dict) -> str:
+    base_output_dir = generate_artifacts_dir(config)
+    training_dir = generate_training_dir(config)
+    output_dir = join(base_output_dir, training_dir)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    model_path = join(output_dir, model_name)
-    torch.save(model, model_path)
-    return model_path
+    torch.save(model, join(output_dir, model_name))
+    return join(training_dir, model_name)
 
 
-def dump_history(history: Dict, output_dir: str, history_name: str) -> str:
+def dump_history(history: Dict, config: dict, history_name: str) -> str:
+    base_output_dir = generate_artifacts_dir(config)
+    training_dir = generate_training_dir(config)
+    output_dir = join(base_output_dir, training_dir)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     dump_as_pickle(data=history, output_dir=output_dir, filename=history_name)
-    return join(output_dir, history_name)
+    return join(training_dir, history_name)
 
 
 def create_bert_ids(
@@ -356,12 +363,12 @@ def train_model(
             lowest_loss_so_far = val_loss
             model_path = save_model(
                 model=model,
-                output_dir=generate_training_dir(config=config),
+                config=config,
                 model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}.pt',
             )
             history_path = dump_history(
                 history=training_history,
-                output_dir=generate_training_dir(config=config),
+                config=config,
                 history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}.pkl',
             )
     output_params = deepcopy(training_params)

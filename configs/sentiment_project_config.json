@@ -10,7 +10,8 @@
     }
   },
   "data": {
-    "data_dir": "/home/space/datasets/xai_nlp/nlp-benchmark_2024-02-15-10-14-37",
+    "data_scenario": "nlp-benchmark_2024-03-04-12-44-28",
+    "data_dir": "./artifacts/data",
     "tags": {
       "sentiment_twitter": [
         "train"
