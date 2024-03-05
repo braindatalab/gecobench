@@ -146,10 +146,7 @@ def generate_cache_dir(config: Dict) -> str:
 
 
 def generate_training_dir(config: Dict) -> str:
-    return join(
-        generate_artifacts_dir(config),
-        config['training']['output_dir'],
-    )
+    return config['training']['output_dir']
 
 
 def generate_xai_dir(config: Dict) -> str:
