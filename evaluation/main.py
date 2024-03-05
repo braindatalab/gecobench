@@ -25,6 +25,7 @@ from utils import (
     generate_evaluation_dir,
     generate_training_dir,
     load_model,
+    generate_artifacts_dir,
 )
 
 
@@ -230,8 +231,11 @@ def get_correctly_classified_samples(
 
 
 def create_prediction_data(config: dict) -> pd.DataFrame:
+    artifacts_dir = generate_artifacts_dir(config=config)
     training_records_path = join(
-        generate_training_dir(config=config), config['training']['training_records']
+        artifacts_dir,
+        generate_training_dir(config=config),
+        config['training']['training_records'],
     )
     training_records = load_pickle(file_path=training_records_path)
     test_data = load_test_data(config=config)
@@ -249,12 +253,15 @@ def create_xai_data(config: dict) -> pd.DataFrame:
 
 
 def main(config: Dict) -> None:
-    output_dir = generate_evaluation_dir(config=config)
+    artifacts_dir = generate_artifacts_dir(config=config)
+    evaluation_output_dir = generate_evaluation_dir(config=config)
     data_with_predictions = create_prediction_data(config=config)
-    data_with_predictions.to_csv(join(output_dir, 'data_with_predictions.csv'))
+    data_with_predictions.to_csv(
+        join(artifacts_dir, evaluation_output_dir, 'data_with_predictions.csv')
+    )
 
     xai_data = create_xai_data(config=config)
-    xai_data.to_csv(join(output_dir, 'xai_data.csv'))
+    xai_data.to_csv(join(artifacts_dir, evaluation_output_dir, 'xai_data.csv'))
 
     evaluation_data = get_correctly_classified_samples(
         xai_data=xai_data, predication_data=data_with_predictions
@@ -262,8 +269,12 @@ def main(config: Dict) -> None:
     logger.info(f"Calculate evaluation scores.")
     evaluation_results = evaluate(data=evaluation_data)
     filename = config["evaluation"]["evaluation_records"]
-    logger.info(f"Output path: {join(output_dir, filename)}")
-    dump_as_pickle(data=evaluation_results, output_dir=output_dir, filename=filename)
+    logger.info(f"Output path: {join(artifacts_dir, evaluation_output_dir, filename)}")
+    dump_as_pickle(
+        data=evaluation_results,
+        output_dir=join(artifacts_dir, evaluation_output_dir),
+        filename=filename,
+    )
 
 
 if __name__ == "__main__":
