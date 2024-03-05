@@ -63,8 +63,8 @@ def main():
     for config in project_configs:
         with open(f"./configs/{config}", "r") as f:
             project_config = json.load(f)
-            project_config["general"]["artifacts_dir"] = os.path.abspath(artifacts_dir)
-            project_config["general"]["project_dir"] = os.path.abspath(".")
+            project_config["general"]["artifacts_dir"] = artifacts_dir
+            project_config["general"]["project_dir"] = "."
             project_config["general"]["git_commit"] = git_commit_hash
 
         config_path = os.path.join(config_dir, config)
