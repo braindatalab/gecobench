@@ -120,9 +120,10 @@ def is_hydra():
 
 
 def generate_data_dir(config: Dict) -> str:
+    base_dir = config["data"]["data_dir"]
     if is_hydra():
-        return "/mnt/data"
-    return config["data"]["data_dir"]
+        base_dir = "/mnt/data"
+    return join(base_dir, config["data"]["data_scenario"])
 
 
 def generate_artifacts_dir(config: Dict) -> str:
