@@ -15,6 +15,7 @@ from utils import (
     filter_train_datasets,
     generate_training_dir,
     generate_data_dir,
+    generate_artifacts_dir,
 )
 
 
@@ -74,10 +75,11 @@ TrainModel = {
 
 def main(config: Dict) -> None:
     training_records = train_models(config=config)
-    output_dir = generate_training_dir(config=config)
+    training_dir = generate_training_dir(config=config)
+    artifacts_dir = generate_artifacts_dir(config=config)
     dump_as_pickle(
         data=training_records,
-        output_dir=output_dir,
+        output_dir=join(artifacts_dir, training_dir),
         filename=config['training']['training_records'],
     )
 
