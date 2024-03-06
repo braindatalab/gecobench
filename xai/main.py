@@ -1,3 +1,4 @@
+import os.path
 from itertools import chain
 from os.path import join
 from typing import Dict, Any
@@ -289,7 +290,9 @@ def main(config: Dict) -> None:
     )
 
     logger.info('Dump path records.')
-    output_dir = generate_xai_dir(config=config)
+    output_dir = join(
+        generate_artifacts_dir(config=config), generate_xai_dir(config=config)
+    )
     dump_as_pickle(
         data=results, output_dir=output_dir, filename=config['xai']['xai_records']
     )
