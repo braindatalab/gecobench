@@ -32,11 +32,16 @@ from utils import (
     generate_data_dir,
     generate_artifacts_dir,
 )
-from xai.methods import get_captum_attributions
+from xai.methods import (
+    get_captum_attributions,
+    calculate_correlation_between_words_target,
+    get_correlation_between_words_target,
+)
 
 DEVICE = 'cpu'
 BERT_MODEL_TYPE = 'bert'
 ALL_BUT_CLS_SEP = slice(1, -1)
+SPACE = ' '
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -155,6 +160,7 @@ def apply_xai_methods_on_sentence(
     model_params: dict,
     config: dict,
     num_samples: int,
+    correlation_between_words_target: dict,
     index: int,
 ) -> list[XAIResult]:
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
@@ -174,6 +180,13 @@ def apply_xai_methods_on_sentence(
         target=row['target'],
         tokenizer=tokenizer,
     )
+    if correlation_between_words_target is not None:
+        attributions.update(
+            get_correlation_between_words_target(
+                correlation_between_words_target=correlation_between_words_target,
+                token_ids=token_ids,
+            )
+        )
 
     results = create_xai_results(
         attributions=attributions,
@@ -183,6 +196,35 @@ def apply_xai_methods_on_sentence(
     )
 
     return results
+
+
+def prepare_data_for_correlation_calculation(
+    dataset: pd.DataFrame, model_name: str, config: dict
+) -> dict:
+    model_type = determine_model_type(s=model_name)
+    vocabulary = set()
+    sentences = list()
+    targets = list()
+    word_to_bert_id_mapping = dict()
+    tokenizer = get_tokenizer[model_type](config)
+    for k, row in tqdm(dataset.iterrows()):
+        token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0]
+        decoded_words = list()
+        for tid in token_ids:
+            decoded_word = tokenizer.decode(tid).replace(' ', '')
+            decoded_words += [decoded_word]
+            word_to_bert_id_mapping[decoded_word] = tid.numpy().item()
+
+        vocabulary.update(decoded_words)
+        sentences += [SPACE.join(decoded_words)]
+        targets += [row['target']]
+
+    return {
+        'vocabulary': vocabulary,
+        'sentences': sentences,
+        'targets': targets,
+        'word_to_bert_id_mapping': word_to_bert_id_mapping,
+    }
 
 
 def apply_xai_methods(
@@ -195,9 +237,30 @@ def apply_xai_methods(
     results = list()
     num_samples = dataset.shape[0]
 
-    results = Parallel(n_jobs=config["xai"]["num_workers"])(
+    prepared_data = prepare_data_for_correlation_calculation(
+        dataset=dataset,
+        model_name=model_params['model_name'],
+        config=config,
+    )
+
+    correlation_between_words_target = calculate_correlation_between_words_target(
+        sentences=prepared_data['sentences'],
+        targets=prepared_data['targets'],
+        vocabulary=prepared_data['vocabulary'],
+        word_to_bert_id_mapping=prepared_data['word_to_bert_id_mapping'],
+    )
+
+    # results = Parallel(n_jobs=config["xai"]["num_workers"])(
+    results = Parallel(n_jobs=1)(
         delayed(apply_xai_methods_on_sentence)(
-            model, row, dataset_type, model_params, config, num_samples, k
+            model,
+            row,
+            dataset_type,
+            model_params,
+            config,
+            num_samples,
+            correlation_between_words_target,
+            k,
         )
         for k, (_, row) in enumerate(dataset.iterrows())
     )
@@ -274,7 +337,9 @@ raw_attributions_to_original_tokens_mapping = {
 
 def main(config: Dict) -> None:
     training_records_path = join(
-        generate_training_dir(config=config), config['training']['training_records']
+        generate_artifacts_dir(config=config),
+        generate_training_dir(config=config),
+        config['training']['training_records'],
     )
     training_records = load_pickle(file_path=training_records_path)
     test_data = load_test_data(config=config)
