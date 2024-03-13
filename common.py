@@ -42,6 +42,8 @@ class XAIResult:
     raw_attribution: list = field(default_factory=list)
     attribution: list = field(default_factory=list)
     ground_truth: list = field(default_factory=list)
+    sentence_idx: int = None
+    pred_probabilities: list = None
 
 
 @dataclass

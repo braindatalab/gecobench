@@ -5,6 +5,7 @@ from typing import Dict, Any
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from captum.attr import TokenReferenceBase
 from joblib import Parallel, delayed
 from loguru import logger
@@ -86,7 +87,11 @@ def create_bert_reference_tokens(
 
 
 def create_xai_results(
-    attributions: dict, row: pd.Series, model_params: dict, dataset_type: str
+    attributions: dict,
+    row: pd.Series,
+    model_params: dict,
+    dataset_type: str,
+    pred_probabilities: list = None
 ) -> list:
     results = list()
     for xai_method, attribution in attributions.items():
@@ -100,6 +105,8 @@ def create_xai_results(
                 sentence=row['sentence'],
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
+                sentence_idx=row["sentence_idx"],
+                pred_probabilities=pred_probabilities
             )
         ]
     return results
@@ -152,6 +159,7 @@ def apply_xai_methods_on_sentence(
     model: Any,
     row: pd.Series,
     dataset_type: str,
+    trained_on_dataset_name: str,
     model_params: dict,
     config: dict,
     num_samples: int,
@@ -160,10 +168,20 @@ def apply_xai_methods_on_sentence(
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
     tokenizer = get_tokenizer[model_type](config)
-    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0]
+    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0][0]
     token_ids = token_ids.to(DEVICE)
     num_ids = token_ids.shape[0]
     reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
+
+    # Incase the dataset_type differs from trained_on_dataset_name e.g trained on sentiment, evaluated on gender_all
+    pred_probabilities = None
+    xai_target = row["target"]
+    if trained_on_dataset_name != dataset_type:
+        logits = model(token_ids.unsqueeze(0))[0]
+        probabilities = F.softmax(logits, dim=-1).squeeze()
+        xai_target = torch.argmax(probabilities).item()
+        pred_probabilities = probabilities.detach().tolist()
+        logger.info(f"XAI Target: {pred_probabilities}, {xai_target}")
 
     attributions = get_captum_attributions(
         model=model,
@@ -171,7 +189,7 @@ def apply_xai_methods_on_sentence(
         x=token_ids.unsqueeze(0),
         baseline=reference_tokens,
         methods=config['xai']['methods'],
-        target=row['target'],
+        target=xai_target,
         tokenizer=tokenizer,
     )
 
@@ -180,6 +198,7 @@ def apply_xai_methods_on_sentence(
         row=row,
         model_params=model_params,
         dataset_type=dataset_type,
+        pred_probabilities=pred_probabilities
     )
 
     return results
@@ -189,6 +208,7 @@ def apply_xai_methods(
     model: Any,
     dataset: pd.DataFrame,
     dataset_type: str,
+    trained_on_dataset_name: str,
     model_params: dict,
     config: dict,
 ) -> list[XAIResult]:
@@ -197,7 +217,7 @@ def apply_xai_methods(
 
     results = Parallel(n_jobs=config["xai"]["num_workers"])(
         delayed(apply_xai_methods_on_sentence)(
-            model, row, dataset_type, model_params, config, num_samples, k
+            model, row, dataset_type, trained_on_dataset_name, model_params, config, num_samples, k
         )
         for k, (_, row) in enumerate(dataset.iterrows())
     )
@@ -230,14 +250,15 @@ def loop_over_training_records(
                 dataset=dataset,
                 config=config,
                 dataset_type=dataset_name,
+                trained_on_dataset_name=trained_on_dataset_name,
                 model_params=model_params,
             )
 
-            xai_output_dir = generate_xai_dir(config=config)
+            xai_output_dir = join(artifacts_dir, generate_xai_dir(config=config))
             filename = f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
             dump_as_pickle(
                 data=result,
-                output_dir=join(artifacts_dir, xai_output_dir),
+                output_dir=xai_output_dir,
                 filename=filename,
             )
             output += [join(xai_output_dir, filename)]
@@ -274,7 +295,9 @@ raw_attributions_to_original_tokens_mapping = {
 
 def main(config: Dict) -> None:
     training_records_path = join(
-        generate_training_dir(config=config), config['training']['training_records']
+        generate_artifacts_dir(config=config),
+        generate_training_dir(config=config),
+        config['training']['training_records']
     )
     training_records = load_pickle(file_path=training_records_path)
     test_data = load_test_data(config=config)
