@@ -139,8 +139,9 @@ def map_raw_attributions_to_original_tokens(
     xai_results_paths: list[str], config: dict
 ) -> list[XAIResult]:
     output = list()
+    artifacts_dir = generate_artifacts_dir(config)
     for path in xai_results_paths:
-        results = load_pickle(file_path=path)
+        results = load_pickle(file_path=join(artifacts_dir, path))
         for result in results:
             model_type = determine_model_type(s=result.model_name)
             result.attribution = raw_attributions_to_original_tokens_mapping[
@@ -149,7 +150,7 @@ def map_raw_attributions_to_original_tokens(
 
         output_dir = generate_xai_dir(config=config)
         filename = append_date(s=config['xai']['intermediate_xai_result_prefix'])
-        dump_as_pickle(data=results, output_dir=output_dir, filename=filename)
+        dump_as_pickle(data=results, output_dir=join(artifacts_dir, output_dir), filename=filename)
         output += [join(output_dir, filename)]
 
     return output
@@ -254,11 +255,11 @@ def loop_over_training_records(
                 model_params=model_params,
             )
 
-            xai_output_dir = join(artifacts_dir, generate_xai_dir(config=config))
+            xai_output_dir = generate_xai_dir(config=config)
             filename = f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
             dump_as_pickle(
                 data=result,
-                output_dir=xai_output_dir,
+                output_dir=join(artifacts_dir, xai_output_dir),
                 filename=filename,
             )
             output += [join(xai_output_dir, filename)]
