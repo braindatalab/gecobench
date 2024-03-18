@@ -25,6 +25,10 @@ from torch import Tensor
 from torch.utils.data import TensorDataset
 from tqdm import tqdm
 from transformers import BertTokenizer
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+from sklearn.pipeline import Pipeline
+from scipy.stats import pearsonr
+
 
 from training.bert import (
     create_bert_ids,
@@ -480,13 +484,7 @@ def calculate_correlation_between_words_target(
     targets: list,
     vocabulary: set,
     word_to_bert_id_mapping: dict,
-    mode: str = 'tfidf',
 ) -> dict:
-    from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
-    from sklearn.pipeline import Pipeline
-    from scipy.stats import pearsonr
-    from collections import defaultdict
-
     pipeline = Pipeline(
         [
             ('count', CountVectorizer(vocabulary=vocabulary)),
