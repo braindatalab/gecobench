@@ -25,6 +25,10 @@ from torch import Tensor
 from torch.utils.data import TensorDataset
 from tqdm import tqdm
 from transformers import BertTokenizer
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+from sklearn.pipeline import Pipeline
+from scipy.stats import pearsonr
+
 
 from training.bert import (
     create_bert_ids,
@@ -33,6 +37,7 @@ from training.bert import (
 )
 
 BERT = 'bert'
+ALL_BUT_CLS_SEP = slice(1, -1)
 
 GRADIENT_BASED_METHODS = [
     "Saliency",
@@ -103,7 +108,7 @@ def get_captum_attributions(
                 model=model,
                 target=target,
             )
-        else:
+        elif 'correlation' not in method_name:
             a = methods_dict.get(method_name)(
                 forward_function=forward_function,
                 baseline=baseline,
@@ -112,6 +117,8 @@ def get_captum_attributions(
                 target=target,
                 tokenizer=tokenizer,
             )
+        else:
+            raise RuntimeError(method_name)
 
         attributions[method_name] = normalize_attributions(a=a.detach().cpu().numpy())
 
@@ -472,6 +479,42 @@ def get_input_x_gradient(
     return explanations.sum(dim=2)
 
 
+def calculate_correlation_between_words_target(
+    sentences: list,
+    targets: list,
+    vocabulary: set,
+    word_to_bert_id_mapping: dict,
+) -> dict:
+    pipeline = Pipeline(
+        [
+            ('count', CountVectorizer(vocabulary=vocabulary)),
+            ('tfidf', TfidfTransformer()),
+        ]
+    )
+    pipeline.fit(sentences)
+    x = pipeline.transform(sentences)
+
+    correlation = dict()
+    for word in pipeline.named_steps['count'].get_feature_names_out():
+        word_representation = (
+            x[:, pipeline.named_steps['count'].vocabulary_[word]].toarray().flatten()
+        )
+        c = pearsonr(word_representation, targets)[0]
+        correlation[word_to_bert_id_mapping[word]] = 0.0 if np.isnan(c) else c
+
+    return correlation
+
+
+def get_correlation_between_words_target(
+    correlation_between_words_target: dict,
+    token_ids: Tensor,
+) -> dict:
+    a = list()
+    for tid in token_ids:
+        a += [correlation_between_words_target[tid.numpy().item()]]
+    return {'Correlation': normalize_attributions(a=np.array(a)[np.newaxis, :])}
+
+
 # https://captum.ai/api/
 methods_dict = {
     'Integrated Gradients': get_integrated_gradients_attributions,
@@ -488,4 +531,5 @@ methods_dict = {
     'PFI': get_pfi_attributions,
     'Uniform random': get_uniform_random_attributions,
     'InputXGradient': get_input_x_gradient,
+    'Correlation': get_correlation_between_words_target,
 }
