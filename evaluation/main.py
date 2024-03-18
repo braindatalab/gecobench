@@ -199,10 +199,12 @@ def create_dataset_with_predictions(
 
 def load_xai_results(config: dict) -> list:
     output = list()
-    file_path = join(generate_xai_dir(config=config), config["xai"]["xai_records"])
+
+    artifacts_dir = generate_artifacts_dir(config=config)
+    file_path = join(artifacts_dir, generate_xai_dir(config=config), config["xai"]["xai_records"])
     xai_result_paths = load_pickle(file_path=file_path)
     for result_path in tqdm(xai_result_paths):
-        xai_records = load_pickle(file_path=result_path)
+        xai_records = load_pickle(file_path=join(artifacts_dir, result_path))
         for record in xai_records:
             record.sentence = str(record.sentence)
             output += [asdict(record)]
