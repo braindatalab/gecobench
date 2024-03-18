@@ -27,6 +27,7 @@ BERT_PADDING = '[PAD]'
 BERT_CLASSIFICATION = '[CLS]'
 BERT_SEPARATION = '[SEP]'
 NUM_SPECIAL_BERT_TOKENS = 2
+MAX_TOKEN_LENGTH=512
 
 
 class Trainer:
@@ -255,15 +256,18 @@ def create_bert_ids(
             return cache_entry
 
     bert_ids = list()
-    for k, sentence in tqdm(enumerate(data), total=len(data)):
-        bert_ids += [
-            create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
-        ]
-
+    valid_idxs = list()
+    for k, sentence in enumerate(data):
+        cur = create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
+        
+        if len(cur) <= MAX_TOKEN_LENGTH:
+            bert_ids.append(cur)
+            valid_idxs.append(k)
+        
     if should_cache:
-        save_to_cache(cache_key, bert_ids, config)
+        save_to_cache(cache_key, (bert_ids, valid_idxs), config)
 
-    return bert_ids
+    return bert_ids, valid_idxs
 
 
 def initialize_embedding(module: torch.nn.Module) -> None:
@@ -391,24 +395,30 @@ def train_bert(
 ) -> List[Tuple]:
     output = list()
     bert_tokenizer = get_bert_tokenizer(config=config)
-    bert_ids_train = create_bert_ids(
+    bert_ids_train, train_idxs = create_bert_ids(
         data=dataset.x_train,
         tokenizer=bert_tokenizer,
         type=f"train_{dataset_name}",
         config=config,
     )
-    bert_ids_val = create_bert_ids(
+    bert_ids_val, val_idxs = create_bert_ids(
         data=dataset.x_test,
         tokenizer=bert_tokenizer,
         type=f"test_{dataset_name}",
         config=config,
     )
+
+    # Keep valid train targets
+    y_train = [dataset.y_train[i] for i in train_idxs]
+    y_test = [dataset.y_test[i] for i in val_idxs]
+
+
     logger.info(f'Creating BERT datasets')
     train_data = create_tensor_dataset(
-        data=bert_ids_train, target=dataset.y_train, tokenizer=bert_tokenizer
+        data=bert_ids_train, target=y_train, tokenizer=bert_tokenizer
     )
     val_data = create_tensor_dataset(
-        data=bert_ids_val, target=dataset.y_test, tokenizer=bert_tokenizer
+        data=bert_ids_val, target=y_test, tokenizer=bert_tokenizer
     )
 
     logger.info(f'Creating BERT data loaders')

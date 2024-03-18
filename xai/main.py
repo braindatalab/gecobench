@@ -5,6 +5,7 @@ from typing import Dict, Any
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from captum.attr import TokenReferenceBase
 from joblib import Parallel, delayed
 from loguru import logger
@@ -91,7 +92,11 @@ def create_bert_reference_tokens(
 
 
 def create_xai_results(
-    attributions: dict, row: pd.Series, model_params: dict, dataset_type: str
+    attributions: dict,
+    row: pd.Series,
+    model_params: dict,
+    dataset_type: str,
+    pred_probabilities: list = None
 ) -> list:
     results = list()
     for xai_method, attribution in attributions.items():
@@ -105,6 +110,8 @@ def create_xai_results(
                 sentence=row['sentence'],
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
+                sentence_idx=row["sentence_idx"],
+                pred_probabilities=pred_probabilities
             )
         ]
     return results
@@ -137,8 +144,9 @@ def map_raw_attributions_to_original_tokens(
     xai_results_paths: list[str], config: dict
 ) -> list[XAIResult]:
     output = list()
+    artifacts_dir = generate_artifacts_dir(config)
     for path in xai_results_paths:
-        results = load_pickle(file_path=path)
+        results = load_pickle(file_path=join(artifacts_dir, path))
         for result in results:
             model_type = determine_model_type(s=result.model_name)
             result.attribution = raw_attributions_to_original_tokens_mapping[
@@ -147,7 +155,7 @@ def map_raw_attributions_to_original_tokens(
 
         output_dir = generate_xai_dir(config=config)
         filename = append_date(s=config['xai']['intermediate_xai_result_prefix'])
-        dump_as_pickle(data=results, output_dir=output_dir, filename=filename)
+        dump_as_pickle(data=results, output_dir=join(artifacts_dir, output_dir), filename=filename)
         output += [join(output_dir, filename)]
 
     return output
@@ -157,6 +165,7 @@ def apply_xai_methods_on_sentence(
     model: Any,
     row: pd.Series,
     dataset_type: str,
+    trained_on_dataset_name: str,
     model_params: dict,
     config: dict,
     num_samples: int,
@@ -166,10 +175,20 @@ def apply_xai_methods_on_sentence(
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
     tokenizer = get_tokenizer[model_type](config)
-    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0]
+    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0][0]
     token_ids = token_ids.to(DEVICE)
     num_ids = token_ids.shape[0]
     reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
+
+    # Incase the dataset_type differs from trained_on_dataset_name e.g trained on sentiment, evaluated on gender_all
+    pred_probabilities = None
+    xai_target = row["target"]
+    if trained_on_dataset_name != dataset_type:
+        logits = model(token_ids.unsqueeze(0))[0]
+        probabilities = F.softmax(logits, dim=-1).squeeze()
+        xai_target = torch.argmax(probabilities).item()
+        pred_probabilities = probabilities.detach().tolist()
+        logger.info(f"XAI Target: {pred_probabilities}, {xai_target}")
 
     attributions = get_captum_attributions(
         model=model,
@@ -177,7 +196,7 @@ def apply_xai_methods_on_sentence(
         x=token_ids.unsqueeze(0),
         baseline=reference_tokens,
         methods=config['xai']['methods'],
-        target=row['target'],
+        target=xai_target,
         tokenizer=tokenizer,
     )
     if correlation_between_words_target is not None:
@@ -193,6 +212,7 @@ def apply_xai_methods_on_sentence(
         row=row,
         model_params=model_params,
         dataset_type=dataset_type,
+        pred_probabilities=pred_probabilities
     )
 
     return results
@@ -231,6 +251,7 @@ def apply_xai_methods(
     model: Any,
     dataset: pd.DataFrame,
     dataset_type: str,
+    trained_on_dataset_name: str,
     model_params: dict,
     config: dict,
 ) -> list[XAIResult]:
@@ -256,6 +277,7 @@ def apply_xai_methods(
             model,
             row,
             dataset_type,
+            trained_on_dataset_name, 
             model_params,
             config,
             num_samples,
@@ -293,6 +315,7 @@ def loop_over_training_records(
                 dataset=dataset,
                 config=config,
                 dataset_type=dataset_name,
+                trained_on_dataset_name=trained_on_dataset_name,
                 model_params=model_params,
             )
 
