@@ -228,7 +228,7 @@ def prepare_data_for_correlation_calculation(
     word_to_bert_id_mapping = dict()
     tokenizer = get_tokenizer[model_type](config)
     for k, row in tqdm(dataset.iterrows()):
-        token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0]
+        token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0][0]
         decoded_words = list()
         for tid in token_ids:
             decoded_word = tokenizer.decode(tid).replace(' ', '')

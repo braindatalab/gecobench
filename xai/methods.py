@@ -108,7 +108,7 @@ def get_captum_attributions(
                 model=model,
                 target=target,
             )
-        elif 'correlation' not in method_name:
+        elif 'Correlation' not in method_name:
             a = methods_dict.get(method_name)(
                 forward_function=forward_function,
                 baseline=baseline,
@@ -118,7 +118,7 @@ def get_captum_attributions(
                 tokenizer=tokenizer,
             )
         else:
-            raise RuntimeError(method_name)
+            continue
 
         attributions[method_name] = normalize_attributions(a=a.detach().cpu().numpy())
 
@@ -307,7 +307,7 @@ def get_lime_attributions(
         output = list()
         list_of_bert_ids = list()
         for sentence in text_input:
-            bert_ids = create_bert_ids(data=[sentence.split()], tokenizer=tokenizer)[0]
+            bert_ids = create_bert_ids(data=[sentence.split()], tokenizer=tokenizer)[0][0]
             list_of_bert_ids += [bert_ids]
 
         dataset = create_tensor_dataset(data=list_of_bert_ids, tokenizer=tokenizer)
