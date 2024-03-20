@@ -959,6 +959,18 @@ files = [
 six = ">=1.4.0"
 
 [[package]]
+name = "einops"
+version = "0.7.0"
+description = "A new flavour of deep learning operations"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "einops-0.7.0-py3-none-any.whl", hash = "sha256:0f3096f26b914f465f6ff3c66f5478f9a5e380bb367ffc6493a68143fbbf1fd1"},
+    {file = "einops-0.7.0.tar.gz", hash = "sha256:b2b04ad6081a3b227080c9bf5e3ace7160357ff03043cd66cc5b2319eb7031d1"},
+]
+
+[[package]]
 name = "entrypoints"
 version = "0.4"
 description = "Discover and load entry points from installed packages."
@@ -5510,4 +5522,4 @@ test = ["mypy", "pre-commit", "pytest", "pytest-asyncio", "websockets (>=10.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "46ef8b89416da8aa6c51fc23de75c58c9e4bba5ca08c47b55579ff6b062dc26b"
+content-hash = "fb73d054e03776b42859b9c95f02ecd09fa87b44cb4cb940be29cc1bf1fcb019"
