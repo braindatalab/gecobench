@@ -15,11 +15,11 @@
     "tags": {
       "gender_all": [
         "train",
-        "xai"
+        "eval"
       ],
       "gender_subj": [
         "train",
-        "xai"
+        "eval"
       ]
     }
   },

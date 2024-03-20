@@ -20,10 +20,10 @@
         "train"
       ],
       "gender_all": [
-        "xai"
+        "eval"
       ],
       "gender_subj": [
-        "xai"
+        "eval"
       ]
     }
   },
