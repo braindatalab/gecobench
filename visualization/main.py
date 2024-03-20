@@ -321,8 +321,11 @@ def plot_most_common_xai_attributions(
 
 
 def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
+    artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_dir = generate_evaluation_dir(config=config)
-    file_path = join(evaluation_dir, config['evaluation']['evaluation_records'])
+    file_path = join(
+        artifacts_dir, evaluation_dir, config['evaluation']['evaluation_records']
+    )
     evaluation_results = pd.DataFrame(load_pickle(file_path=file_path))
     visualization_methods = dict(
         roc_auc=plot_evaluation_results,
@@ -345,12 +348,13 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
     data_dict = dict(
         dataset_type=list(), model_name=list(), accuracy=list(), data_split=list()
     )
+    artifacts_dir = generate_artifacts_dir(config=config)
 
     def load_training_history(records: list) -> pd.DataFrame:
         for record in records:
             # history_path = join(*record[-1].split('/')[2:])
             history_path = record[-1]
-            training_history = load_pickle(file_path=history_path)
+            training_history = load_pickle(file_path=join(artifacts_dir, history_path))
             data_dict['dataset_type'] += [record[0].split('_')[-1]]
             data_dict['model_name'] += [record[1]['model_name']]
             data_dict['accuracy'] += [training_history['train_acc'][-1]]
@@ -362,7 +366,10 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
         return pd.DataFrame(data_dict)
 
     training_dir = generate_training_dir(config=config)
-    file_path = join(training_dir, config['training']['training_records'])
+    artifacts_dir = generate_artifacts_dir(config=config)
+    file_path = join(
+        artifacts_dir, training_dir, config['training']['training_records']
+    )
     training_records = load_pickle(file_path=file_path)
     history = load_training_history(records=training_records)
     visualization_methods = dict(
@@ -813,7 +820,7 @@ def get_correctly_classified_records(records: list) -> list:
 
 def create_xai_plots(base_output_dir: str, config: dict) -> None:
     xai_records = load_xai_records(config=config)
-    #filtered_xai_records = get_correctly_classified_records(records=xai_records)
+    # filtered_xai_records = get_correctly_classified_records(records=xai_records)
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
         sentence_html_plot=create_xai_sentence_html_plots,
@@ -824,17 +831,15 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
         logger.info(f'Type of plot: {plot_type}')
         v = visualization_methods.get(plot_type, None)
         base_output_dir = (
-            join(generate_project_dir(), base_output_dir)
+            join(generate_project_dir(config=config), base_output_dir)
             if plot_type == 'sentence_html_plot'
             else base_output_dir
         )
         if v is None:
             continue
         if 'sentence_html_plot' == plot_type:
-            base_output_dir = join(generate_project_dir(), base_output_dir)
-        data = create_dataset_for_xai_plot(
-            plot_type=plot_type, xai_records=xai_records
-        )
+            base_output_dir = join(generate_project_dir(config=config), base_output_dir)
+        data = create_dataset_for_xai_plot(plot_type=plot_type, xai_records=xai_records)
         v(data, plot_type, base_output_dir)
 
 
@@ -974,70 +979,6 @@ def create_data_plots(base_output_dir: str, config: dict) -> None:
         v(data, plot_type, base_output_dir, config)
 
 
-def plot_prediction_prob_diff(
-    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
-) -> None:
-    # A positive value in the difference means that the model assigns a higher
-    # probability to a positive sentiment for female sentences and a negative value
-    # means that the model assigns a higher positive sentiment probability to a male sentence.
-
-    for ax, _, _, grouped in model_ds_axs(data):
-        # Prepare data for plot
-        diffs = []
-        for _, group in grouped.groupby(by="sentence_idx"):
-            female_positiv_prob = group[group["target"] == 0].iloc[0][
-                "pred_probabilities"
-            ][1]
-            male_positive_prob = group[group["target"] == 1].iloc[0][
-                "pred_probabilities"
-            ][1]
-            diffs += [female_positiv_prob - male_positive_prob]
-
-        # Plot histograms
-        ax.set_xlabel("Probability")
-        ax.set_ylabel("Counts")
-        ax.hist(diffs, bins=50)
-        ax.legend()
-
-    plt.suptitle("Difference in probabilities of positive sentiment\n female - male")
-    file_path = join(base_output_dir, f'{plot_type}.png')
-    logger.info(file_path)
-    plt.savefig(file_path, dpi=300, bbox_inches='tight')
-    plt.close()
-
-
-def plot_prediction_positive(
-    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
-) -> None:
-    for ax, _, _, grouped in model_ds_axs(data):
-        # Prepare data for plot
-        female_positiv_probs = []
-        male_positive_probs = []
-        for _, group in grouped.groupby(by="sentence_idx"):
-            female_positiv_prob = group[group["target"] == 0].iloc[0][
-                "pred_probabilities"
-            ][1]
-            male_positive_prob = group[group["target"] == 1].iloc[0][
-                "pred_probabilities"
-            ][1]
-
-            female_positiv_probs.append(female_positiv_prob)
-            male_positive_probs.append(male_positive_prob)
-
-        # Plot histograms
-        ax.set_xlabel("Probability")
-        ax.set_ylabel("Counts")
-        ax.hist(female_positiv_probs, bins=50, label="Female positive", alpha=0.5)
-        ax.hist(male_positive_probs, bins=50, label="Male positive", alpha=0.5)
-        ax.legend()
-
-    plt.suptitle("Probability of positive sentiment")
-    file_path = join(base_output_dir, f'{plot_type}.png')
-    logger.info(file_path)
-    plt.savefig(file_path, dpi=300, bbox_inches='tight')
-    plt.close()
-
-
 def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
     pad = 5
     _, axs = plt.subplots(
@@ -1073,10 +1014,76 @@ def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
             yield (ax, model_name, dataset_type, group2)
 
 
+def plot_prediction_prob_diff(
+    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
+) -> None:
+    # A positive value in the difference means that the model assigns a higher
+    # probability to a positive sentiment for female sentences and a negative value
+    # means that the model assigns a higher positive sentiment probability to a male sentence.
+
+    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 10)):
+        # Prepare data for plot
+        diffs = []
+        for _, group in grouped.groupby(by="sentence_idx"):
+            female_positiv_prob = group[group["target"] == 0].iloc[0][
+                "pred_probabilities"
+            ][1]
+            male_positive_prob = group[group["target"] == 1].iloc[0][
+                "pred_probabilities"
+            ][1]
+            diffs += [female_positiv_prob - male_positive_prob]
+
+        # Plot histograms
+        ax.set_xlabel("Probability")
+        ax.set_ylabel("Counts")
+        ax.hist(diffs, bins=50)
+        ax.legend()
+
+    plt.suptitle("Difference in probabilities of positive sentiment\n female - male")
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def plot_prediction_positive(
+    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
+) -> None:
+    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 10)):
+        # Prepare data for plot
+        female_positiv_probs = []
+        male_positive_probs = []
+        for _, group in grouped.groupby(by="sentence_idx"):
+            female_positiv_prob = group[group["target"] == 0].iloc[0][
+                "pred_probabilities"
+            ][1]
+            male_positive_prob = group[group["target"] == 1].iloc[0][
+                "pred_probabilities"
+            ][1]
+
+            female_positiv_probs.append(female_positiv_prob)
+            male_positive_probs.append(male_positive_prob)
+
+        # Plot histograms
+        ax.set_xlabel("Probability")
+        ax.set_ylabel("Counts")
+        ax.hist(female_positiv_probs, bins=50, label="Female positive", alpha=0.5)
+        ax.hist(male_positive_probs, bins=50, label="Male positive", alpha=0.5)
+        ax.legend()
+
+    plt.suptitle("Probability of positive sentiment")
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 def plot_prediction_diff(
     data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
 ) -> None:
-    for ax, _, _, grouped in model_ds_axs(data):
+    for ax, _, _, grouped in model_ds_axs(
+        data, figsize=(15, 10), sharey=True, sharex=True
+    ):
         # Prepare data for plot
         same = 0
         male_pos_fem_neg = 0
@@ -1142,7 +1149,7 @@ def calculate_sentence_wise_attribution_diff(data: pd.DataFrame) -> None:
                     f"{female_word.lower()} / {male_word.lower()}",
                     diff,
                 )
-    
+
     # Calculate mean attribution difference for each word
     for word in attribution_diff:
         attribution_diff[word] = np.mean(attribution_diff[word])
@@ -1158,12 +1165,15 @@ def plot_sentence_wise_attribution_diff(
     # Negative attribution difference means that more attribution is given to the
     # token in the male sentence and less in then female and vice versa.
 
-    for ax, _, _, grouped in model_ds_axs(data):
+    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 15)):
         # Prepare word data for plot
         dfs = []
         for method, grouped_method in grouped.groupby(by="attribution_method"):
             attribution_diff = calculate_sentence_wise_attribution_diff(grouped_method)
-            method_df = pd.DataFrame(Counter(attribution_diff).most_common(n=5), columns=["word", "abs_difference"])
+            method_df = pd.DataFrame(
+                Counter(attribution_diff).most_common(n=5),
+                columns=["word", "abs_difference"],
+            )
             method_df["rank"] = np.arange(1, top_k + 1)
             method_df["method"] = [method] * top_k
             dfs.append(method_df)
