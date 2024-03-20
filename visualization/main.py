@@ -25,7 +25,8 @@ from utils import (
     generate_training_dir,
     generate_xai_dir,
     generate_project_dir,
-    generate_data_dir
+    generate_data_dir,
+    generate_artifacts_dir,
 )
 
 MODEL_NAME_MAP = dict(
@@ -274,6 +275,7 @@ def plot_most_common_xai_attributions(
                             g.containers[start:], ggdf.groupby(by='attribution_method')
                         ):
                             g.bar_label(container, labels=mggdf['word'], fontsize=3)
+
                         axs[k, j].legend(
                             loc='lower right',
                             ncols=1,
@@ -398,9 +400,18 @@ def create_xai_sentence_html_plots(
     for key, group in data:
         for index, row in group.iterrows():
             for model in pre_trained_models:
-                if row['model_name'] == model and row['model_repetition_number'] == 0 and row['sentence'] == str(sentence) and row['dataset_type'] == str(dataset_type):
-                    df_explanations_sentence_different_models = df_explanations_sentence_different_models.append(row, ignore_index=True)
-                    
+                if (
+                    row['model_name'] == model
+                    and row['model_repetition_number'] == 0
+                    and row['sentence'] == str(sentence)
+                    and row['dataset_type'] == str(dataset_type)
+                ):
+                    df_explanations_sentence_different_models = (
+                        df_explanations_sentence_different_models.append(
+                            row, ignore_index=True
+                        )
+                    )
+
     model_image_paths = []
     for model in pre_trained_models:
         df_model = df_explanations_sentence_different_models[
@@ -692,7 +703,10 @@ def create_xai_sentence_html_plots(
     else:
         print(f"Warning: Image {file_path_legend_plot} not found.")
 
-    file_path = join(base_output_dir, f'{sample_index}_{dataset_type}_{selected_sentence_length}_models_xai_sentence_html_plot.html')
+    file_path = join(
+        base_output_dir,
+        f'{sample_index}_{dataset_type}_{selected_sentence_length}_models_xai_sentence_html_plot.html',
+    )
     with open(file_path, 'w') as file:
         file.write(html_content)
 
@@ -775,13 +789,12 @@ def create_dataset_for_xai_plot(
 
 def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
-    file_path = join(xai_dir, config['xai']['xai_records'])
+    artifacts_dir = generate_artifacts_dir(config=config)
+    file_path = join(artifacts_dir, xai_dir, config['xai']['xai_records'])
     paths_to_xai_records = load_pickle(file_path=file_path)
-    # Temporary fix for running locally
-    paths_to_xai_records = [s.strip('/mnt/') for s in paths_to_xai_records]
     data_list = list()
     for p in tqdm(paths_to_xai_records):
-        results = load_pickle(file_path=p)
+        results = load_pickle(file_path=join(artifacts_dir, p))
         for xai_records in results:
             data_list += [asdict(xai_records)]
 
@@ -961,6 +974,254 @@ def create_data_plots(base_output_dir: str, config: dict) -> None:
         v(data, plot_type, base_output_dir, config)
 
 
+def plot_prediction_prob_diff(
+    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
+) -> None:
+    # A positive value in the difference means that the model assigns a higher
+    # probability to a positive sentiment for female sentences and a negative value
+    # means that the model assigns a higher positive sentiment probability to a male sentence.
+
+    for ax, _, _, grouped in model_ds_axs(data):
+        # Prepare data for plot
+        diffs = []
+        for _, group in grouped.groupby(by="sentence_idx"):
+            female_positiv_prob = group[group["target"] == 0].iloc[0][
+                "pred_probabilities"
+            ][1]
+            male_positive_prob = group[group["target"] == 1].iloc[0][
+                "pred_probabilities"
+            ][1]
+            diffs += [female_positiv_prob - male_positive_prob]
+
+        # Plot histograms
+        ax.set_xlabel("Probability")
+        ax.set_ylabel("Counts")
+        ax.hist(diffs, bins=50)
+        ax.legend()
+
+    plt.suptitle("Difference in probabilities of positive sentiment\n female - male")
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def plot_prediction_positive(
+    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
+) -> None:
+    for ax, _, _, grouped in model_ds_axs(data):
+        # Prepare data for plot
+        female_positiv_probs = []
+        male_positive_probs = []
+        for _, group in grouped.groupby(by="sentence_idx"):
+            female_positiv_prob = group[group["target"] == 0].iloc[0][
+                "pred_probabilities"
+            ][1]
+            male_positive_prob = group[group["target"] == 1].iloc[0][
+                "pred_probabilities"
+            ][1]
+
+            female_positiv_probs.append(female_positiv_prob)
+            male_positive_probs.append(male_positive_prob)
+
+        # Plot histograms
+        ax.set_xlabel("Probability")
+        ax.set_ylabel("Counts")
+        ax.hist(female_positiv_probs, bins=50, label="Female positive", alpha=0.5)
+        ax.hist(male_positive_probs, bins=50, label="Male positive", alpha=0.5)
+        ax.legend()
+
+    plt.suptitle("Probability of positive sentiment")
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
+    pad = 5
+    _, axs = plt.subplots(
+        nrows=len(data["model_name"].unique()),
+        ncols=len(data["dataset_type"].unique()),
+        figsize=figsize,
+        **kwargs,
+    )
+
+    for model_idx, (model_name, group) in enumerate(data.groupby(by="model_name")):
+        for ds_idx, (dataset_type, group2) in enumerate(
+            group.groupby(by="dataset_type")
+        ):
+            ax = axs[model_idx][ds_idx]
+
+            # Set title and labels
+            if model_idx == 0:
+                ax.set_title(f"{dataset_type}")
+
+            if ds_idx == 0:
+                ax.annotate(
+                    model_name,
+                    xy=(0, 0.5),
+                    xytext=(-ax.yaxis.labelpad - pad, 0),
+                    xycoords=ax.yaxis.label,
+                    textcoords='offset points',
+                    size='large',
+                    ha='right',
+                    va='center',
+                    rotation=90,
+                )
+
+            yield (ax, model_name, dataset_type, group2)
+
+
+def plot_prediction_diff(
+    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
+) -> None:
+    for ax, _, _, grouped in model_ds_axs(data):
+        # Prepare data for plot
+        same = 0
+        male_pos_fem_neg = 0
+        fem_pos_male_neg = 0
+        for _, group in grouped.groupby(by="sentence_idx"):
+            female_pred = np.argmax(
+                group[group["target"] == 0].iloc[0]["pred_probabilities"]
+            )
+            male_pred = np.argmax(
+                group[group["target"] == 1].iloc[0]["pred_probabilities"]
+            )
+
+            if female_pred == male_pred:
+                same += 1
+            elif male_pred == 1:
+                male_pos_fem_neg += 1
+            else:
+                fem_pos_male_neg += 1
+
+        # Plot stacked horizontal bar chart
+        categories = [
+            'Same sentiment',
+            'Male positive, female negative',
+            'Female positive, male negative',
+        ]
+        values = [same, male_pos_fem_neg, fem_pos_male_neg]
+
+        ax.barh(categories, values, color=['blue', 'green', 'red'])
+        ax.set_xlabel('Counts')
+
+    plt.suptitle("Difference in predictions")
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def calculate_sentence_wise_attribution_diff(data: pd.DataFrame) -> None:
+    attribution_diff = dict()
+
+    def add_diff(word, diff):
+        if word not in attribution_diff:
+            attribution_diff[word] = []
+        attribution_diff[word].append(diff)
+
+    for _, group in tqdm(data.groupby(by="sentence_idx")):
+        assert len(group) == 2
+
+        female = group[group["target"] == 0].iloc[0]
+        male = group[group["target"] == 1].iloc[0]
+
+        for female_word, male_word, female_attr, male_attr in zip(
+            female["sentence"],
+            male["sentence"],
+            female["attribution"],
+            male["attribution"],
+        ):
+            diff = np.abs(female_attr - male_attr)
+            if female_word == male_word:
+                add_diff(female_word, diff)
+            else:
+                add_diff(
+                    f"{female_word.lower()} / {male_word.lower()}",
+                    diff,
+                )
+    
+    # Calculate mean attribution difference for each word
+    for word in attribution_diff:
+        attribution_diff[word] = np.mean(attribution_diff[word])
+
+    return attribution_diff
+
+
+def plot_sentence_wise_attribution_diff(
+    data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
+) -> None:
+    top_k = 5
+
+    # Negative attribution difference means that more attribution is given to the
+    # token in the male sentence and less in then female and vice versa.
+
+    for ax, _, _, grouped in model_ds_axs(data):
+        # Prepare word data for plot
+        dfs = []
+        for method, grouped_method in grouped.groupby(by="attribution_method"):
+            attribution_diff = calculate_sentence_wise_attribution_diff(grouped_method)
+            method_df = pd.DataFrame(Counter(attribution_diff).most_common(n=5), columns=["word", "abs_difference"])
+            method_df["rank"] = np.arange(1, top_k + 1)
+            method_df["method"] = [method] * top_k
+            dfs.append(method_df)
+
+        df = pd.concat(dfs)
+
+        # Define order of ranks and hue order / method order
+        ranks = np.unique(df['rank'].values)
+        mean_attr_method = df[df["rank"] == 1].groupby(by="method").mean()
+        mean_attr_method.sort_values(by="abs_difference", ascending=False, inplace=True)
+
+        g = sns.barplot(
+            x="abs_difference",
+            y="rank",
+            order=ranks,
+            hue="method",
+            hue_order=list(mean_attr_method.index),
+            orient="y",
+            data=df,
+            ax=ax,
+            width=0.8,
+            native_scale=False,
+        )
+
+        # Add word labels to bars
+        for container, (name, mggdf) in zip(g.containers, df.groupby(by='method')):
+            g.bar_label(container, labels=mggdf['word'], fontsize=8, padding=3)
+
+        # Move legend to bottom right corner
+        sns.move_legend(g, "lower right", fontsize=8)
+
+    plt.suptitle("Difference in attributions between male and female sentences")
+    file_path = join(base_output_dir, f'{plot_type}.png')
+    logger.info(file_path)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def create_prediction_plots(base_output_dir: str, config: dict) -> None:
+    xai_results = load_xai_records(config=config)
+    xai_results = pd.DataFrame(xai_results)
+
+    visualization_methods = dict(
+        prediction_positive=plot_prediction_positive,
+        prediction_prob_diff=plot_prediction_prob_diff,
+        prediction_diff=plot_prediction_diff,
+        sentence_wise_attribution_diff=plot_sentence_wise_attribution_diff,
+    )
+
+    plot_types = config['visualization']['visualizations']['prediction']
+    for plot_type in plot_types:
+        logger.info(f'Type of plot: {plot_type}')
+        v = visualization_methods.get(plot_type, None)
+        if v is None:
+            continue
+        v(xai_results, plot_type, base_output_dir, config)
+
+
 def visualize_results(base_output_dir: str, config: dict) -> None:
     for visualization, _ in config['visualization']['visualizations'].items():
         v = VISUALIZATIONS.get(visualization, None)
@@ -973,6 +1234,7 @@ VISUALIZATIONS = dict(
     xai=create_xai_plots,
     evaluation=create_evaluation_plots,
     model=create_model_performance_plots,
+    prediction=create_prediction_plots,
 )
 
 
