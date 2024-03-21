@@ -58,10 +58,14 @@ class SelfAttention(nn.Module):
         value = self.value(x)
 
         s = 1 / (self.dim**0.5)
-        key_transposed = rearrange(tensor=key, pattern='btn->bnt')
-        attention_scores = s * torch.einsum('btm,bms->bts', query, key_transposed)
+        key_transposed = rearrange(tensor=key, pattern='b t n -> b n t')
+        attention_scores = s * torch.einsum(
+            'b t m, b m s -> b t s', query, key_transposed
+        )
         attention_weights = masked_softmax(attention_scores, mask=attention_mask)
-        attention = torch.einsum('bst,btm->bsm', self.dropout(attention_weights), value)
+        attention = torch.einsum(
+            'b s t, b t m -> b s m', self.dropout(attention_weights), value
+        )
 
         return attention, attention_weights
 
