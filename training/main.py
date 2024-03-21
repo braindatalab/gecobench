@@ -69,7 +69,7 @@ TrainModel = {
     'bert_all': train_bert,
     'bert_only_embedding': train_bert,
     'bert_randomly_init_embedding_classification': train_bert,
-    'simple_model': train_simple_attention_model,
+    'one_layer_attention': train_simple_attention_model,
 }
 
 

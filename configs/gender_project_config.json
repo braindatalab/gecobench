@@ -32,11 +32,11 @@
     "training_records": "training_records.pkl",
     "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
     "models": {
-      "simple_model": {
+      "one_layer_attention": {
         "batch_size": 64,
         "epochs": 200,
         "learning_rate": 0.01,
-        "model_name": "simple_attention_classification",
+        "model_name": "one_layer_attention_classification",
         "model_performance": "simple_model_history",
         "embedding_dim": 64
       },
