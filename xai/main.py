@@ -96,7 +96,7 @@ def create_xai_results(
     row: pd.Series,
     model_params: dict,
     dataset_type: str,
-    pred_probabilities: list = None
+    pred_probabilities: list = None,
 ) -> list:
     results = list()
     for xai_method, attribution in attributions.items():
@@ -111,7 +111,7 @@ def create_xai_results(
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
                 sentence_idx=row["sentence_idx"],
-                pred_probabilities=pred_probabilities
+                pred_probabilities=pred_probabilities,
             )
         ]
     return results
@@ -155,7 +155,9 @@ def map_raw_attributions_to_original_tokens(
 
         output_dir = generate_xai_dir(config=config)
         filename = append_date(s=config['xai']['intermediate_xai_result_prefix'])
-        dump_as_pickle(data=results, output_dir=join(artifacts_dir, output_dir), filename=filename)
+        dump_as_pickle(
+            data=results, output_dir=join(artifacts_dir, output_dir), filename=filename
+        )
         output += [join(output_dir, filename)]
 
     return output
@@ -212,7 +214,7 @@ def apply_xai_methods_on_sentence(
         row=row,
         model_params=model_params,
         dataset_type=dataset_type,
-        pred_probabilities=pred_probabilities
+        pred_probabilities=pred_probabilities,
     )
 
     return results
@@ -276,7 +278,7 @@ def apply_xai_methods(
             model,
             row,
             dataset_type,
-            trained_on_dataset_name, 
+            trained_on_dataset_name,
             model_params,
             config,
             num_samples,
@@ -342,18 +344,23 @@ def load_test_data(config: dict) -> dict[pd.DataFrame]:
     return data
 
 
-get_tokenizer = {'bert': get_bert_tokenizer}
+get_tokenizer = {'bert': get_bert_tokenizer, 'one_layer_attention': get_bert_tokenizer}
 
-create_token_ids = {'bert': create_bert_ids}
+create_token_ids = {'bert': create_bert_ids, 'one_layer_attention': create_bert_ids}
 
 create_model_token_to_original_token_mapping = {
-    'bert': create_bert_to_original_token_mapping
+    'bert': create_bert_to_original_token_mapping,
+    'one_layer_attention': create_bert_to_original_token_mapping,
 }
 
-create_reference_tokens = {'bert': create_bert_reference_tokens}
+create_reference_tokens = {
+    'bert': create_bert_reference_tokens,
+    'one_layer_attention': create_bert_reference_tokens,
+}
 
 raw_attributions_to_original_tokens_mapping = {
-    'bert': map_bert_attributions_to_original_tokens
+    'bert': map_bert_attributions_to_original_tokens,
+    'one_layer_attention': map_bert_attributions_to_original_tokens,
 }
 
 
