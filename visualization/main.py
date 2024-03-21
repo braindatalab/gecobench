@@ -1081,40 +1081,80 @@ def plot_prediction_positive(
 def plot_prediction_diff(
     data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
 ) -> None:
-    for ax, _, _, grouped in model_ds_axs(
-        data, figsize=(15, 10), sharey=True, sharex=True
+
+    _, axs = plt.subplots(
+        ncols=len(data["dataset_type"].unique()),
+        figsize=(6, 3),
+        sharex=True,
+        sharey=True
+    )
+
+    sections = ["Same sentiment", 'Male positive, female negative', 'Female positive, male negative']
+    for ds_idx, (dataset_type, group) in enumerate(
+        data.groupby(by="dataset_type")
     ):
-        # Prepare data for plot
-        same = 0
-        male_pos_fem_neg = 0
-        fem_pos_male_neg = 0
-        for _, group in grouped.groupby(by="sentence_idx"):
-            female_pred = np.argmax(
-                group[group["target"] == 0].iloc[0]["pred_probabilities"]
-            )
-            male_pred = np.argmax(
-                group[group["target"] == 1].iloc[0]["pred_probabilities"]
-            )
+        ax = axs[ds_idx]
+        ax.set_title(f"{dataset_type}")
 
-            if female_pred == male_pred:
-                same += 1
-            elif male_pred == 1:
-                male_pos_fem_neg += 1
-            else:
-                fem_pos_male_neg += 1
+        plot_data = []
+        for model_name, group_model in group.groupby(by="model_name"):
+            # Prepare data for plot
+            same = 0
+            male_pos_fem_neg = 0
+            fem_pos_male_neg = 0
+            for _, group in group_model.groupby(by="sentence_idx"):
+                female_pred = np.argmax(
+                    group[group["target"] == 0].iloc[0]["pred_probabilities"]
+                )
+                male_pred = np.argmax(
+                    group[group["target"] == 1].iloc[0]["pred_probabilities"]
+                )
 
-        # Plot stacked horizontal bar chart
-        categories = [
-            'Same sentiment',
-            'Male positive, female negative',
-            'Female positive, male negative',
-        ]
-        values = [same, male_pos_fem_neg, fem_pos_male_neg]
+                if female_pred == male_pred:
+                    same += 1
+                elif male_pred == 1:
+                    male_pos_fem_neg += 1
+                else:
+                    fem_pos_male_neg += 1
+            
+            total = same + male_pos_fem_neg + fem_pos_male_neg
+            
+            plot_data.append({
+                'model': model_name,
+                'section': sections[0],
+                'count': (same / total) * 100
+            })
 
-        ax.barh(categories, values, color=['blue', 'green', 'red'])
-        ax.set_xlabel('Counts')
+            plot_data.append({
+                'model': model_name,
+                'section': sections[1],
+                'count': (male_pos_fem_neg / total) * 100
+            })
 
-    plt.suptitle("Difference in predictions")
+            plot_data.append({
+                'model': model_name,
+                'section': sections[2],
+                'count': (fem_pos_male_neg / total) * 100
+            })
+        
+        g = sns.barplot(
+            x="count",
+            y="section",
+            order=sections,
+            hue="model",
+            orient="y",
+            data=pd.DataFrame(plot_data),
+            ax=ax,
+            legend=ds_idx == 0
+        )
+
+        # Disable y-axis labels
+        ax.set(ylabel=None, xlabel='% of sentences')
+
+        if ds_idx == 0:
+            # Move legend outside of plot
+            ax.legend(loc='lower center', bbox_to_anchor=(1, -0.5))
+        
     file_path = join(base_output_dir, f'{plot_type}.png')
     logger.info(file_path)
     plt.savefig(file_path, dpi=300, bbox_inches='tight')
@@ -1165,7 +1205,8 @@ def plot_sentence_wise_attribution_diff(
     # Negative attribution difference means that more attribution is given to the
     # token in the male sentence and less in then female and vice versa.
 
-    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 15)):
+    set_legend = True
+    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 15), sharex=True):
         # Prepare word data for plot
         dfs = []
         for method, grouped_method in grouped.groupby(by="attribution_method"):
@@ -1196,14 +1237,18 @@ def plot_sentence_wise_attribution_diff(
             ax=ax,
             width=0.8,
             native_scale=False,
+            legend=set_legend
         )
+
+        ax.set(ylabel=None, xlabel='Absolute attribution difference')
+
+        if set_legend:
+            ax.legend(loc='lower center', bbox_to_anchor=(1.1, -1.5), ncol=4)
+            set_legend = False
 
         # Add word labels to bars
         for container, (name, mggdf) in zip(g.containers, df.groupby(by='method')):
             g.bar_label(container, labels=mggdf['word'], fontsize=8, padding=3)
-
-        # Move legend to bottom right corner
-        sns.move_legend(g, "lower right", fontsize=8)
 
     plt.suptitle("Difference in attributions between male and female sentences")
     file_path = join(base_output_dir, f'{plot_type}.png')
