@@ -86,7 +86,7 @@ class AttentionPooler(nn.Module):
 class VanillaAttentionClassifier(nn.Module):
     def __init__(self, vocab_size: int, emd_dim: int, num_labels: int, p: float = 0.0):
         super().__init__()
-        self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emd_dim)
+        self.embeddings = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emd_dim)
         self.attention = SelfAttention(dim=emd_dim, p=p)
         self.pooler = AttentionPooler(dim=emd_dim)
         self.classifier = nn.Linear(emd_dim, num_labels)
@@ -94,10 +94,10 @@ class VanillaAttentionClassifier(nn.Module):
     def forward(
         self,
         x: Tensor,
-        token_type_ids: Tensor,
         attention_mask: Tensor,
+        token_type_ids: Tensor,
     ) -> SequenceClassifierOutput:
-        x = self.embedding(x)
+        x = self.embeddings(x)
         attention, attention_weights = self.attention(x, attention_mask)
         first_token = self.pooler(attention)
         logits = self.classifier(first_token)
@@ -483,7 +483,7 @@ def train_simple_attention_model(
     y_train = [dataset.y_train[i] for i in train_idxs]
     y_test = [dataset.y_test[i] for i in val_idxs]
 
-    logger.info(f'Creating BERT datasets')
+    logger.info(f'Creating VanillaAttention datasets')
     train_data = create_tensor_dataset(
         data=bert_ids_train, target=y_train, tokenizer=bert_tokenizer
     )
@@ -491,11 +491,11 @@ def train_simple_attention_model(
         data=bert_ids_val, target=y_test, tokenizer=bert_tokenizer
     )
 
-    logger.info(f'Creating BERT data loaders')
+    logger.info(f'Creating VanillaAttention data loaders')
     train_loader = DataLoader(train_data, shuffle=True, batch_size=params['batch_size'])
     val_loader = DataLoader(val_data, shuffle=True, batch_size=params['batch_size'])
 
-    logger.info(f'Begin training BERT model')
+    logger.info(f'Begin training VanillaAttention model')
     for k in range(config['training']['num_training_repetitions']):
         output += train_model(
             config=config,
