@@ -35,6 +35,8 @@ from training.bert import (
     add_padding_if_necessary,
     create_attention_mask_from_bert_ids,
 )
+from utils import determine_model_type, BERT_MODEL_TYPE, \
+    ONE_LAYER_ATTENTION_MODEL_TYPE
 
 BERT = 'bert'
 ALL_BUT_CLS_SEP = slice(1, -1)
@@ -49,12 +51,17 @@ GRADIENT_BASED_METHODS = [
 
 
 class SkippingEmbedding(torch.nn.Module):
-    def __init__(self, model: torch.nn.Module):
+    def __init__(self, model: torch.nn.Module, model_type: str):
         super().__init__()
         self.model = model
+        self.model_type = determine_model_type(s=model_type)
 
     def forward(self, inputs: torch.tensor):
-        return self.model(input_ids=None, inputs_embeds=inputs)[0]
+        if BERT_MODEL_TYPE == self.model_type:
+            x = self.model(input_ids=None, inputs_embeds=inputs)[0]
+        elif ONE_LAYER_ATTENTION_MODEL_TYPE == self.model_type:
+            x = self.model(embeddings=inputs)[0]
+        return x
 
 
 def normalize_attributions(a: np.ndarray) -> np.ndarray:
@@ -84,27 +91,26 @@ def get_captum_attributions(
     attributions = dict()
     check_availability_of_xai_methods(methods=methods)
 
+    def forward_function(inputs: Tensor, attention_mask: Tensor = None) -> Tensor:
+        output = (
+            model(inputs) if attention_mask is None else model(inputs, attention_mask)
+        )
+        forward_function_output = torch.softmax(output.logits, dim=1)
+        return forward_function_output
+
     if BERT in model_type:
-
-        def forward_function(inputs: Tensor, attention_mask: Tensor = None) -> Tensor:
-            output = (
-                model(inputs)
-                if attention_mask is None
-                else model(inputs, attention_mask)
-            )
-            forward_function_output = torch.softmax(output.logits, dim=1)
-            return forward_function_output
-
-        bert_embeddings = model.base_model.embeddings
+        embeddings = model.base_model.embeddings
+    else:
+        embeddings = model.embeddings
 
     for method_name in methods:
         logger.info(method_name)
 
         if method_name in GRADIENT_BASED_METHODS:
             a = methods_dict.get(method_name)(
-                forward_function=SkippingEmbedding(model),
+                forward_function=SkippingEmbedding(model, model_type),
                 baseline=baseline,
-                data=bert_embeddings(x),
+                data=embeddings(x),
                 model=model,
                 target=target,
             )
@@ -113,7 +119,7 @@ def get_captum_attributions(
                 forward_function=forward_function,
                 baseline=baseline,
                 data=x,
-                model=model if 'Gradient SHAP' == method_name else bert_embeddings,
+                model=model if 'Gradient SHAP' == method_name else embeddings,
                 target=target,
                 tokenizer=tokenizer,
             )
@@ -307,7 +313,9 @@ def get_lime_attributions(
         output = list()
         list_of_bert_ids = list()
         for sentence in text_input:
-            bert_ids = create_bert_ids(data=[sentence.split()], tokenizer=tokenizer)[0][0]
+            bert_ids = create_bert_ids(data=[sentence.split()], tokenizer=tokenizer)[0][
+                0
+            ]
             list_of_bert_ids += [bert_ids]
 
         dataset = create_tensor_dataset(data=list_of_bert_ids, tokenizer=tokenizer)

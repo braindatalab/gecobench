@@ -32,6 +32,9 @@ from utils import (
     load_jsonl_as_dict,
     generate_data_dir,
     generate_artifacts_dir,
+    BERT_MODEL_TYPE,
+    ONE_LAYER_ATTENTION_MODEL_TYPE,
+    determine_model_type,
 )
 from xai.methods import (
     get_captum_attributions,
@@ -40,7 +43,6 @@ from xai.methods import (
 )
 
 DEVICE = 'cpu'
-BERT_MODEL_TYPE = 'bert'
 ALL_BUT_CLS_SEP = slice(1, -1)
 SPACE = ' '
 
@@ -68,13 +70,6 @@ def create_bert_to_original_token_mapping(data: list, tokenizer: BertTokenizer) 
             )
         ]
     return mappings
-
-
-def determine_model_type(s: str) -> str:
-    result = None
-    if BERT_MODEL_TYPE in s:
-        result = BERT_MODEL_TYPE
-    return result
 
 
 def create_bert_reference_tokens(
@@ -273,7 +268,8 @@ def apply_xai_methods(
         word_to_bert_id_mapping=prepared_data['word_to_bert_id_mapping'],
     )
 
-    results = Parallel(n_jobs=config["xai"]["num_workers"])(
+    # results = Parallel(n_jobs=config["xai"]["num_workers"])(
+    results = Parallel(n_jobs=1)(
         delayed(apply_xai_methods_on_sentence)(
             model,
             row,
@@ -344,23 +340,29 @@ def load_test_data(config: dict) -> dict[pd.DataFrame]:
     return data
 
 
-get_tokenizer = {'bert': get_bert_tokenizer, 'one_layer_attention': get_bert_tokenizer}
+get_tokenizer = {
+    BERT_MODEL_TYPE: get_bert_tokenizer,
+    ONE_LAYER_ATTENTION_MODEL_TYPE: get_bert_tokenizer,
+}
 
-create_token_ids = {'bert': create_bert_ids, 'one_layer_attention': create_bert_ids}
+create_token_ids = {
+    BERT_MODEL_TYPE: create_bert_ids,
+    ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_ids,
+}
 
 create_model_token_to_original_token_mapping = {
-    'bert': create_bert_to_original_token_mapping,
-    'one_layer_attention': create_bert_to_original_token_mapping,
+    BERT_MODEL_TYPE: create_bert_to_original_token_mapping,
+    ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_to_original_token_mapping,
 }
 
 create_reference_tokens = {
-    'bert': create_bert_reference_tokens,
-    'one_layer_attention': create_bert_reference_tokens,
+    BERT_MODEL_TYPE: create_bert_reference_tokens,
+    ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_reference_tokens,
 }
 
 raw_attributions_to_original_tokens_mapping = {
-    'bert': map_bert_attributions_to_original_tokens,
-    'one_layer_attention': map_bert_attributions_to_original_tokens,
+    BERT_MODEL_TYPE: map_bert_attributions_to_original_tokens,
+    ONE_LAYER_ATTENTION_MODEL_TYPE: map_bert_attributions_to_original_tokens,
 }
 
 
