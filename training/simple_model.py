@@ -93,11 +93,15 @@ class VanillaAttentionClassifier(nn.Module):
 
     def forward(
         self,
-        x: Tensor,
-        attention_mask: Tensor,
-        token_type_ids: Tensor,
+        x: Tensor = None,
+        attention_mask: Tensor = None,
+        token_type_ids: Tensor = None,
+        embeddings: Tensor = None,
     ) -> SequenceClassifierOutput:
-        x = self.embeddings(x)
+        if embeddings is not None:
+            x = embeddings
+        else:
+            x = self.embeddings(x)
         attention, attention_weights = self.attention(x, attention_mask)
         first_token = self.pooler(attention)
         logits = self.classifier(first_token)
