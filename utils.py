@@ -17,6 +17,9 @@ import os
 
 from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 
+BERT_MODEL_TYPE = 'bert'
+ONE_LAYER_ATTENTION_MODEL_TYPE = 'one_layer_attention'
+
 
 def load_pickle(file_path: str) -> Any:
     with open(file_path, 'rb') as file:
@@ -189,3 +192,12 @@ def load_model(path: str) -> Any:
     model.eval()
     model.zero_grad()
     return model
+
+
+def determine_model_type(s: str) -> str:
+    result = None
+    if BERT_MODEL_TYPE in s:
+        result = BERT_MODEL_TYPE
+    elif ONE_LAYER_ATTENTION_MODEL_TYPE in s:
+        result = ONE_LAYER_ATTENTION_MODEL_TYPE
+    return result
