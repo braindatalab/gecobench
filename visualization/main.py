@@ -980,6 +980,10 @@ def create_data_plots(base_output_dir: str, config: dict) -> None:
 
 
 def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
+    """
+    Helper function that creates a grid of subplots for each model and dataset type.
+    and groups the data accordingly.
+    """
     pad = 5
     _, axs = plt.subplots(
         nrows=len(data["model_name"].unique()),
@@ -1013,16 +1017,21 @@ def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
                 )
 
             plots.append((ax, model_name, dataset_type, group2))
-    
+
     return plots
 
 
 def plot_prediction_prob_diff(
     data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
 ) -> None:
-    # A positive value in the difference means that the model assigns a higher
-    # probability to a positive sentiment for female sentences and a negative value
-    # means that the model assigns a higher positive sentiment probability to a male sentence.
+    """
+    The plot shows the differences in the probability of positive sentiment between
+    the male and female version of the same sentence.
+
+    A positive value in the difference means that the model assigns a higher
+    probability to a positive sentiment for female sentences and a negative value
+    means that the model assigns a higher positive sentiment probability to male sentences on average.
+    """
 
     plots = model_ds_axs(data, figsize=(15, 10), sharex=True, sharey=True)
 
@@ -1031,7 +1040,6 @@ def plot_prediction_prob_diff(
         # Prepare data for plot
         diffs = []
         for _, group in grouped.groupby(by=["sentence_idx", "model_repetition_number"]):
-            assert len(group) == 2
             female_positiv_prob = group[group["target"] == 0].iloc[0][
                 "pred_probabilities"
             ][1]
@@ -1039,9 +1047,9 @@ def plot_prediction_prob_diff(
                 "pred_probabilities"
             ][1]
             diffs += [female_positiv_prob - male_positive_prob]
-        
+
         plot_diffs.append(diffs)
-    
+
     max_diff = np.max(np.abs(diffs))
     for diffs, (ax, _, _, _) in zip(plot_diffs, plots):
         # Plot histograms
@@ -1049,7 +1057,7 @@ def plot_prediction_prob_diff(
         ax.set_ylabel("Counts")
         ax.hist(diffs, bins=50, range=(-max_diff, max_diff))
         ax.legend()
-    
+
     plt.suptitle("Difference in probabilities of positive sentiment\n female - male")
     file_path = join(base_output_dir, f'{plot_type}.png')
     logger.info(file_path)
@@ -1060,10 +1068,19 @@ def plot_prediction_prob_diff(
 def plot_prediction_positive(
     data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
 ) -> None:
+    """
+    The plot shows the distribution of the probability of positive sentiment for
+    male and female sentences.
+    """
+
     for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 10)):
         # Prepare data for plot
-        female_positiv_probs = [pred[1] for pred in grouped[grouped["target"] == 0]["pred_probabilities"]]
-        male_positive_probs = [pred[1] for pred in grouped[grouped["target"] == 1]["pred_probabilities"]]
+        female_positiv_probs = [
+            pred[1] for pred in grouped[grouped["target"] == 0]["pred_probabilities"]
+        ]
+        male_positive_probs = [
+            pred[1] for pred in grouped[grouped["target"] == 1]["pred_probabilities"]
+        ]
 
         # Plot histograms
         ax.set_xlabel("Probability")
@@ -1083,18 +1100,27 @@ def plot_prediction_positive(
 def plot_prediction_diff(
     data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
 ) -> None:
+    """
+    The plot shows how the predicted labels positive/negative differ for the
+    male and the female version of the same sentence.
+
+    e.g. if the male version of the same sentence is predicted as positive and the
+    female version as negative or vice versa.
+    """
 
     _, axs = plt.subplots(
         ncols=len(data["dataset_type"].unique()),
         figsize=(6, 3),
         sharex=True,
-        sharey=True
+        sharey=True,
     )
 
-    sections = ["Same sentiment", 'Male positive, female negative', 'Female positive, male negative']
-    for ds_idx, (dataset_type, group) in enumerate(
-        data.groupby(by="dataset_type")
-    ):
+    sections = [
+        "Same sentiment",
+        'Male positive, female negative',
+        'Female positive, male negative',
+    ]
+    for ds_idx, (dataset_type, group) in enumerate(data.groupby(by="dataset_type")):
         ax = axs[ds_idx]
         ax.set_title(f"{dataset_type}")
 
@@ -1104,8 +1130,9 @@ def plot_prediction_diff(
             same = 0
             male_pos_fem_neg = 0
             fem_pos_male_neg = 0
-            for _, group in group_model.groupby(by=["sentence_idx", "model_repetition_number"]):
-                assert len(group) == 2
+            for _, group in group_model.groupby(
+                by=["sentence_idx", "model_repetition_number"]
+            ):
                 female_pred = np.argmax(
                     group[group["target"] == 0].iloc[0]["pred_probabilities"]
                 )
@@ -1119,28 +1146,34 @@ def plot_prediction_diff(
                     male_pos_fem_neg += 1
                 else:
                     fem_pos_male_neg += 1
-            
+
             total = same + male_pos_fem_neg + fem_pos_male_neg
-            
-            plot_data.append({
-                'model': model_name,
-                'section': sections[0],
-                'count': (same / total) * 100
-            })
 
-            plot_data.append({
-                'model': model_name,
-                'section': sections[1],
-                'count': (male_pos_fem_neg / total) * 100
-            })
+            plot_data.append(
+                {
+                    'model': model_name,
+                    'section': sections[0],
+                    'count': (same / total) * 100,
+                }
+            )
 
-            plot_data.append({
-                'model': model_name,
-                'section': sections[2],
-                'count': (fem_pos_male_neg / total) * 100
-            })
-        
-        g = sns.barplot(
+            plot_data.append(
+                {
+                    'model': model_name,
+                    'section': sections[1],
+                    'count': (male_pos_fem_neg / total) * 100,
+                }
+            )
+
+            plot_data.append(
+                {
+                    'model': model_name,
+                    'section': sections[2],
+                    'count': (fem_pos_male_neg / total) * 100,
+                }
+            )
+
+        sns.barplot(
             x="count",
             y="section",
             order=sections,
@@ -1148,7 +1181,7 @@ def plot_prediction_diff(
             orient="y",
             data=pd.DataFrame(plot_data),
             ax=ax,
-            legend=ds_idx == 0
+            legend=ds_idx == 0,
         )
 
         # Disable y-axis labels
@@ -1157,7 +1190,7 @@ def plot_prediction_diff(
         if ds_idx == 0:
             # Move legend outside of plot
             ax.legend(loc='lower center', bbox_to_anchor=(1, -0.5))
-        
+
     file_path = join(base_output_dir, f'{plot_type}.png')
     logger.info(file_path)
     plt.savefig(file_path, dpi=300, bbox_inches='tight')
@@ -1165,6 +1198,10 @@ def plot_prediction_diff(
 
 
 def calculate_sentence_wise_attribution_diff(data: pd.DataFrame) -> None:
+    """
+    Calculates the difference in attributions for each word in a sentence between
+    the male and female version of the sentence.
+    """
     attribution_diff = dict()
 
     def add_diff(word, diff):
@@ -1203,10 +1240,11 @@ def calculate_sentence_wise_attribution_diff(data: pd.DataFrame) -> None:
 def plot_sentence_wise_attribution_diff(
     data: pd.DataFrame, plot_type: str, base_output_dir: str, config: dict
 ) -> None:
+    """
+    The plot shows the top k words with the highest attribution difference of words
+    for the male and female version of the same sentence.
+    """
     top_k = 5
-
-    # Negative attribution difference means that more attribution is given to the
-    # token in the male sentence and less in then female and vice versa.
 
     set_legend = True
     for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 15), sharex=True):
@@ -1240,10 +1278,14 @@ def plot_sentence_wise_attribution_diff(
             ax=ax,
             width=0.8,
             native_scale=False,
-            legend=set_legend
+            legend=set_legend,
         )
 
-        ax.set(ylabel=None, xlabel='Absolute attribution difference')
+        ax.set(
+            ylabel=None,
+            xlabel='Absolute attribution difference',
+            xlim=(0, 1),
+        )
 
         if set_legend:
             ax.legend(loc='lower center', bbox_to_anchor=(1.1, -1.5), ncol=4)
