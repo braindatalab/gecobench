@@ -20,7 +20,7 @@ from training.bert import (
     get_bert_tokenizer,
 )
 from utils import (
-    filter_xai_datasets,
+    filter_eval_datasets,
     generate_training_dir,
     load_json_file,
     load_jsonl_as_df,
@@ -298,7 +298,7 @@ def loop_over_training_records(
         # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
         datasets = [trained_on_dataset_name]
         if trained_on_dataset_name not in data:
-            datasets = filter_xai_datasets(config)
+            datasets = filter_eval_datasets(config)
 
         for dataset_name in datasets:
             logger.info(
@@ -331,7 +331,7 @@ def loop_over_training_records(
 def load_test_data(config: dict) -> dict[pd.DataFrame]:
     data = dict()
 
-    for dataset in filter_xai_datasets(config):
+    for dataset in filter_eval_datasets(config):
         validate_dataset_key(dataset_key=dataset)
         data[dataset] = load_jsonl_as_df(
             file_path=join(generate_data_dir(config), dataset, "test.jsonl")

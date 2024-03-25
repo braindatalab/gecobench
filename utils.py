@@ -84,9 +84,9 @@ def filter_train_datasets(config: Dict) -> List[str]:
     return [dataset for dataset in tags.keys() if "train" in tags[dataset]]
 
 
-def filter_xai_datasets(config: Dict) -> List[str]:
+def filter_eval_datasets(config: Dict) -> List[str]:
     tags = config["data"]["tags"]
-    return [dataset for dataset in tags.keys() if "xai" in tags[dataset]]
+    return [dataset for dataset in tags.keys() if "eval" in tags[dataset]]
 
 
 def dict_hash(dictionary) -> str:

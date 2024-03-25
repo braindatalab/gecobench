@@ -1,6 +1,4 @@
-import ast
-import json
-import json
+import os
 import warnings
 from dataclasses import asdict
 from os.path import join
@@ -19,6 +17,7 @@ from common import EvaluationResult
 from training.bert import create_bert_ids, create_tensor_dataset
 from xai.main import load_test_data
 from utils import (
+    filter_eval_datasets,
     load_pickle,
     dump_as_pickle,
     generate_xai_dir,
@@ -155,7 +154,7 @@ def create_bert_tensor_data(data: dict, config: dict) -> dict:
             revision=config['training']['bert_revision'],
         )
         sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
-        bert_ids = create_bert_ids(data=sentences, tokenizer=bert_tokenizer)
+        bert_ids, _ = create_bert_ids(data=sentences, tokenizer=bert_tokenizer)
         tensor_data = create_tensor_dataset(
             data=bert_ids, target=target, tokenizer=bert_tokenizer
         )
@@ -179,20 +178,29 @@ def create_dataset_with_predictions(
         'prediction': list(),
         'dataset_type': list(),
     }
+    artifacts_dir = generate_artifacts_dir(config=config)
     tensor_data = create_bert_tensor_data(data=data, config=config)
-    for dataset_name, model_params, model_path, _ in tqdm(records):
-        x, attention_mask, target = tensor_data['tensors'][dataset_name]
-        model = load_model(path=model_path)
-        prediction = torch.argmax(model(x, attention_mask=attention_mask).logits, dim=1)
-        n = target.shape[0]
-        data_dict['model_repetition_number'] += n * [model_params['repetition']]
-        data_dict['model_name'] += n * [model_params['model_name']]
-        data_dict['sentence'] += [
-            str(sentence) for sentence in tensor_data['sentences'][dataset_name]
-        ]
-        data_dict['target'] += target.detach().numpy().tolist()
-        data_dict['prediction'] += prediction.detach().numpy().tolist()
-        data_dict['dataset_type'] += n * [dataset_name]
+    for trained_on_dataset_name, model_params, model_path, _ in tqdm(records):
+
+        # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
+        # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
+        datasets = [trained_on_dataset_name]
+        if trained_on_dataset_name not in data:
+            datasets = filter_eval_datasets(config)
+
+        for dataset_name in datasets:
+            x, attention_mask, target = tensor_data['tensors'][dataset_name]
+            model = load_model(path=join(artifacts_dir, model_path))
+            prediction = torch.argmax(model(x, attention_mask=attention_mask).logits, dim=1)
+            n = target.shape[0]
+            data_dict['model_repetition_number'] += n * [model_params['repetition']]
+            data_dict['model_name'] += n * [model_params['model_name']]
+            data_dict['sentence'] += [
+                str(sentence) for sentence in tensor_data['sentences'][dataset_name]
+            ]
+            data_dict['target'] += target.detach().numpy().tolist()
+            data_dict['prediction'] += prediction.detach().numpy().tolist()
+            data_dict['dataset_type'] += n * [dataset_name]
 
     return pd.DataFrame(data_dict)
 
@@ -258,6 +266,7 @@ def main(config: Dict) -> None:
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
     data_with_predictions = create_prediction_data(config=config)
+    os.makedirs(join(artifacts_dir, evaluation_output_dir), exist_ok=True)
     data_with_predictions.to_csv(
         join(artifacts_dir, evaluation_output_dir, 'data_with_predictions.csv')
     )
