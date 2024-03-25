@@ -268,7 +268,8 @@ def apply_xai_methods(
         word_to_bert_id_mapping=prepared_data['word_to_bert_id_mapping'],
     )
 
-    results = Parallel(n_jobs=config["xai"]["num_workers"])(
+    # results = Parallel(n_jobs=config["xai"]["num_workers"])(
+    results = Parallel(n_jobs=1)(
         delayed(apply_xai_methods_on_sentence)(
             model,
             row,
