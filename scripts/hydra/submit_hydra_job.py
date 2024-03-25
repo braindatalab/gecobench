@@ -44,7 +44,7 @@ def main():
         required=False,
         help="Email",
         type=str,
-        default="hjalmar.schulz@charite.de",
+        default="",
     )
 
     args = parser.parse_args()
