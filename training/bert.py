@@ -7,7 +7,7 @@ import torch
 from loguru import logger
 from tqdm import tqdm
 from torch import Tensor
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, Module
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
 from transformers import BertForSequenceClassification, BertTokenizer
@@ -34,7 +34,7 @@ class Trainer:
     def __init__(
         self,
         config: Dict,
-        model: BertForSequenceClassification,
+        model: Module,
         train_loader: DataLoader,
         val_loader: DataLoader,
         loss: CrossEntropyLoss,

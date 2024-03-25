@@ -1,29 +1,28 @@
 from copy import deepcopy
-from os.path import join
-from pathlib import Path
-from typing import Tuple, Dict, List, Any
+from typing import Tuple, Dict, List
 
 import torch
-from loguru import logger
-from tqdm import tqdm
-from torch import Tensor
 from einops import rearrange
+from loguru import logger
+from torch import Tensor
 from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
-from torch.utils.data import DataLoader, TensorDataset
-from transformers import BertForSequenceClassification, BertTokenizer
-import wandb
+from torch.utils.data import DataLoader
+from transformers import BertForSequenceClassification
 from transformers.modeling_outputs import SequenceClassifierOutput
 
 from common import DataSet
+from training.bert import (
+    get_bert_tokenizer,
+    create_bert_ids,
+    create_tensor_dataset,
+    save_model,
+    dump_history,
+    Trainer,
+)
 from utils import (
     set_random_states,
-    generate_training_dir,
-    dump_as_pickle,
-    load_from_cache,
-    save_to_cache,
-    generate_artifacts_dir,
 )
 
 BERT_PADDING = '[PAD]'
@@ -106,251 +105,6 @@ class VanillaAttentionClassifier(nn.Module):
         first_token = self.pooler(attention)
         logits = self.classifier(first_token)
         return SequenceClassifierOutput(logits=logits, attentions=attention_weights)
-
-
-class Trainer:
-    def __init__(
-        self,
-        config: Dict,
-        model: BertForSequenceClassification,
-        train_loader: DataLoader,
-        val_loader: DataLoader,
-        loss: CrossEntropyLoss,
-        optimizer: torch.optim.Optimizer,
-        device: str,
-        run_name: str,
-    ):
-        self.config = config
-        self.model = model
-        self.train_loader = train_loader
-        self.val_loader = val_loader
-        self.loss = loss
-        self.optimizer = optimizer
-        self.device = device
-        self.logger_enabled = "wandb" in self.config['general']
-        self.run_name = run_name
-
-        self.init_logger()
-
-    def init_logger(self):
-        if self.logger_enabled:
-            wandb.init(
-                project=self.config['general']['wandb']['project'],
-                entity=self.config['general']['wandb']['entity'],
-                name=self.run_name,
-                config=self.config,
-            )
-
-    def finish_run(self):
-        if self.logger_enabled:
-            wandb.finish()
-
-    def log_dict(self, log_dict):
-        if self.logger_enabled:
-            wandb.log(log_dict)
-
-    def log_val(self, step):
-        if (
-            self.logger_enabled
-            and step % self.config['general']['wandb']['validate_every_n_steps'] == 0
-            and step > 0
-        ):
-            val_loss, val_acc = self.validate_epoch()
-            self.log_dict(
-                {
-                    'val_loss': val_loss / len(self.val_loader),
-                    'val_acc': val_acc / len(self.val_loader),
-                }
-            )
-
-    def train_epoch(self) -> Tuple:
-        train_loss, train_acc = 0.0, 0
-
-        bar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-        for step, batch in bar:
-            input_ids = batch[0].to(torch.long).to(self.device)
-            attention_mask = batch[1].to(self.device)
-            labels = batch[2].to(torch.long).to(self.device)
-
-            output = self.model(
-                input_ids, token_type_ids=None, attention_mask=attention_mask
-            )
-            logits = output.logits
-            l = self.loss(logits, labels)
-
-            l.backward()
-            self.optimizer.step()
-            torch.nn.utils.clip_grad_norm_(
-                self.model.parameters(), 1.0
-            )  # for exploding gradients
-
-            train_loss += l.item()
-            scores, predictions = torch.max(logits, 1)
-            batch_train_acc = torch.sum(
-                (predictions == labels), dtype=torch.float
-            ).item() / float(labels.shape[0])
-
-            train_acc += batch_train_acc
-
-            self.log_dict(
-                {
-                    'train_loss': l.item(),
-                    'train_acc': batch_train_acc,
-                }
-            )
-
-            # Validate every n steps, as specified in the config
-            self.log_val(step)
-
-            bar.set_description(
-                f"Train Loss:{train_loss / float(step + 1):.2f}, "
-                f"Train Acc:{train_acc / float(step + 1):.2f}"
-            )
-
-        return train_loss, train_acc
-
-    def validate_epoch(self) -> Tuple:
-        val, val_correct = 0.0, 0
-        self.model.eval()
-        bar = tqdm(enumerate(self.val_loader), total=len(self.val_loader))
-        for step, batch in bar:
-            input_ids = batch[0].to(torch.long).to(self.device)
-            attention_mask = batch[1].to(self.device)
-            lables = batch[2].to(torch.long).to(self.device)
-
-            output = self.model(
-                input_ids, token_type_ids=None, attention_mask=attention_mask
-            )
-            logits = output.logits
-            l = self.loss(logits, lables)
-
-            val += l.item()
-            scores, predictions = torch.max(logits, 1)
-            val_correct += torch.sum(
-                (predictions == lables), dtype=torch.float
-            ).item() / float(lables.shape[0])
-
-            bar.set_description(
-                f"Val Loss:{val / float(step + 1):.2f}, "
-                f"Val Acc:{val_correct / float(step + 1):.2f}"
-            )
-
-        return val, val_correct
-
-
-def get_bert_ids(tokenizer: BertTokenizer, token: str) -> Tensor:
-    return tokenizer(
-        text=token,
-        padding=True,
-        truncation=True,
-        return_tensors='pt',
-        add_special_tokens=False,
-    )['input_ids'].flatten()
-
-
-def create_bert_ids_from_sentence(
-    tokenizer: BertTokenizer, sentence: List[str]
-) -> Tensor:
-    tokens = torch.tensor([])
-    classification_id = get_bert_ids(tokenizer=tokenizer, token=BERT_CLASSIFICATION)
-    separation_id = get_bert_ids(tokenizer=tokenizer, token=BERT_SEPARATION)
-    tokens = torch.cat((tokens, classification_id), dim=0)
-    for k, word in enumerate(sentence):
-        word_id = get_bert_ids(tokenizer=tokenizer, token=word)
-        tokens = torch.cat((tokens, word_id), dim=0)
-
-    tokens = torch.cat((tokens, separation_id), dim=0)
-    return tokens.type(torch.long)
-
-
-def add_padding_if_necessary(
-    tokenizer: BertTokenizer, ids: Tensor, max_sentence_length: int
-) -> Tensor:
-    difference = max_sentence_length - ids.shape[0]
-    output = ids
-    if difference > 0:
-        padding_id = get_bert_ids(tokenizer=tokenizer, token=BERT_PADDING)
-        padding = torch.tensor([padding_id.numpy()[0]] * difference)
-        output = torch.cat((ids, padding), dim=0)
-
-    return output
-
-
-def create_attention_mask_from_bert_ids(
-    tokenizer: BertTokenizer, ids: Tensor
-) -> Tensor:
-    attention_mask = torch.ones_like(ids)
-    padding_id = get_bert_ids(tokenizer=tokenizer, token=BERT_PADDING)
-    padding_mask = ids == padding_id
-    attention_mask[padding_mask] = 0
-    return attention_mask
-
-
-def create_tensor_dataset(
-    data: List, target: List, tokenizer: BertTokenizer
-) -> TensorDataset:
-    max_sentence_length = max([len(ids) for ids in data])
-    tokens = torch.zeros(size=(len(data), max_sentence_length))
-    attention_mask = torch.zeros(size=(len(data), max_sentence_length))
-    for k, ids in enumerate(data):
-        tokens[k, :] = add_padding_if_necessary(
-            tokenizer=tokenizer, ids=ids, max_sentence_length=max_sentence_length
-        )
-        attention_mask[k, :] = create_attention_mask_from_bert_ids(
-            tokenizer=tokenizer,
-            ids=tokens[k, :],
-        )
-
-    return TensorDataset(tokens.type(torch.long), attention_mask, torch.tensor(target))
-
-
-def save_model(model: Any, model_name: str, config: dict) -> str:
-    base_output_dir = generate_artifacts_dir(config)
-    training_dir = generate_training_dir(config)
-    output_dir = join(base_output_dir, training_dir)
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    torch.save(model, join(output_dir, model_name))
-    return join(training_dir, model_name)
-
-
-def dump_history(history: Dict, config: dict, history_name: str) -> str:
-    base_output_dir = generate_artifacts_dir(config)
-    training_dir = generate_training_dir(config)
-    output_dir = join(base_output_dir, training_dir)
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    dump_as_pickle(data=history, output_dir=output_dir, filename=history_name)
-    return join(training_dir, history_name)
-
-
-def create_bert_ids(
-    data: List, tokenizer: BertTokenizer, type: str = "", config: dict = None
-) -> List:
-    should_cache = type != "" and config is not None
-
-    if should_cache:
-        cache_key = f"bert_ids_{type}"
-        cache_entry = load_from_cache(cache_key, config)
-        if cache_entry is not None:
-            return cache_entry
-
-    bert_ids = list()
-    valid_idxs = list()
-    for k, sentence in enumerate(data):
-        cur = create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
-
-        if len(cur) <= MAX_TOKEN_LENGTH:
-            bert_ids.append(cur)
-            valid_idxs.append(k)
-
-    if should_cache:
-        save_to_cache(cache_key, (bert_ids, valid_idxs), config)
-
-    return bert_ids, valid_idxs
-
-
-def initialize_embedding(module: torch.nn.Module) -> None:
-    if isinstance(module, torch.nn.Embedding):
-        torch.nn.init.xavier_uniform_(module.weight)
 
 
 def train_model(
@@ -456,13 +210,6 @@ def train_model(
     trainer.finish_run()
 
     return [(dataset_name, output_params, model_path, history_path)]
-
-
-def get_bert_tokenizer(config: dict) -> BertTokenizer:
-    return BertTokenizer.from_pretrained(
-        pretrained_model_name_or_path='bert-base-uncased',
-        revision=config['training']['bert_revision'],
-    )
 
 
 def train_simple_attention_model(
