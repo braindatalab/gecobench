@@ -1030,7 +1030,8 @@ def plot_prediction_prob_diff(
     for _, _, _, grouped in plots:
         # Prepare data for plot
         diffs = []
-        for _, group in grouped.groupby(by="sentence_idx"):
+        for _, group in grouped.groupby(by=["sentence_idx", "model_repetition_number"]):
+            assert len(group) == 2
             female_positiv_prob = group[group["target"] == 0].iloc[0][
                 "pred_probabilities"
             ][1]
@@ -1061,18 +1062,8 @@ def plot_prediction_positive(
 ) -> None:
     for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 10)):
         # Prepare data for plot
-        female_positiv_probs = []
-        male_positive_probs = []
-        for _, group in grouped.groupby(by="sentence_idx"):
-            female_positiv_prob = group[group["target"] == 0].iloc[0][
-                "pred_probabilities"
-            ][1]
-            male_positive_prob = group[group["target"] == 1].iloc[0][
-                "pred_probabilities"
-            ][1]
-
-            female_positiv_probs.append(female_positiv_prob)
-            male_positive_probs.append(male_positive_prob)
+        female_positiv_probs = [pred[1] for pred in grouped[grouped["target"] == 0]["pred_probabilities"]]
+        male_positive_probs = [pred[1] for pred in grouped[grouped["target"] == 1]["pred_probabilities"]]
 
         # Plot histograms
         ax.set_xlabel("Probability")
@@ -1113,7 +1104,8 @@ def plot_prediction_diff(
             same = 0
             male_pos_fem_neg = 0
             fem_pos_male_neg = 0
-            for _, group in group_model.groupby(by="sentence_idx"):
+            for _, group in group_model.groupby(by=["sentence_idx", "model_repetition_number"]):
+                assert len(group) == 2
                 female_pred = np.argmax(
                     group[group["target"] == 0].iloc[0]["pred_probabilities"]
                 )
@@ -1180,7 +1172,7 @@ def calculate_sentence_wise_attribution_diff(data: pd.DataFrame) -> None:
             attribution_diff[word] = []
         attribution_diff[word].append(diff)
 
-    for _, group in tqdm(data.groupby(by="sentence_idx")):
+    for _, group in tqdm(data.groupby(by=["sentence_idx", "model_repetition_number"])):
         assert len(group) == 2
 
         female = group[group["target"] == 0].iloc[0]
