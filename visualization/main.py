@@ -988,6 +988,7 @@ def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
         **kwargs,
     )
 
+    plots = []
     for model_idx, (model_name, group) in enumerate(data.groupby(by="model_name")):
         for ds_idx, (dataset_type, group2) in enumerate(
             group.groupby(by="dataset_type")
@@ -1011,7 +1012,9 @@ def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
                     rotation=90,
                 )
 
-            yield (ax, model_name, dataset_type, group2)
+            plots.append((ax, model_name, dataset_type, group2))
+    
+    return plots
 
 
 def plot_prediction_prob_diff(
@@ -1021,7 +1024,10 @@ def plot_prediction_prob_diff(
     # probability to a positive sentiment for female sentences and a negative value
     # means that the model assigns a higher positive sentiment probability to a male sentence.
 
-    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 10)):
+    plots = model_ds_axs(data, figsize=(15, 10), sharex=True, sharey=True)
+
+    plot_diffs = []
+    for _, _, _, grouped in plots:
         # Prepare data for plot
         diffs = []
         for _, group in grouped.groupby(by="sentence_idx"):
@@ -1032,13 +1038,17 @@ def plot_prediction_prob_diff(
                 "pred_probabilities"
             ][1]
             diffs += [female_positiv_prob - male_positive_prob]
-
+        
+        plot_diffs.append(diffs)
+    
+    max_diff = np.max(np.abs(diffs))
+    for diffs, (ax, _, _, _) in zip(plot_diffs, plots):
         # Plot histograms
         ax.set_xlabel("Probability")
         ax.set_ylabel("Counts")
-        ax.hist(diffs, bins=50)
+        ax.hist(diffs, bins=50, range=(-max_diff, max_diff))
         ax.legend()
-
+    
     plt.suptitle("Difference in probabilities of positive sentiment\n female - male")
     file_path = join(base_output_dir, f'{plot_type}.png')
     logger.info(file_path)
@@ -1067,6 +1077,7 @@ def plot_prediction_positive(
         # Plot histograms
         ax.set_xlabel("Probability")
         ax.set_ylabel("Counts")
+        ax.set_xlim(0, 1)
         ax.hist(female_positiv_probs, bins=50, label="Female positive", alpha=0.5)
         ax.hist(male_positive_probs, bins=50, label="Male positive", alpha=0.5)
         ax.legend()
