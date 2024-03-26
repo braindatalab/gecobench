@@ -220,6 +220,11 @@ def plot_most_common_xai_attributions(
     attribution_methods = np.unique(data['attribution_method'].values)
     ranks = np.unique(data['rank'].values)
 
+    labels = {
+        "most_common_xai_attributions": "Cumulated attribution for female/male",
+        "most_common_xai_attributions_normalized": "Normalized cumulated attribution for female/male",
+    }
+
     fig, axs = plt.subplots(
         nrows=len(rows),
         ncols=len(columns),
@@ -227,92 +232,86 @@ def plot_most_common_xai_attributions(
         sharey=True,
         layout='constrained',
         gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
-        figsize=(4, 8),
+        figsize=(5, 10),
     )
 
+    plot_normalized = plot_type == 'most_common_xai_attributions_normalized'
+
+    data = data[data['normalized'] == (1 if plot_normalized else 0)]
     grouped_data = data.groupby(by=['mapped_model_name', 'dataset_type'])
+
+    max_abs_attribution = data['attribution'].abs().max()
+    max_abs_attribution = max_abs_attribution + 0.2 * max_abs_attribution
 
     for k, r in enumerate(rows):
         for j, c in enumerate(columns):
             for keys, df in grouped_data:
                 if (r, c) != keys:
                     continue
-                for normalized, gdf in df.groupby(by='normalized'):
-                    if normalized:
-                        continue
-                    for s, (gender, ggdf) in enumerate(gdf.groupby(by='gender')):
-                        ggdf[gender] = (
-                            ggdf['attribution']
+
+                for s, (gender, ggdf) in enumerate(df.groupby(by='gender')):
+                    ggdf[gender] = (
+                        ggdf['attribution'] if 1 == s else (-1) * ggdf['attribution']
+                    )
+
+                    g = sns.barplot(
+                        data=ggdf,
+                        x=gender,
+                        y='rank',
+                        order=ranks,
+                        hue='attribution_method',
+                        orient='y',
+                        ax=axs[k, j],
+                        width=0.8,
+                        native_scale=False,
+                        legend=True if 1 == s else False,
+                        palette=(
+                            sns.color_palette('pastel', len(attribution_methods))
                             if 1 == s
-                            else (-1) * ggdf['attribution']
-                        )
+                            else sns.color_palette('muted', len(attribution_methods))
+                        ),
+                    )
+                    start = (
+                        0
+                        if len(attribution_methods) == len(g.containers)
+                        else len(attribution_methods)
+                    )
+                    for container, (name, mggdf) in zip(
+                        g.containers[start:], ggdf.groupby(by='attribution_method')
+                    ):
+                        g.bar_label(container, labels=mggdf['word'], fontsize=3)
 
-                        g = sns.barplot(
-                            data=ggdf,
-                            x=gender,
-                            y='rank',
-                            order=ranks,
-                            hue='attribution_method',
-                            orient='y',
-                            ax=axs[k, j],
-                            width=0.8,
-                            native_scale=False,
-                            legend=True if 1 == s else False,
-                            palette=(
-                                sns.color_palette('pastel', len(attribution_methods))
-                                if 1 == s
-                                else sns.color_palette(
-                                    'muted', len(attribution_methods)
-                                )
-                            ),
-                        )
-                        start = (
-                            0
-                            if len(attribution_methods) == len(g.containers)
-                            else len(attribution_methods)
-                        )
-                        for container, (name, mggdf) in zip(
-                            g.containers[start:], ggdf.groupby(by='attribution_method')
-                        ):
-                            g.bar_label(container, labels=mggdf['word'], fontsize=3)
+                    axs[k, j].legend(
+                        loc='lower right',
+                        ncols=1,
+                        # fontsize='xx-small',
+                        prop={'size': 2},
+                    )
 
-                        axs[k, j].legend(
-                            loc='lower right',
-                            ncols=1,
-                            # fontsize='xx-small',
-                            prop={'size': 2},
-                        )
+                    for label in (
+                        axs[k, j].get_xticklabels() + axs[k, j].get_yticklabels()
+                    ):
+                        label.set_fontsize(4)
 
-                        for label in (
-                            axs[k, j].get_xticklabels() + axs[k, j].get_yticklabels()
-                        ):
-                            label.set_fontsize(4)
+                    axs[k, j].set_box_aspect(1)
+                    axs[k, j].axvline(x=0, color='black', linestyle='-', linewidth=0.5)
 
-                        axs[k, j].set_box_aspect(1)
-                        axs[k, j].axvline(
-                            x=0, color='black', linestyle='-', linewidth=0.5
+                    axs[k, j].set_xlim(-max_abs_attribution, max_abs_attribution)
+                    axs[k, j].set_yticks(ranks, ranks + 1)
+                    axs[k, j].set_xlabel(labels[plot_type], fontsize=4)
+                    axs[k, j].set_ylabel(
+                        ggdf.loc[ggdf.index[0], 'mapped_model_name'], fontsize=4
+                    )
+                    axs[k, j].spines['top'].set_linewidth(0.5)
+                    axs[k, j].spines['right'].set_linewidth(0.5)
+                    axs[k, j].spines['bottom'].set_linewidth(0.5)
+                    axs[k, j].spines['left'].set_linewidth(0.5)
+                    axs[k, j].grid(linewidth=0.2)
+                    if 0 == k:
+                        axs[k, j].set_title(
+                            f'Dataset: {ggdf.loc[ggdf.index[0], "dataset_type"]}',
+                            fontsize=4,
                         )
-
-                        axs[k, j].set_xticks(
-                            [-1000, -500, 0, 500, 1000], [1000, 500, 0, 500, 1000]
-                        )
-                        axs[k, j].set_yticks(ranks, ranks + 1)
-                        axs[k, j].set_xlabel(
-                            'Cumulated attribution for female/male', fontsize=4
-                        )
-                        axs[k, j].set_ylabel(
-                            ggdf.loc[ggdf.index[0], 'mapped_model_name'], fontsize=4
-                        )
-                        axs[k, j].spines['top'].set_linewidth(0.5)
-                        axs[k, j].spines['right'].set_linewidth(0.5)
-                        axs[k, j].spines['bottom'].set_linewidth(0.5)
-                        axs[k, j].spines['left'].set_linewidth(0.5)
-                        axs[k, j].grid(linewidth=0.2)
-                        if 0 == k:
-                            axs[k, j].set_title(
-                                f'Dataset: {ggdf.loc[ggdf.index[0], "dataset_type"]}',
-                                fontsize=4,
-                            )
 
     file_path = join(base_output_dir, f'{plot_type}.png')
     logger.info(file_path)
@@ -722,7 +721,7 @@ def create_dataset_for_xai_plot(
     plot_type: str, xai_records: list
 ) -> pd.DataFrame | DataFrameGroupBy:
     output = None
-    if 'most_common_xai_attributions' == plot_type:
+    if 'most_common_xai_attributions' in plot_type:
         data = pd.DataFrame(xai_records)
         grouped_data = data.groupby(
             by=['model_name', 'dataset_type', 'target', 'attribution_method']
@@ -823,6 +822,7 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
     # filtered_xai_records = get_correctly_classified_records(records=xai_records)
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
+        most_common_xai_attributions_normalized=plot_most_common_xai_attributions,
         sentence_html_plot=create_xai_sentence_html_plots,
     )
 
@@ -979,7 +979,7 @@ def create_data_plots(base_output_dir: str, config: dict) -> None:
         v(data, plot_type, base_output_dir, config)
 
 
-def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
+def model_ds_axs(data: pd.DataFrame, font_size = None, figsize: tuple = (10, 10), **kwargs):
     """
     Helper function that creates a grid of subplots for each model and dataset type.
     and groups the data accordingly.
@@ -1001,7 +1001,7 @@ def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
 
             # Set title and labels
             if model_idx == 0:
-                ax.set_title(f"{dataset_type}")
+                ax.set_title(f"{dataset_type}", fontsize=font_size)
 
             if ds_idx == 0:
                 ax.annotate(
@@ -1010,10 +1010,10 @@ def model_ds_axs(data: pd.DataFrame, figsize: tuple = (10, 10), **kwargs):
                     xytext=(-ax.yaxis.labelpad - pad, 0),
                     xycoords=ax.yaxis.label,
                     textcoords='offset points',
-                    size='large',
                     ha='right',
                     va='center',
                     rotation=90,
+                    fontsize=font_size,
                 )
 
             plots.append((ax, model_name, dataset_type, group2))
@@ -1246,8 +1246,7 @@ def plot_sentence_wise_attribution_diff(
     """
     top_k = 5
 
-    set_legend = True
-    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 15), sharex=True):
+    for ax, _, _, grouped in model_ds_axs(data, font_size=4, figsize=(5, 12), sharex=True):
         # Prepare word data for plot
         dfs = []
         for method, grouped_method in grouped.groupby(by="attribution_method"):
@@ -1278,24 +1277,30 @@ def plot_sentence_wise_attribution_diff(
             ax=ax,
             width=0.8,
             native_scale=False,
-            legend=set_legend,
+            legend=True,
         )
+
+        for label in (
+            ax.get_xticklabels() + ax.get_yticklabels()
+        ):
+            label.set_fontsize(4)
 
         ax.set(
             ylabel=None,
-            xlabel='Absolute attribution difference',
-            xlim=(0, 1),
+            xlim=(0, 1)
         )
+        ax.set_xlabel("Absolute attribution difference", fontsize=4)
 
-        if set_legend:
-            ax.legend(loc='lower center', bbox_to_anchor=(1.1, -1.5), ncol=4)
-            set_legend = False
+        ax.legend(
+            loc='lower right',
+            ncol=1,
+            prop={'size': 2},
+        )
 
         # Add word labels to bars
         for container, (name, mggdf) in zip(g.containers, df.groupby(by='method')):
-            g.bar_label(container, labels=mggdf['word'], fontsize=8, padding=3)
+            g.bar_label(container, labels=mggdf['word'], fontsize=3, padding=3)
 
-    plt.suptitle("Difference in attributions between male and female sentences")
     file_path = join(base_output_dir, f'{plot_type}.png')
     logger.info(file_path)
     plt.savefig(file_path, dpi=300, bbox_inches='tight')

@@ -127,6 +127,7 @@
       ],
       "_xai": [
         "_most_common_xai_attributions",
+        "most_common_xai_attributions_normalized",
         "sentence_html_plot"
       ],
       "evaluation": [

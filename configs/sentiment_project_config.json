@@ -13,10 +13,18 @@
     "data_scenario": "nlp-benchmark_2024-03-04-12-44-28",
     "data_dir": "./artifacts/data",
     "tags": {
-      "sentiment_twitter": ["train"],
-      "sentiment_imdb": ["train"],
-      "gender_all": ["eval"],
-      "gender_subj": ["eval"]
+      "sentiment_twitter": [
+        "train"
+      ],
+      "sentiment_imdb": [
+        "train"
+      ],
+      "gender_all": [
+        "eval"
+      ],
+      "gender_subj": [
+        "eval"
+      ]
     }
   },
   "training": {
@@ -34,7 +42,10 @@
         "learning_rate": 0.0001,
         "model_name": "bert_randomly_init_embedding_classification",
         "model_performance": "bert_only_embedding_history",
-        "layers_to_train": ["bert.embeddings", "classifier"]
+        "layers_to_train": [
+          "bert.embeddings",
+          "classifier"
+        ]
       },
       "bert_only_classification": {
         "batch_size": 32,
@@ -42,7 +53,9 @@
         "learning_rate": 0.0001,
         "model_name": "bert_only_classification",
         "model_performance": "bert_only_classification_history",
-        "layers_to_train": ["classifier"]
+        "layers_to_train": [
+          "classifier"
+        ]
       },
       "bert_only_embedding_classification": {
         "batch_size": 32,
@@ -50,7 +63,10 @@
         "learning_rate": 0.0001,
         "model_name": "bert_only_embedding_classification",
         "model_performance": "bert_only_embedding_classification_history",
-        "layers_to_train": ["bert.embeddings", "classification"]
+        "layers_to_train": [
+          "bert.embeddings",
+          "classification"
+        ]
       },
       "bert_all": {
         "batch_size": 32,
@@ -66,7 +82,9 @@
         "learning_rate": 0.0001,
         "model_name": "bert_only_embedding",
         "model_performance": "bert_only_embedding_history",
-        "layers_to_train": ["bert.embeddings"]
+        "layers_to_train": [
+          "bert.embeddings"
+        ]
       }
     }
   },
@@ -97,14 +115,19 @@
     "output_dir": "visualization_sentiment",
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
-      "xai": ["most_common_xai_attributions"],
+      "xai": [
+        "most_common_xai_attributions",
+        "most_common_xai_attributions_normalized"
+      ],
       "prediction": [
         "prediction_positive",
         "prediction_prob_diff",
         "prediction_diff",
         "sentence_wise_attribution_diff"
       ],
-      "evaluation": ["mass_accuracy"]
+      "evaluation": [
+        "mass_accuracy"
+      ]
     }
   }
 }
