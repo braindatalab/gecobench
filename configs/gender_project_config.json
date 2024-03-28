@@ -27,7 +27,7 @@
     "output_dir": "training_gender",
     "num_workers": 4,
     "val_size": 0.2,
-    "num_training_repetitions": 10,
+    "num_training_repetitions": 5,
     "device": "cuda",
     "training_records": "training_records.pkl",
     "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
@@ -79,16 +79,6 @@
         "model_name": "bert_all",
         "model_performance": "bert_all_history",
         "layers_to_train": []
-      },
-      "bert_only_embedding": {
-        "batch_size": 32,
-        "epochs": 20,
-        "learning_rate": 0.0001,
-        "model_name": "bert_only_embedding",
-        "model_performance": "bert_only_embedding_history",
-        "layers_to_train": [
-          "bert.embeddings"
-        ]
       }
     }
   },
@@ -103,11 +93,13 @@
       "Saliency",
       "InputXGradient",
       "Guided Backprop",
-      "Deconvolution",
+      "Gradient SHAP",
+      "LIME",
       "DeepLift",
       "Kernel SHAP",
       "Uniform random",
-      "Integrated Gradients"
+      "Integrated Gradients",
+      "Correlation"
     ]
   },
   "evaluation": {
