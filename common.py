@@ -12,6 +12,10 @@ DATASET_SUBJECT = 'subject'
 DataTargetPair = namedtuple('DataTargetPair', 'data target')
 DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
 
+class SaveVersion(Enum):
+    last = "last"
+    best = "best"
+
 
 class DatasetKeys(Enum):
     gender_all = "gender_all"
