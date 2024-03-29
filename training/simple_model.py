@@ -197,12 +197,12 @@ def train_model(
             model_path = save_model(
                 model=model,
                 config=config,
-                model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}.pt',
+                model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}_best.pt',
             )
             history_path = dump_history(
                 history=training_history,
                 config=config,
-                history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}.pkl',
+                history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}_best.pkl',
             )
 
     # Best validiation accuracy model
@@ -230,8 +230,7 @@ def train_model(
 
     trainer.finish_run()
 
-    return records 
-
+    return records
 
 
 def train_simple_attention_model(
