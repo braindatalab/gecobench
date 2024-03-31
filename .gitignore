@@ -147,3 +147,6 @@ logs
 
 #container
 *apptainerfile.sif
+
+#VS Code related
+.vscode
