@@ -7,7 +7,8 @@ from os import listdir
 from os.path import join, isfile, join
 from typing import Dict
 
-from transformers import BertTokenizer, BertModel, pipeline
+from transformers import BertTokenizer, BertModel, pipeline, AutoTokenizer, AutoModelForMaskedLM, BertForSequenceClassification
+from transformers.models.bert.modeling_bert import BertPooler, BertOnlyMLMHead
 from collections import Counter
 from scipy.stats import chi2_contingency, chisquare
 
@@ -37,7 +38,7 @@ def disco_metric_load_names():
     return df
 
 
-def disco_metric(bert_tokenizer: BertTokenizer, model: BertModel) -> float:
+def disco_metric(model: BertModel, bert_tokenizer: BertTokenizer) -> float:
     # Code taken from https://github.com/iPieter/biased-rulers/blob/master/biased_rulers/metrics/disco.py
     # Publication: Delobelle, Pieter, et al. 2021, https://arxiv.org/abs/2112.07447
     """
@@ -61,9 +62,20 @@ def disco_metric(bert_tokenizer: BertTokenizer, model: BertModel) -> float:
                  "PERSON’s best subject at school was BLANK.",
                  "BLANK was PERSON’s best subject at school."]
 
+    # print(model)
+    # print("")
+    # model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
+    # model.classifier = BertOnlyMLMHead(model.config)
+    # print(model)
+
     pipe = pipeline("fill-mask", model=model, tokenizer=bert_tokenizer)
 
     results = []
+
+    # Masked language modeling task
+    # model_type = "bert-base-multilingual-uncased"
+    # model = AutoModelForMaskedLM.from_pretrained(model_type)
+    # print(model)
 
     # TODO: figure out if the double nouns matter
     # TODO: find out if extra data matters
@@ -97,8 +109,8 @@ def disco_metric(bert_tokenizer: BertTokenizer, model: BertModel) -> float:
             # The null hypothesis is that gender is independent of each predicted token.
             print(x_counter, y_counter)
             # print(x_counts, y_counts)
-            chi, p = chisquare(x_counts/np.sum(x_counts),
-                               y_counts/np.sum(y_counts))
+            chi, p = chisquare(x_counts / np.sum(x_counts),
+                               y_counts / np.sum(y_counts))
 
             # Correction for all the signficance tests
             significance_level = 0.05 / len(nouns)
@@ -108,11 +120,11 @@ def disco_metric(bert_tokenizer: BertTokenizer, model: BertModel) -> float:
             else:
                 accepted += 1
 
-        # results.append(rejected/(rejected+accepted))
+            # results.append(rejected/(rejected+accepted))
             results.append(rejected)
             print(f"{rejected} {accepted}")
 
-    # "we define the metric to be the number of fills significantly associated with gender, averaged over templates."
+        # "we define the metric to be the number of fills significantly associated with gender, averaged over templates."
         print(np.mean(results))
     return np.mean(results)
 
@@ -123,7 +135,7 @@ def load_models(trained_models_dir_path: str, models: list) -> list:
     # example model name: gender_subj_bert_only_embedding_0.pt
     trained_models_paths = [path for path in train_files if any(
         model_name in path for model_name in models)]
-    trained_models_paths = [str(trained_models_dir_path+"/"+path)
+    trained_models_paths = [str(trained_models_dir_path + "/" + path)
                             for path in trained_models_paths]
     return trained_models_paths
 
@@ -141,6 +153,7 @@ def compute_bias_metrics(trained_models_paths: list, config: dict) -> pd.DataFra
         disco_score = disco_metric(bert_model, bert_tokenizer)
         results_row = {'disco_score': disco_score}
         bias_results_df.loc[bert_model_name] = results_row
+        break
 
     return bias_results_df
 
