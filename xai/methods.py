@@ -3,6 +3,7 @@ from typing import Dict, Callable
 import lime
 import numpy as np
 import torch
+from torch.utils.data.dataloader import default_collate
 from captum._utils.models.linear_model import SkLearnLasso
 from captum.attr import (
     Saliency,
@@ -40,6 +41,7 @@ from utils import determine_model_type, BERT_MODEL_TYPE, \
 
 BERT = 'bert'
 ALL_BUT_CLS_SEP = slice(1, -1)
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 GRADIENT_BASED_METHODS = [
     "Saliency",
@@ -114,12 +116,19 @@ def get_captum_attributions(
                 model=model,
                 target=target,
             )
+        elif method_name == "Gradient SHAP":
+            a = methods_dict.get(method_name)(
+                forward_function=SkippingEmbedding(model, model_type),
+                baseline=embeddings(baseline),
+                data=embeddings(x),
+                target=target,
+            )
         elif 'Correlation' not in method_name:
             a = methods_dict.get(method_name)(
                 forward_function=forward_function,
                 baseline=baseline,
                 data=x,
-                model=model if 'Gradient SHAP' == method_name else embeddings,
+                model=embeddings,
                 target=target,
                 tokenizer=tokenizer,
             )
@@ -204,12 +213,10 @@ def get_deepshap_attributions(
 def get_gradient_shap_attributions(
     data: torch.Tensor,
     baseline: Tensor,
-    model: torch.nn.Module,
     forward_function: Callable,
-    target: list,
-    tokenizer: BertTokenizer,
+    target: list
 ) -> torch.tensor:
-    return GradientShap(forward_function).attribute(inputs=data, baselines=baseline)
+    return GradientShap(forward_function).attribute(inputs=data, baselines=baseline, target=target)
 
 
 def get_guided_backprop_attributions(
@@ -319,13 +326,15 @@ def get_lime_attributions(
             list_of_bert_ids += [bert_ids]
 
         dataset = create_tensor_dataset(data=list_of_bert_ids, tokenizer=tokenizer)
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=100)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=100,
+            collate_fn=lambda x: tuple(x_.to(DEVICE) for x_ in default_collate(x))
+        )
         for batch in tqdm(dataloader):
-            output += [forward_function(*batch).detach().numpy()]
+            output += [forward_function(*batch).cpu().detach().numpy()]
 
         return np.concatenate(output)
 
-    x = data.flatten().detach().numpy()
+    x = data.flatten().detach()
     text = tokenizer.decode(x[1:-1])
     explainer = LimeTextExplainer(class_names=['0', '1'], char_level=False)
     lime_explanation = explainer.explain_instance(
