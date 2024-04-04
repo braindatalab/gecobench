@@ -179,7 +179,7 @@ def apply_xai_methods_on_sentence(
 
     # Incase the dataset_type differs from trained_on_dataset_name e.g trained on sentiment, evaluated on gender_all
     pred_probabilities = None
-    xai_target = row["target"]
+    xai_target = int(row["target"])
     if trained_on_dataset_name != dataset_type:
         logits = model(token_ids.unsqueeze(0))[0]
         probabilities = F.softmax(logits, dim=-1).squeeze()
