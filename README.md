@@ -11,7 +11,7 @@ The script expects the raw pickle files to be in `data/raw`.
 To generate the datasets we can run the following command:
 
 ```bash
-python generate_data.py --config=./configs/dataset_config.json
+python generate_data.py --config=./configs/data_config.json
 ```
 
 This will generate a timestamped folder in the `artifacts/data` directory locally.
