@@ -116,7 +116,8 @@
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
       "xai": [
-        "most_common_xai_attributions"
+        "most_common_xai_attributions",
+        "most_common_xai_attributions_normalized"
       ],
       "prediction": [
         "prediction_positive",
