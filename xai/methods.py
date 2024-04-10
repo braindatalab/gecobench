@@ -36,8 +36,7 @@ from training.bert import (
     add_padding_if_necessary,
     create_attention_mask_from_bert_ids,
 )
-from utils import determine_model_type, BERT_MODEL_TYPE, \
-    ONE_LAYER_ATTENTION_MODEL_TYPE
+from utils import determine_model_type, BERT_MODEL_TYPE, ONE_LAYER_ATTENTION_MODEL_TYPE
 
 BERT = 'bert'
 ALL_BUT_CLS_SEP = slice(1, -1)
@@ -211,12 +210,13 @@ def get_deepshap_attributions(
 
 
 def get_gradient_shap_attributions(
-    data: torch.Tensor,
-    baseline: Tensor,
-    forward_function: Callable,
-    target: list
+    data: torch.Tensor, baseline: Tensor, forward_function: Callable, target: list
 ) -> torch.tensor:
-    return GradientShap(forward_function).attribute(inputs=data, baselines=baseline, target=target)
+    explanations = GradientShap(forward_function).attribute(
+        inputs=data, baselines=baseline, target=target
+    )
+
+    return explanations.sum(dim=2)
 
 
 def get_guided_backprop_attributions(
@@ -326,8 +326,10 @@ def get_lime_attributions(
             list_of_bert_ids += [bert_ids]
 
         dataset = create_tensor_dataset(data=list_of_bert_ids, tokenizer=tokenizer)
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=100,
-            collate_fn=lambda x: tuple(x_.to(DEVICE) for x_ in default_collate(x))
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=100,
+            collate_fn=lambda x: tuple(x_.to(DEVICE) for x_ in default_collate(x)),
         )
         for batch in tqdm(dataloader):
             output += [forward_function(*batch).cpu().detach().numpy()]
