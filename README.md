@@ -5,13 +5,13 @@ NLP Benchmark for XAI methods
 # Building the datasets
 
 Currently we have four datasets: `gender_all`, `gender_subj`, `sentiment_twitter` and `sentiment_imdb`.
-The config in `config/dataset_config.json` specifies the datasets and the parameters for the data generation.
+The config in `config/data_config.json` specifies the datasets and the parameters for the data generation.
 The script expects the raw pickle files to be in `data/raw`.
 
 To generate the datasets we can run the following command:
 
 ```bash
-python generate_data.py --config=./configs/dataset_config.json
+python generate_data.py --config=./configs/data_config.json
 ```
 
 This will generate a timestamped folder in the `artifacts/data` directory locally.

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from transformers import BertForSequenceClassification
 from transformers.modeling_outputs import SequenceClassifierOutput
 
-from common import DataSet
+from common import DataSet, SaveVersion
 from training.bert import (
     get_bert_tokenizer,
     create_bert_ids,
@@ -197,19 +197,40 @@ def train_model(
             model_path = save_model(
                 model=model,
                 config=config,
-                model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}.pt',
+                model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}_best.pt',
             )
             history_path = dump_history(
                 history=training_history,
                 config=config,
-                history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}.pkl',
+                history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}_best.pkl',
             )
+
+    # Best validiation accuracy model
     output_params = deepcopy(training_params)
     output_params['repetition'] = idx
+    output_params['save_version'] = SaveVersion.last
+    records = [(dataset_name, output_params, model_path, history_path)]
+
+    # Last epoch model
+    output_params_last = deepcopy(training_params)
+    output_params_last['repetition'] = idx
+    output_params_last['save_version'] = SaveVersion.best
+
+    model_path_last = save_model(
+        model=model,
+        config=config,
+        model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}_last.pt',
+    )
+    history_path_last = dump_history(
+        history=training_history,
+        config=config,
+        history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}_last.pkl',
+    )
+    records += [(dataset_name, output_params_last, model_path_last, history_path_last)]
 
     trainer.finish_run()
 
-    return [(dataset_name, output_params, model_path, history_path)]
+    return records
 
 
 def train_simple_attention_model(
