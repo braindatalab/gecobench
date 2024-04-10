@@ -717,6 +717,21 @@ def create_xai_sentence_html_plots(
         file.write(html_content)
 
 
+def get_tfidf_weights(
+    df: pd.DataFrame,
+):
+    # Create a vocab of the words in the dataset. Needed as we split the sentence based
+    # on the tokenizer and not based on whitespaces.
+    vocab = set()
+    for i, row in df.iterrows():
+        vocab.update(row['sentence'])
+
+    vectorizer = TfidfVectorizer(vocabulary=list(vocab))
+    X = vectorizer.fit_transform(df['sentence'].apply(lambda x: ' '.join(x)))
+
+    return X, vectorizer
+
+
 def create_dataset_for_xai_plot(
     plot_type: str, xai_records: list
 ) -> pd.DataFrame | DataFrameGroupBy:
@@ -740,25 +755,32 @@ def create_dataset_for_xai_plot(
         for keys, df in tqdm(grouped_data):
             word_frequencies = dict()
             accumulated_attributions = dict()
-            normalized_attributions = dict()
-            for j, row in df.iterrows():
+            tf_idf_normalized_attributions = dict()
+
+            tf_idf_weights, vectorizer = get_tfidf_weights(df=df)
+
+            for row_idx, (_, row) in enumerate(df.iterrows()):
                 for k, word in enumerate(row['sentence']):
                     if word not in accumulated_attributions:
                         accumulated_attributions[word] = row['attribution'][k]
+                        tf_idf_normalized_attributions[word] = (
+                            tf_idf_weights[row_idx, vectorizer.vocabulary_[word]]
+                            * row['attribution'][k]
+                        )
                         word_frequencies[word] = 1
                     else:
                         accumulated_attributions[word] += row['attribution'][k]
+                        tf_idf_normalized_attributions[word] += (
+                            tf_idf_weights[row_idx, vectorizer.vocabulary_[word]]
+                            * row['attribution'][k]
+                        )
                         word_frequencies[word] += 1
 
-            for word in accumulated_attributions:
-                r = accumulated_attributions[word] / word_frequencies[word]
-                normalized_attributions[word] = r
-
             word_counter = Counter(accumulated_attributions)
-            word_counter_normalized = Counter(normalized_attributions)
+            word_counter_tf_idf_normalized = Counter(tf_idf_normalized_attributions)
             word_counters = zip(
                 word_counter.most_common(n=5),
-                word_counter_normalized.most_common(n=5),
+                word_counter_tf_idf_normalized.most_common(n=5),
             )
 
             for i, (c, cn) in enumerate(word_counters):
@@ -979,7 +1001,9 @@ def create_data_plots(base_output_dir: str, config: dict) -> None:
         v(data, plot_type, base_output_dir, config)
 
 
-def model_ds_axs(data: pd.DataFrame, font_size = None, figsize: tuple = (10, 10), **kwargs):
+def model_ds_axs(
+    data: pd.DataFrame, font_size=None, figsize: tuple = (10, 10), **kwargs
+):
     """
     Helper function that creates a grid of subplots for each model and dataset type.
     and groups the data accordingly.
@@ -1246,7 +1270,9 @@ def plot_sentence_wise_attribution_diff(
     """
     top_k = 5
 
-    for ax, _, _, grouped in model_ds_axs(data, font_size=4, figsize=(5, 12), sharex=True):
+    for ax, _, _, grouped in model_ds_axs(
+        data, font_size=4, figsize=(5, 12), sharex=True
+    ):
         # Prepare word data for plot
         dfs = []
         for method, grouped_method in grouped.groupby(by="attribution_method"):
@@ -1280,15 +1306,10 @@ def plot_sentence_wise_attribution_diff(
             legend=True,
         )
 
-        for label in (
-            ax.get_xticklabels() + ax.get_yticklabels()
-        ):
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
             label.set_fontsize(4)
 
-        ax.set(
-            ylabel=None,
-            xlim=(0, 1)
-        )
+        ax.set(ylabel=None, xlim=(0, 1))
         ax.set_xlabel("Absolute attribution difference", fontsize=4)
 
         ax.legend(
