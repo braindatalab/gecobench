@@ -13,11 +13,15 @@ from tqdm import tqdm
 from transformers import BertTokenizer
 import torch
 
-from common import EvaluationResult
+from common import XAIEvaluationResult, ModelEvaluationResult, EvaluationResult
 from training.bert import create_bert_ids, create_tensor_dataset
 from xai.main import load_test_data
 from utils import (
     filter_eval_datasets,
+    filter_train_datasets,
+    validate_dataset_key,
+    generate_data_dir,
+    load_jsonl_as_df,
     load_pickle,
     dump_as_pickle,
     generate_xai_dir,
@@ -26,6 +30,10 @@ from utils import (
     load_model,
     generate_artifacts_dir,
 )
+
+
+def accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return np.mean(y_true == y_pred)
 
 
 def roc_auc_scores(y_true: np.ndarray, y_score: np.ndarray) -> float:
@@ -122,7 +130,7 @@ def calculate_scores(attribution: np.ndarray, ground_truth: np.ndarray) -> Dict:
 
 def bundle_evaluation_results(xai_record: pd.Series, scores: dict) -> dict:
     output = asdict(
-        EvaluationResult(
+        XAIEvaluationResult(
             model_name=xai_record.model_name,
             model_repetition_number=xai_record.model_repetition_number,
             dataset_type=xai_record.dataset_type,
@@ -133,7 +141,7 @@ def bundle_evaluation_results(xai_record: pd.Series, scores: dict) -> dict:
     return output
 
 
-def evaluate(data: pd.DataFrame) -> list[dict]:
+def evaluate_xai(data: pd.DataFrame) -> list[dict]:
     results = list()
     for k, row in tqdm(data.iterrows()):
         scores = calculate_scores(
@@ -191,7 +199,9 @@ def create_dataset_with_predictions(
         for dataset_name in datasets:
             x, attention_mask, target = tensor_data['tensors'][dataset_name]
             model = load_model(path=join(artifacts_dir, model_path))
-            prediction = torch.argmax(model(x, attention_mask=attention_mask).logits, dim=1)
+            prediction = torch.argmax(
+                model(x, attention_mask=attention_mask).logits, dim=1
+            )
             n = target.shape[0]
             data_dict['model_repetition_number'] += n * [model_params['repetition']]
             data_dict['model_name'] += n * [model_params['model_name']]
@@ -209,7 +219,9 @@ def load_xai_results(config: dict) -> list:
     output = list()
 
     artifacts_dir = generate_artifacts_dir(config=config)
-    file_path = join(artifacts_dir, generate_xai_dir(config=config), config["xai"]["xai_records"])
+    file_path = join(
+        artifacts_dir, generate_xai_dir(config=config), config["xai"]["xai_records"]
+    )
     xai_result_paths = load_pickle(file_path=file_path)
     for result_path in tqdm(xai_result_paths):
         xai_records = load_pickle(file_path=join(artifacts_dir, result_path))
@@ -250,7 +262,7 @@ def create_prediction_data(config: dict) -> pd.DataFrame:
     training_records = load_pickle(file_path=training_records_path)
     test_data = load_test_data(config=config)
 
-    logger.info(f'Compute prediction dataset.')
+    logger.info('Compute prediction dataset.')
     data = create_dataset_with_predictions(
         data=test_data, records=training_records, config=config
     )
@@ -260,6 +272,65 @@ def create_prediction_data(config: dict) -> pd.DataFrame:
 def create_xai_data(config: dict) -> pd.DataFrame:
     xai_df = pd.DataFrame(load_xai_results(config=config))
     return xai_df
+
+
+def load_test_data_for_trained_on_ds(config: dict) -> pd.DataFrame:
+    """
+    Load the test data for the datasets the model was trained on.
+    The datasets with tag "train" in the config.
+    """
+
+    data = dict()
+    for dataset in filter_train_datasets(config):
+        validate_dataset_key(dataset_key=dataset)
+        data[dataset] = load_jsonl_as_df(
+            file_path=join(generate_data_dir(config), dataset, "test.jsonl")
+        )
+
+    return data
+
+
+def evaluate_model_performance(config: Dict) -> None:
+    logger.info("Evaluate model performance.")
+    artifacts_dir = generate_artifacts_dir(config=config)
+    training_records_path = join(
+        artifacts_dir,
+        generate_training_dir(config=config),
+        config['training']['training_records'],
+    )
+    training_records = load_pickle(file_path=training_records_path)
+    test_data = load_test_data_for_trained_on_ds(config=config)
+    logger.info(f"Loaded test data for trained on datasets: {test_data.keys()}")
+
+    logger.info("Compute prediction dataset.")
+    data = create_dataset_with_predictions(
+        data=test_data, records=training_records, config=config
+    )
+    logger.info("Prediction dataset created.")
+
+    evaluation_output_dir = generate_evaluation_dir(config=config)
+    os.makedirs(join(artifacts_dir, evaluation_output_dir), exist_ok=True)
+
+    logger.info("Evaluate model predictions.")
+    results = []
+    for (model_name, repetition, dataset_type), group in data.groupby(
+        ['model_name', 'model_repetition_number', 'dataset_type']
+    ):
+        accuracy_score = accuracy(
+            y_true=group['target'].values, y_pred=group['prediction'].values
+        )
+
+        results.append(
+            ModelEvaluationResult(
+                model_name=model_name,
+                model_repetition_number=repetition,
+                dataset_type=dataset_type,
+                accuracy=accuracy_score,
+            )
+        )
+    logger.info("Model evaluation finished.")
+
+    return results
 
 
 def main(config: Dict) -> None:
@@ -277,8 +348,15 @@ def main(config: Dict) -> None:
     evaluation_data = get_correctly_classified_samples(
         xai_data=xai_data, predication_data=data_with_predictions
     )
-    logger.info(f"Calculate evaluation scores.")
-    evaluation_results = evaluate(data=evaluation_data)
+    logger.info("Calculate evaluation scores.")
+    xai_evaluation_results = evaluate_xai(data=evaluation_data)
+    model_evaluation_results = evaluate_model_performance(config=config)
+
+    evaluation_results = EvaluationResult(
+        xai_evaluation_results=xai_evaluation_results,
+        model_evaluation_results=model_evaluation_results,
+    )
+
     filename = config["evaluation"]["evaluation_records"]
     logger.info(f"Output path: {join(artifacts_dir, evaluation_output_dir, filename)}")
     dump_as_pickle(

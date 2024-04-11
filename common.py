@@ -12,6 +12,7 @@ DATASET_SUBJECT = 'subject'
 DataTargetPair = namedtuple('DataTargetPair', 'data target')
 DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
 
+
 class SaveVersion(Enum):
     last = "last"
     best = "best"
@@ -51,9 +52,23 @@ class XAIResult:
 
 
 @dataclass
-class EvaluationResult:
+class XAIEvaluationResult:
     model_name: str = None
     dataset_type: str = None
     model_repetition_number: int = None
     attribution_method: str = None
     # Here, we append evaluation metrics: ROC-AUC, precision, etc
+
+
+@dataclass
+class ModelEvaluationResult:
+    model_name: str = None
+    dataset_type: str = None
+    model_repetition_number: int = None
+    accuracy: float = None
+
+
+@dataclass
+class EvaluationResult:
+    xai_results: list[XAIEvaluationResult] = None
+    model_results: list[ModelEvaluationResult] = None
