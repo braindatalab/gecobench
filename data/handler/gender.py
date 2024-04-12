@@ -47,15 +47,24 @@ def preprocess_training_datasets(dataset_config: Dict, output_dir: str) -> None:
     dataframe = load_pickle(file_path=file_path)
 
     word_list = assemble_list_of_words(data=dataframe.drop(['target'], axis=1))
-    target = dataframe['target'].tolist()
+
+    ground_truth = load_pickle(
+        file_path=dataset_config['raw_data'][f'ground_truth_train']
+    )
+    ground_truth.sort_index(inplace=True)
+    ground_truth = reformat_columns(data=ground_truth)
+    ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
 
     train_set = [
         {
             "sentence": word_list_item,
+            "ground_truth": ground_truth_item,
             "target": target_item,
             "sentence_idx": idx,
         }
-        for idx, (word_list_item, target_item) in enumerate(zip(word_list, target))
+        for idx, (word_list_item, ground_truth_item, target_item) in enumerate(
+            zip(word_list, ground_truth_list, dataframe['target'].tolist())
+        )
     ]
 
     dump_as_jsonl(
@@ -92,7 +101,7 @@ def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
         word_list = assemble_list_of_words(data=dataframe.drop(['target'], axis=1))
 
         ground_truth = load_pickle(
-            file_path=dataset_config['raw_data'][f'ground_truth']
+            file_path=dataset_config['raw_data'][f'ground_truth_test']
         )
         ground_truth = reformat_columns(data=ground_truth)
         ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
