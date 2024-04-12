@@ -27,7 +27,7 @@ BERT_PADDING = '[PAD]'
 BERT_CLASSIFICATION = '[CLS]'
 BERT_SEPARATION = '[SEP]'
 NUM_SPECIAL_BERT_TOKENS = 2
-MAX_TOKEN_LENGTH=512
+MAX_TOKEN_LENGTH = 512
 
 
 class Trainer:
@@ -210,12 +210,15 @@ def create_attention_mask_from_bert_ids(
 
 
 def create_tensor_dataset(
-    data: List, target: List, tokenizer: BertTokenizer
+    data: List,
+    target: List,
+    tokenizer: BertTokenizer,
+    include_idx: bool = False,
 ) -> TensorDataset:
     max_sentence_length = max([len(ids) for ids in data])
     tokens = torch.zeros(size=(len(data), max_sentence_length))
     attention_mask = torch.zeros(size=(len(data), max_sentence_length))
-    for k, ids in enumerate(data):
+    for k, ids in tqdm(enumerate(data), total=len(data), desc='Creating BERT dataset'):
         tokens[k, :] = add_padding_if_necessary(
             tokenizer=tokenizer, ids=ids, max_sentence_length=max_sentence_length
         )
@@ -224,7 +227,19 @@ def create_tensor_dataset(
             ids=tokens[k, :],
         )
 
-    return TensorDataset(tokens.type(torch.long), attention_mask, torch.tensor(target))
+    if include_idx:
+        return TensorDataset(
+            tokens.type(torch.long),
+            attention_mask,
+            torch.tensor(target),
+            torch.arange(len(data)),
+        )
+
+    return TensorDataset(
+        tokens.type(torch.long),
+        attention_mask,
+        torch.tensor(target),
+    )
 
 
 def save_model(model: Any, model_name: str, config: dict) -> str:
@@ -258,13 +273,15 @@ def create_bert_ids(
 
     bert_ids = list()
     valid_idxs = list()
-    for k, sentence in enumerate(data):
+    for k, sentence in tqdm(
+        enumerate(data), total=len(data), desc=f'Creating BERT IDs {type}'
+    ):
         cur = create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
-        
+
         if len(cur) <= MAX_TOKEN_LENGTH:
             bert_ids.append(cur)
             valid_idxs.append(k)
-        
+
     if should_cache:
         save_to_cache(cache_key, (bert_ids, valid_idxs), config)
 
@@ -376,7 +393,7 @@ def train_model(
                 config=config,
                 history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}_best.pkl',
             )
-    
+
     # Best validiation accuracy model
     output_params = deepcopy(training_params)
     output_params['repetition'] = idx
@@ -402,7 +419,7 @@ def train_model(
 
     trainer.finish_run()
 
-    return records 
+    return records
 
 
 def get_bert_tokenizer(config: dict) -> BertTokenizer:
@@ -433,7 +450,6 @@ def train_bert(
     # Keep valid train targets
     y_train = [dataset.y_train[i] for i in train_idxs]
     y_test = [dataset.y_test[i] for i in val_idxs]
-
 
     logger.info(f'Creating BERT datasets')
     train_data = create_tensor_dataset(

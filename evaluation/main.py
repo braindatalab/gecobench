@@ -31,6 +31,8 @@ from utils import (
     generate_artifacts_dir,
 )
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return np.mean(y_true == y_pred)
@@ -155,23 +157,27 @@ def evaluate_xai(data: pd.DataFrame) -> list[dict]:
 
 
 def create_bert_tensor_data(data: dict, config: dict) -> dict:
-    output = dict(tensors=dict(), sentences=dict())
+    output = dict(dataset=dict(), sentences=dict())
     for name, dataset in data.items():
         bert_tokenizer = BertTokenizer.from_pretrained(
             pretrained_model_name_or_path='bert-base-uncased',
             revision=config['training']['bert_revision'],
         )
         sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
-        bert_ids, _ = create_bert_ids(data=sentences, tokenizer=bert_tokenizer)
+        logger.info(f"Create tensor data for dataset: {name}")
+        bert_ids, _ = create_bert_ids(
+            data=sentences,
+            tokenizer=bert_tokenizer,
+            type=f"{name}_test_bert_ids",
+            config=config,
+        )
+        logger.info(f"Created bert ids for dataset: {name}")
         tensor_data = create_tensor_dataset(
-            data=bert_ids, target=target, tokenizer=bert_tokenizer
+            data=bert_ids, target=target, tokenizer=bert_tokenizer, include_idx=True
         )
+
         output['sentences'][name] = sentences
-        output['tensors'][name] = (
-            tensor_data.tensors[0],
-            tensor_data.tensors[1],
-            tensor_data.tensors[2],
-        )
+        output['dataset'][name] = tensor_data
     return output
 
 
@@ -188,7 +194,9 @@ def create_dataset_with_predictions(
     }
     artifacts_dir = generate_artifacts_dir(config=config)
     tensor_data = create_bert_tensor_data(data=data, config=config)
-    for trained_on_dataset_name, model_params, model_path, _ in tqdm(records):
+    for trained_on_dataset_name, model_params, model_path, _ in tqdm(
+        records, desc='Evaluate model predictions'
+    ):
 
         # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
         # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
@@ -196,21 +204,46 @@ def create_dataset_with_predictions(
         if trained_on_dataset_name not in data:
             datasets = filter_eval_datasets(config)
 
+        logger.info(
+            f"Model: {model_params['model_name']}, trained on: {trained_on_dataset_name} - Evaluate on: {datasets}"
+        )
+
         for dataset_name in datasets:
-            x, attention_mask, target = tensor_data['tensors'][dataset_name]
+            dataset = tensor_data["dataset"][dataset_name]
+            sentences = tensor_data["sentences"][dataset_name]
+
             model = load_model(path=join(artifacts_dir, model_path))
-            prediction = torch.argmax(
-                model(x, attention_mask=attention_mask).logits, dim=1
-            )
-            n = target.shape[0]
-            data_dict['model_repetition_number'] += n * [model_params['repetition']]
-            data_dict['model_name'] += n * [model_params['model_name']]
-            data_dict['sentence'] += [
-                str(sentence) for sentence in tensor_data['sentences'][dataset_name]
-            ]
-            data_dict['target'] += target.detach().numpy().tolist()
-            data_dict['prediction'] += prediction.detach().numpy().tolist()
-            data_dict['dataset_type'] += n * [dataset_name]
+            model.to(DEVICE)
+
+            with torch.no_grad():
+                for batch in torch.utils.data.DataLoader(
+                    dataset=dataset,
+                    batch_size=256,
+                    shuffle=False,
+                ):
+                    x, attention_mask, target, sentence_idxs = batch
+                    x, attention_mask, target = (
+                        x.to(DEVICE),
+                        attention_mask.to(DEVICE),
+                        target.to(DEVICE),
+                    )
+
+                    prediction = torch.argmax(
+                        model(x, attention_mask=attention_mask).logits, dim=1
+                    )
+                    n = target.shape[0]
+                    data_dict['model_repetition_number'] += n * [
+                        model_params['repetition']
+                    ]
+                    data_dict['model_name'] += n * [model_params['model_name']]
+                    data_dict['sentence'] += [
+                        str(sentences[sentence_idx]) for sentence_idx in sentence_idxs
+                    ]
+                    data_dict['target'] += target.detach().cpu().numpy().tolist()
+                    data_dict['prediction'] += (
+                        prediction.detach().cpu().numpy().tolist()
+                    )
+                    data_dict['dataset_type'] += n * [dataset_name]
 
     return pd.DataFrame(data_dict)
 
@@ -335,6 +368,9 @@ def evaluate_model_performance(config: Dict) -> None:
 
 def main(config: Dict) -> None:
     artifacts_dir = generate_artifacts_dir(config=config)
+
+    model_evaluation_results = evaluate_model_performance(config=config)
+
     evaluation_output_dir = generate_evaluation_dir(config=config)
     data_with_predictions = create_prediction_data(config=config)
     os.makedirs(join(artifacts_dir, evaluation_output_dir), exist_ok=True)
@@ -350,7 +386,6 @@ def main(config: Dict) -> None:
     )
     logger.info("Calculate evaluation scores.")
     xai_evaluation_results = evaluate_xai(data=evaluation_data)
-    model_evaluation_results = evaluate_model_performance(config=config)
 
     evaluation_results = EvaluationResult(
         xai_evaluation_results=xai_evaluation_results,
