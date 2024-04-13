@@ -1,56 +1,64 @@
 import numpy as np
-import pandas as pd
-import torch
-
-import os
-from os import listdir
-from os.path import join, isfile, join
+from os.path import join, join
 from typing import Dict
-
-from transformers import BertTokenizer, BertModel, pipeline, AutoTokenizer, AutoModelForMaskedLM, BertForSequenceClassification
-from transformers.models.bert.modeling_bert import BertPooler, BertOnlyMLMHead
-from collections import Counter
-from scipy.stats import chi2_contingency, chisquare
-
+from common import DataSet, DatasetKeys, validate_dataset_key
 from utils import (
-    filter_xai_datasets,
-    generate_training_dir,
-    load_json_file,
-    load_jsonl_as_df,
-    load_pickle,
-    dump_as_pickle,
-    generate_xai_dir,
-    append_date,
-    load_model,
     load_jsonl_as_dict,
     generate_data_dir,
-    generate_artifacts_dir,
+    filter_train_datasets,
 )
 
 
-# TODO: Implement occurence matrix S 
-# Load datasets
-# Identify gender words (female: she, her, women, etc.)
-# Iterate through all sentences
-    #  Iteratre through 
+def load_dataset_raw(config: Dict, dataset_key: str) -> DataSet:
+    path = join(generate_data_dir(config), dataset_key, "train.jsonl")
+    raw_data = load_jsonl_as_dict(path)
+    return raw_data
+
+
+def generate_corpus(config) -> list:
+    corpus = []
+    for name in filter_train_datasets(config):
+        validate_dataset_key(name)
+        dataset = load_dataset_raw(config, name)
+        for sentence in dataset['sentence']:
+            for word in sentence:
+                corpus.append(word)
+    return list(set(corpus))
+
+
+def get_gender_terms(dataset) -> list:
+    # TODO: Get gender terms from the data
+    return
+
+
+def co_occurrence_matrix(dataset, corpus, gender_terms, gender) -> None:
+    S = np.zeros((len(corpus), len(gender_terms)))
+    for x, term in enumerate(gender_terms):
+        for target, sentence in zip(dataset['target'], dataset['sentence']):
+            if target == gender:
+                if term in sentence:
+                    for word in sentence:
+                        if word in corpus:
+                            S[corpus.index(word), x] += 1
+
+    return S
 
 
 def main(config: Dict) -> None:
-    trained_models_dir_path = join(
-        generate_artifacts_dir(config=config),
-        generate_training_dir(config=config),
-    )
+    # male: target == 1, female: target == 0
+    corpus = generate_corpus(config)
+    male_terms = ['He', 'His', 'his', 'men']
+    female_terms = ['She', 'Her', 'her', 'woman']
 
-
-    # logger.info(f"Calculate evaluation scores.")
-    # evaluation_results = evaluate(data=evaluation_data)
-    # filename = config["evaluation"]["evaluation_records"]
-    # logger.info(f"Output path: {join(artifacts_dir, evaluation_output_dir, filename)}")
-    # dump_as_pickle(
-    #     data=evaluation_results,
-    #     output_dir=join(artifacts_dir, evaluation_output_dir),
-    #     filename=filename,
-    # )
+    for name in filter_train_datasets(config):
+        validate_dataset_key(name)
+        dataset = load_dataset_raw(config, name)
+        S_male = co_occurrence_matrix(dataset, corpus, male_terms, 1)
+        S_female = co_occurrence_matrix(dataset, corpus, female_terms, 0)
+        S_male_norm, S_female_norm = np.linalg.norm(S_male), np.linalg.norm(S_female)
+        print(f"Matrix norm of S_male = {S_male_norm}")
+        print(f"Matrix norm of S_female = {S_female_norm}")
+        assert S_male_norm == S_female_norm
 
 
 if __name__ == '__main__':
