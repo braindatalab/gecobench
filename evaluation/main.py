@@ -165,12 +165,15 @@ def create_bert_tensor_data(data: dict, config: dict) -> dict:
         )
         sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
         logger.info(f"Create tensor data for dataset: {name}")
-        bert_ids, _ = create_bert_ids(
+        bert_ids, valid_idxs = create_bert_ids(
             data=sentences,
             tokenizer=bert_tokenizer,
             type=f"{name}_test_bert_ids",
             config=config,
         )
+
+        target = [target[i] for i in valid_idxs]
+
         logger.info(f"Created bert ids for dataset: {name}")
         tensor_data = create_tensor_dataset(
             data=bert_ids, target=target, tokenizer=bert_tokenizer, include_idx=True
