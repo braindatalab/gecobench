@@ -46,16 +46,29 @@ def preprocess_training_datasets(dataset_config: Dict, output_dir: str) -> None:
     file_path = dataset_config['raw_data']["train"]
     dataframe = load_pickle(file_path=file_path)
 
-    word_list = assemble_list_of_words(data=dataframe.drop(['target'], axis=1))
-    target = dataframe['target'].tolist()
+    word_list = assemble_list_of_words(
+        data=dataframe.drop(['target', "sentence_idx"], axis=1)
+    )
+
+    ground_truth = load_pickle(
+        file_path=dataset_config['raw_data'][f'ground_truth_train']
+    )
+    ground_truth = reformat_columns(data=ground_truth)
+    ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
 
     train_set = [
         {
             "sentence": word_list_item,
+            "ground_truth": ground_truth_item,
             "target": target_item,
             "sentence_idx": idx,
         }
-        for idx, (word_list_item, target_item) in enumerate(zip(word_list, target))
+        for word_list_item, ground_truth_item, target_item, idx in zip(
+            word_list,
+            ground_truth_list,
+            dataframe['target'].tolist(),
+            dataframe["sentence_idx"].tolist(),
+        )
     ]
 
     dump_as_jsonl(
@@ -89,10 +102,12 @@ def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
         print(f'Processing {data_name}')
         gender = determine_gender(s=data_name)
         dataframe = load_pickle(file_path=file_path)
-        word_list = assemble_list_of_words(data=dataframe.drop(['target'], axis=1))
+        word_list = assemble_list_of_words(
+            data=dataframe.drop(['target', "sentence_idx"], axis=1)
+        )
 
         ground_truth = load_pickle(
-            file_path=dataset_config['raw_data'][f'ground_truth']
+            file_path=dataset_config['raw_data'][f'ground_truth_test']
         )
         ground_truth = reformat_columns(data=ground_truth)
         ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
@@ -105,8 +120,11 @@ def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
                 "target": target_item,
                 "sentence_idx": idx,
             }
-            for idx, (word_list_item, ground_truth_item, target_item) in enumerate(
-                zip(word_list, ground_truth_list, dataframe['target'].tolist())
+            for word_list_item, ground_truth_item, target_item, idx in zip(
+                word_list,
+                ground_truth_list,
+                dataframe['target'].tolist(),
+                dataframe["sentence_idx"].tolist(),
             )
         ]
         sets += test_set
