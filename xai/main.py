@@ -99,6 +99,7 @@ def create_xai_results(
             XAIResult(
                 model_repetition_number=model_params['repetition'],
                 model_name=model_params['model_name'],
+                model_version=model_params['save_version'],
                 dataset_type=dataset_type,
                 target=row['target'],
                 attribution_method=xai_method,
