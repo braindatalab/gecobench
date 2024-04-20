@@ -10,7 +10,11 @@ from torch import Tensor
 from torch.nn import CrossEntropyLoss, Module
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
-from transformers import BertForSequenceClassification, BertTokenizer
+from transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    get_linear_schedule_with_warmup,
+)
 import wandb
 
 from common import DataSet, SaveVersion
@@ -27,7 +31,7 @@ BERT_PADDING = '[PAD]'
 BERT_CLASSIFICATION = '[CLS]'
 BERT_SEPARATION = '[SEP]'
 NUM_SPECIAL_BERT_TOKENS = 2
-MAX_TOKEN_LENGTH=512
+MAX_TOKEN_LENGTH = 512
 
 
 class Trainer:
@@ -35,10 +39,12 @@ class Trainer:
         self,
         config: Dict,
         model: Module,
+        model_name: str,
         train_loader: DataLoader,
         val_loader: DataLoader,
         loss: CrossEntropyLoss,
         optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
         device: str,
         run_name: str,
     ):
@@ -48,9 +54,12 @@ class Trainer:
         self.val_loader = val_loader
         self.loss = loss
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
         self.logger_enabled = "wandb" in self.config['general']
         self.run_name = run_name
+        self.model_name = model_name
+        self.global_step = 0
 
         self.init_logger()
 
@@ -60,7 +69,7 @@ class Trainer:
                 project=self.config['general']['wandb']['project'],
                 entity=self.config['general']['wandb']['entity'],
                 name=self.run_name,
-                config=self.config,
+                config={"model_name": self.model_name, **self.config},
             )
 
     def finish_run(self):
@@ -83,6 +92,7 @@ class Trainer:
                 {
                     'val_loss': val_loss / len(self.val_loader),
                     'val_acc': val_acc / len(self.val_loader),
+                    'learning_rate': self.scheduler.get_last_lr()[0],
                 }
             )
 
@@ -91,6 +101,8 @@ class Trainer:
 
         bar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
         for step, batch in bar:
+            self.optimizer.zero_grad()
+
             input_ids = batch[0].to(torch.long).to(self.device)
             attention_mask = batch[1].to(self.device)
             labels = batch[2].to(torch.long).to(self.device)
@@ -103,6 +115,7 @@ class Trainer:
 
             l.backward()
             self.optimizer.step()
+            self.scheduler.step()
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(), 1.0
             )  # for exploding gradients
@@ -119,6 +132,7 @@ class Trainer:
                 {
                     'train_loss': l.item(),
                     'train_acc': batch_train_acc,
+                    'learning_rate': self.scheduler.get_last_lr()[0],
                 }
             )
 
@@ -260,11 +274,11 @@ def create_bert_ids(
     valid_idxs = list()
     for k, sentence in enumerate(data):
         cur = create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
-        
+
         if len(cur) <= MAX_TOKEN_LENGTH:
             bert_ids.append(cur)
             valid_idxs.append(k)
-        
+
     if should_cache:
         save_to_cache(cache_key, (bert_ids, valid_idxs), config)
 
@@ -314,6 +328,11 @@ def train_model(
     model.to(config['training']['device'])
     optimizer = Adam(model.parameters(), lr=learning_rate)
     loss = CrossEntropyLoss()
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=num_epochs * len(train_loader) * 0.1,
+        num_training_steps=num_epochs * len(train_loader),
+    )
 
     for name, param in model.named_parameters():
         if name.startswith(tuple(training_params['layers_to_train'])) or 0 == len(
@@ -329,10 +348,12 @@ def train_model(
     trainer = Trainer(
         config=config,
         model=model,
+        model_name=training_params['model_name'],
         train_loader=train_loader,
         val_loader=val_loader,
         loss=loss,
         optimizer=optimizer,
+        scheduler=scheduler,
         device=config['training']['device'],
         run_name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
     )
@@ -376,7 +397,7 @@ def train_model(
                 config=config,
                 history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}_best.pkl',
             )
-    
+
     # Best validiation accuracy model
     output_params = deepcopy(training_params)
     output_params['repetition'] = idx
@@ -402,7 +423,7 @@ def train_model(
 
     trainer.finish_run()
 
-    return records 
+    return records
 
 
 def get_bert_tokenizer(config: dict) -> BertTokenizer:
@@ -433,7 +454,6 @@ def train_bert(
     # Keep valid train targets
     y_train = [dataset.y_train[i] for i in train_idxs]
     y_test = [dataset.y_test[i] for i in val_idxs]
-
 
     logger.info(f'Creating BERT datasets')
     train_data = create_tensor_dataset(
