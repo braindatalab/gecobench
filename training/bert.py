@@ -47,6 +47,7 @@ class Trainer:
         scheduler: torch.optim.lr_scheduler,
         device: str,
         run_name: str,
+        accumulate_batches: int = 0,
     ):
         self.config = config
         self.model = model
@@ -60,6 +61,7 @@ class Trainer:
         self.run_name = run_name
         self.model_name = model_name
         self.global_step = 0
+        self.accumulate_batches = accumulate_batches
 
         self.init_logger()
 
@@ -101,7 +103,10 @@ class Trainer:
 
         bar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
         for step, batch in bar:
-            self.optimizer.zero_grad()
+            if self.accumulate_batches == 0 or (
+                self.accumulate_batches > 0 and step % self.accumulate_batches == 0
+            ):
+                self.optimizer.zero_grad()
 
             input_ids = batch[0].to(torch.long).to(self.device)
             attention_mask = batch[1].to(self.device)
@@ -356,6 +361,11 @@ def train_model(
         scheduler=scheduler,
         device=config['training']['device'],
         run_name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
+        accumulate_batches=(
+            training_params['accumulate_batches']
+            if 'accumulate_batches' in training_params
+            else 1
+        ),
     )
     lowest_loss_so_far = 1e7
     for epoch in range(num_epochs):

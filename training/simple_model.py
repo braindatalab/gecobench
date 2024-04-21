@@ -170,6 +170,11 @@ def train_model(
         optimizer=optimizer,
         device=config['training']['device'],
         run_name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
+        accumulate_batches=(
+            training_params['accumulate_batches']
+            if 'accumulate_batches' in training_params
+            else 1
+        ),
     )
     lowest_loss_so_far = 1e7
     for epoch in range(num_epochs):
