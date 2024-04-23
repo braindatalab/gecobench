@@ -71,15 +71,16 @@
       "one_layer_attention": {
         "batch_size": 64,
         "epochs": 200,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.00005,
         "model_name": "one_layer_attention_classification",
         "model_performance": "simple_model_history",
-        "embedding_dim": 512
+        "embedding_dim": 512,
+        "accumulate_batches": -1
       },
       "bert_randomly_init_embedding_classification": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.00001,
         "model_name": "bert_randomly_init_embedding_classification",
         "model_performance": "bert_only_embedding_history",
         "layers_to_train": [
@@ -90,7 +91,7 @@
       "bert_only_classification": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.01,
         "model_name": "bert_only_classification",
         "model_performance": "bert_only_classification_history",
         "layers_to_train": [
@@ -100,7 +101,7 @@
       "bert_only_embedding_classification": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.001,
         "model_name": "bert_only_embedding_classification",
         "model_performance": "bert_only_embedding_classification_history",
         "layers_to_train": [
@@ -111,7 +112,7 @@
       "bert_all": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.00001,
         "model_name": "bert_all",
         "model_performance": "bert_all_history",
         "layers_to_train": []
