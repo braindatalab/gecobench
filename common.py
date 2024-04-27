@@ -39,6 +39,7 @@ def validate_dataset_key(dataset_key: str):
 @dataclass
 class XAIResult:
     model_name: str = None
+    model_version: SaveVersion = None
     model_repetition_number: int = None
     dataset_type: str = None
     target: float = None
@@ -54,8 +55,9 @@ class XAIResult:
 @dataclass
 class XAIEvaluationResult:
     model_name: str = None
-    dataset_type: str = None
+    model_version: str = None
     model_repetition_number: int = None
+    dataset_type: str = None
     attribution_method: str = None
     # Here, we append evaluation metrics: ROC-AUC, precision, etc
 
@@ -63,8 +65,9 @@ class XAIEvaluationResult:
 @dataclass
 class ModelEvaluationResult:
     model_name: str = None
-    dataset_type: str = None
+    model_version: str = None
     model_repetition_number: int = None
+    dataset_type: str = None
     accuracy: float = None
 
 
