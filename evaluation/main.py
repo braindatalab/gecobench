@@ -395,12 +395,12 @@ def evaluate_model_performance(config: Dict) -> None:
 def evaluate_xai_performance(config: Dict) -> None:
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
+    os.makedirs(join(artifacts_dir, evaluation_output_dir), exist_ok=True)
 
     xai_data = create_xai_data(config=config)
     xai_data.to_pickle(join(artifacts_dir, evaluation_output_dir, 'xai_data.pkl'))
 
     data_with_predictions = create_prediction_data(config=config)
-    os.makedirs(join(artifacts_dir, evaluation_output_dir), exist_ok=True)
     data_with_predictions.to_pickle(
         join(artifacts_dir, evaluation_output_dir, 'data_with_predictions.pkl')
     )
