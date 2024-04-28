@@ -145,5 +145,12 @@ data/dataset_generation/data
 wandb
 logs
 
-#container
+# container
 *apptainerfile.sif
+
+# VS Code related
+.vscode
+
+# MacOS
+.DS_store
+data/.DS_Store

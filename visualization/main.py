@@ -40,6 +40,12 @@ MODEL_NAME_MAP = dict(
 DATASET_NAME_MAP = dict(subject='$\mathcal{D}_{S}$', all='$\mathcal{D}_{SO}$')
 GENDER = {0.0: 'female', 1.0: 'male'}
 
+MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES = dict(
+    accumulated="most_common_xai_attributions",
+    tf_idf="most_common_xai_attributions_tf_idf",
+    freq="most_common_xai_attributions_freq",
+)
+
 
 def compute_average_score_per_repetition(data: pd.DataFrame) -> pd.DataFrame:
     results = list()
@@ -221,8 +227,15 @@ def plot_most_common_xai_attributions(
     ranks = np.unique(data['rank'].values)
 
     labels = {
-        "most_common_xai_attributions": "Cumulated attribution for female/male",
-        "most_common_xai_attributions_normalized": "Normalized cumulated attribution for female/male",
+        MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES[
+            'accumulated'
+        ]: "Cumulated attribution for female/male",
+        MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES[
+            "tf_idf"
+        ]: "TF-IDF normalized cumulated attribution for female/male",
+        MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES[
+            "freq"
+        ]: "Frequency normalized cumulated attribution for female/male",
     }
 
     fig, axs = plt.subplots(
@@ -235,9 +248,7 @@ def plot_most_common_xai_attributions(
         figsize=(5, 10),
     )
 
-    plot_normalized = plot_type == 'most_common_xai_attributions_normalized'
-
-    data = data[data['normalized'] == (1 if plot_normalized else 0)]
+    data = data[data['plot_type'] == plot_type]
     grouped_data = data.groupby(by=['mapped_model_name', 'dataset_type'])
 
     max_abs_attribution = data['attribution'].abs().max()
@@ -717,6 +728,21 @@ def create_xai_sentence_html_plots(
         file.write(html_content)
 
 
+def get_tfidf_weights(
+    df: pd.DataFrame,
+):
+    # Create a vocab of the words in the dataset. Needed as we split the sentence based
+    # on the tokenizer and not based on whitespaces.
+    vocab = set()
+    for i, row in df.iterrows():
+        vocab.update(row['sentence'])
+
+    vectorizer = TfidfVectorizer(vocabulary=list(vocab))
+    X = vectorizer.fit_transform(df['sentence'].apply(lambda x: ' '.join(x)))
+
+    return X, vectorizer
+
+
 def create_dataset_for_xai_plot(
     plot_type: str, xai_records: list
 ) -> pd.DataFrame | DataFrameGroupBy:
@@ -734,51 +760,61 @@ def create_dataset_for_xai_plot(
             attribution=list(),
             attribution_method=list(),
             rank=list(),
-            normalized=list(),
+            plot_type=list(),
         )
 
         for keys, df in tqdm(grouped_data):
             word_frequencies = dict()
             accumulated_attributions = dict()
-            normalized_attributions = dict()
-            for j, row in df.iterrows():
+            freq_normalized_attributions = dict()
+            tf_idf_normalized_attributions = dict()
+
+            tf_idf_weights, vectorizer = get_tfidf_weights(df=df)
+
+            for row_idx, (_, row) in enumerate(df.iterrows()):
                 for k, word in enumerate(row['sentence']):
                     if word not in accumulated_attributions:
                         accumulated_attributions[word] = row['attribution'][k]
+                        tf_idf_normalized_attributions[word] = (
+                            tf_idf_weights[row_idx, vectorizer.vocabulary_[word]]
+                            * row['attribution'][k]
+                        )
                         word_frequencies[word] = 1
                     else:
                         accumulated_attributions[word] += row['attribution'][k]
+                        tf_idf_normalized_attributions[word] += (
+                            tf_idf_weights[row_idx, vectorizer.vocabulary_[word]]
+                            * row['attribution'][k]
+                        )
                         word_frequencies[word] += 1
 
             for word in accumulated_attributions:
                 r = accumulated_attributions[word] / word_frequencies[word]
-                normalized_attributions[word] = r
+                freq_normalized_attributions[word] = r
 
-            word_counter = Counter(accumulated_attributions)
-            word_counter_normalized = Counter(normalized_attributions)
-            word_counters = zip(
-                word_counter.most_common(n=5),
-                word_counter_normalized.most_common(n=5),
+            def add_to_data(word_counter: Counter, plot_type: str):
+                for i, (word, attribution) in enumerate(word_counter):
+                    data_dict['model_name'] += [keys[0]]
+                    data_dict['dataset_type'] += [keys[1]]
+                    data_dict['gender'] += [GENDER[keys[2]]]
+                    data_dict['attribution_method'] += [keys[3]]
+                    data_dict['word'] += [word]
+                    data_dict['attribution'] += [attribution]
+                    data_dict['rank'] += [i]
+                    data_dict['plot_type'] += [plot_type]
+
+            add_to_data(
+                Counter(accumulated_attributions).most_common(n=5),
+                MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES['accumulated'],
             )
-
-            for i, (c, cn) in enumerate(word_counters):
-                data_dict['model_name'] += [keys[0]]
-                data_dict['dataset_type'] += [keys[1]]
-                data_dict['gender'] += [GENDER[keys[2]]]
-                data_dict['attribution_method'] += [keys[3]]
-                data_dict['word'] += [c[0]]
-                data_dict['attribution'] += [c[1]]
-                data_dict['rank'] += [i]
-                data_dict['normalized'] += [0]
-
-                data_dict['model_name'] += [keys[0]]
-                data_dict['dataset_type'] += [keys[1]]
-                data_dict['gender'] += [GENDER[keys[2]]]
-                data_dict['attribution_method'] += [keys[3]]
-                data_dict['word'] += [cn[0]]
-                data_dict['attribution'] += [cn[1]]
-                data_dict['rank'] += [i]
-                data_dict['normalized'] += [1]
+            add_to_data(
+                Counter(tf_idf_normalized_attributions).most_common(n=5),
+                MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES['tf_idf'],
+            )
+            add_to_data(
+                Counter(freq_normalized_attributions).most_common(n=5),
+                MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES['freq'],
+            )
 
         output = pd.DataFrame(data_dict)
     elif 'sentence_html_plot' == plot_type:
@@ -822,7 +858,8 @@ def create_xai_plots(base_output_dir: str, config: dict) -> None:
     # filtered_xai_records = get_correctly_classified_records(records=xai_records)
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
-        most_common_xai_attributions_normalized=plot_most_common_xai_attributions,
+        most_common_xai_attributions_tf_idf=plot_most_common_xai_attributions,
+        most_common_xai_attributions_freq=plot_most_common_xai_attributions,
         sentence_html_plot=create_xai_sentence_html_plots,
     )
 
@@ -979,7 +1016,9 @@ def create_data_plots(base_output_dir: str, config: dict) -> None:
         v(data, plot_type, base_output_dir, config)
 
 
-def model_ds_axs(data: pd.DataFrame, font_size = None, figsize: tuple = (10, 10), **kwargs):
+def model_ds_axs(
+    data: pd.DataFrame, font_size=None, figsize: tuple = (10, 10), **kwargs
+):
     """
     Helper function that creates a grid of subplots for each model and dataset type.
     and groups the data accordingly.
@@ -1246,7 +1285,9 @@ def plot_sentence_wise_attribution_diff(
     """
     top_k = 5
 
-    for ax, _, _, grouped in model_ds_axs(data, font_size=4, figsize=(5, 12), sharex=True):
+    for ax, _, _, grouped in model_ds_axs(
+        data, font_size=4, figsize=(5, 12), sharex=True
+    ):
         # Prepare word data for plot
         dfs = []
         for method, grouped_method in grouped.groupby(by="attribution_method"):
@@ -1280,15 +1321,10 @@ def plot_sentence_wise_attribution_diff(
             legend=True,
         )
 
-        for label in (
-            ax.get_xticklabels() + ax.get_yticklabels()
-        ):
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
             label.set_fontsize(4)
 
-        ax.set(
-            ylabel=None,
-            xlim=(0, 1)
-        )
+        ax.set(ylabel=None, xlim=(0, 1))
         ax.set_xlabel("Absolute attribution difference", fontsize=4)
 
         ax.legend(

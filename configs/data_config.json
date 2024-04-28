@@ -9,7 +9,8 @@
                 "train": "data/raw/training_df_all.pkl",
                 "test_female": "data/raw/df_validation_female_all.pkl",
                 "test_male": "data/raw/df_validation_male_all.pkl",
-                "ground_truth": "data/raw/gt_all_val.pkl"
+                "ground_truth_test": "data/raw/gt_all_val.pkl",
+                "ground_truth_train": "data/raw/gt_all_train.pkl"
             },
             "output_filenames": {
                 "train": "train.jsonl",
@@ -22,7 +23,8 @@
                 "train": "data/raw/training_df_subj.pkl",
                 "test_female": "data/raw/df_validation_female_subj.pkl",
                 "test_male": "data/raw/df_validation_male_subj.pkl",
-                "ground_truth": "data/raw/gt_subj_val.pkl"
+                "ground_truth_test": "data/raw/gt_subj_val.pkl",
+                "ground_truth_train": "data/raw/gt_subj_train.pkl"
             },
             "output_filenames": {
                 "train": "train.jsonl",

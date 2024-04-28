@@ -397,13 +397,13 @@ def train_model(
     # Best validiation accuracy model
     output_params = deepcopy(training_params)
     output_params['repetition'] = idx
-    output_params['save_version'] = SaveVersion.last
+    output_params['save_version'] = SaveVersion.best
     records = [(dataset_name, output_params, model_path, history_path)]
 
     # Last epoch model
     output_params_last = deepcopy(training_params)
     output_params_last['repetition'] = idx
-    output_params_last['save_version'] = SaveVersion.best
+    output_params_last['save_version'] = SaveVersion.last
 
     model_path_last = save_model(
         model=model,

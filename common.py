@@ -41,6 +41,7 @@ class XAIResult:
     model_name: str = None
     model_version: SaveVersion = None
     model_repetition_number: int = None
+    model_version: SaveVersion = None
     dataset_type: str = None
     target: float = None
     attribution_method: str = None
