@@ -120,3 +120,13 @@ To copy the results from the cluster to your local machine you can use the `get_
 ```bash
 ./scripts/hydra/get_results_from_cluster.sh xai-nlp-benchmark-2024...
 ```
+
+# Viewing the html plots
+
+To view the html plots start a local server in the root directory of the project:
+
+```bash
+python -m http.server 9000
+```
+
+Then navigate to `http://localhost:9000` in your browser, go to the artifacts folder for the run, select the visualization folder and click on the html file.

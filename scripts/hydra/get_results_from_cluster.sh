@@ -31,14 +31,23 @@ HYDRA_SSH="$HYDRA_SSH_USER@hydra"
 
 mkdir -p artifacts/$1
 
-scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/data artifacts/$1
+scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/configs artifacts/$1
+
+scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/training_gender_no_sub_samp artifacts/$1
 scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/training_gender artifacts/$1
 scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/training_sentiment artifacts/$1
+
+scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/xai_gender_no_sub_samp artifacts/$1
 scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/xai_gender artifacts/$1
 scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/xai_sentiment artifacts/$1
+
+scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/evaluation_gender_no_sub_samp artifacts/$1
 scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/evaluation_gender artifacts/$1
 scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/evaluation_sentiment artifacts/$1
-scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/configs artifacts/$1
+
+scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/visualization_gender_no_sub_samp artifacts/$1
+scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/visualization_gender artifacts/$1
+scp -r $HYDRA_SSH:$ARTIFACTS_DIR/"$1"/visualization_sentiment artifacts/$1
 
 echo "Results copied to artifacts/$1"
 
