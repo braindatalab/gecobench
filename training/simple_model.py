@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from transformers import BertForSequenceClassification
+from transformers import BertForSequenceClassification, get_linear_schedule_with_warmup
 from transformers.modeling_outputs import SequenceClassifierOutput
 
 from common import DataSet, SaveVersion
@@ -153,16 +153,28 @@ def train_model(
     model.to(config['training']['device'])
     optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=1e-1, eps=1e-5)
     loss = CrossEntropyLoss()
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=num_epochs * len(train_loader) * 0.1,
+        num_training_steps=num_epochs * len(train_loader),
+    )
 
     trainer = Trainer(
         config=config,
         model=model,
+        model_name=training_params['model_name'],
         train_loader=train_loader,
         val_loader=val_loader,
+        scheduler=scheduler,
         loss=loss,
         optimizer=optimizer,
         device=config['training']['device'],
         run_name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
+        accumulate_batches=(
+            training_params['accumulate_batches']
+            if 'accumulate_batches' in training_params
+            else 1
+        ),
     )
     lowest_loss_so_far = 1e7
     for epoch in range(num_epochs):

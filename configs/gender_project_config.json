@@ -13,8 +13,46 @@
     "data_scenario": "nlp-benchmark_2024-04-07-21-43-57",
     "data_dir": "./artifacts/data",
     "tags": {
-      "gender_all": ["train", "eval"],
-      "gender_subj": ["train", "eval"]
+      "gender_all": [
+        "train",
+        "eval"
+      ],
+      "gender_subj": [
+        "train",
+        "eval"
+      ]
+    }
+  },
+  "sweep": {
+    "_id": "oiaj6pkc",
+    "config": {
+      "name": "bert_only_embedding_classification, gender_all",
+      "method": "grid",
+      "metric": {
+        "goal": "maximize",
+        "name": "val_acc"
+      },
+      "parameters": {
+        "model_name": {
+          "value": "bert_only_embedding_classification"
+        },
+        "dataset_name": {
+          "value": "gender_all"
+        },
+        "learning_rate": {
+          "values": [
+            0.1,
+            0.05,
+            0.01,
+            0.001,
+            0.005,
+            0.0001,
+            0.0005,
+            0.00001,
+            0.00005
+          ]
+        }
+      }
     }
   },
   "training": {
@@ -32,7 +70,8 @@
         "learning_rate": 0.01,
         "model_name": "one_layer_attention_classification",
         "model_performance": "simple_model_history",
-        "embedding_dim": 64
+        "embedding_dim": 64,
+        "accumulate_batches": -1
       },
       "bert_randomly_init_embedding_classification": {
         "batch_size": 32,
@@ -40,28 +79,36 @@
         "learning_rate": 0.0001,
         "model_name": "bert_randomly_init_embedding_classification",
         "model_performance": "bert_only_embedding_history",
-        "layers_to_train": ["bert.embeddings", "classifier"]
+        "layers_to_train": [
+          "bert.embeddings",
+          "classifier"
+        ]
       },
       "bert_only_classification": {
         "batch_size": 32,
         "epochs": 20,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.01,
         "model_name": "bert_only_classification",
         "model_performance": "bert_only_classification_history",
-        "layers_to_train": ["classifier"]
+        "layers_to_train": [
+          "classifier"
+        ]
       },
       "bert_only_embedding_classification": {
         "batch_size": 32,
         "epochs": 20,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.01,
         "model_name": "bert_only_embedding_classification",
         "model_performance": "bert_only_embedding_classification_history",
-        "layers_to_train": ["bert.embeddings", "classification"]
+        "layers_to_train": [
+          "bert.embeddings",
+          "classification"
+        ]
       },
       "bert_all": {
         "batch_size": 32,
         "epochs": 20,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.000005,
         "model_name": "bert_all",
         "model_performance": "bert_all_history",
         "layers_to_train": []
@@ -97,8 +144,12 @@
     "output_dir": "visualization_gender",
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
-      "data": ["correlation_plot"],
-      "model": ["model_performance"],
+      "data": [
+        "correlation_plot"
+      ],
+      "model": [
+        "model_performance"
+      ],
       "_xai": [
         "most_common_xai_attributions",
         "most_common_xai_attributions_tf_idf",

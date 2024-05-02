@@ -13,10 +13,50 @@
     "data_scenario": "nlp-benchmark_2024-03-04-12-44-28",
     "data_dir": "./artifacts/data",
     "tags": {
-      "sentiment_twitter": ["train"],
-      "sentiment_imdb": ["train"],
-      "gender_all": ["eval"],
-      "gender_subj": ["eval"]
+      "sentiment_twitter": [
+        "train"
+      ],
+      "sentiment_imdb": [
+        "train"
+      ],
+      "gender_all": [
+        "eval"
+      ],
+      "gender_subj": [
+        "eval"
+      ]
+    }
+  },
+  "sweep": {
+    "_id": "oiaj6pkc",
+    "config": {
+      "name": "bert_only_embedding_classification, gender_all",
+      "method": "grid",
+      "metric": {
+        "goal": "maximize",
+        "name": "val_acc"
+      },
+      "parameters": {
+        "model_name": {
+          "value": "bert_only_embedding_classification"
+        },
+        "dataset_name": {
+          "value": "gender_all"
+        },
+        "learning_rate": {
+          "values": [
+            0.1,
+            0.05,
+            0.01,
+            0.001,
+            0.005,
+            0.0001,
+            0.0005,
+            0.00001,
+            0.00005
+          ]
+        }
+      }
     }
   },
   "training": {
@@ -31,39 +71,48 @@
       "one_layer_attention": {
         "batch_size": 64,
         "epochs": 200,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.00005,
         "model_name": "one_layer_attention_classification",
         "model_performance": "simple_model_history",
-        "embedding_dim": 512
+        "embedding_dim": 512,
+        "accumulate_batches": -1
       },
       "bert_randomly_init_embedding_classification": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.00001,
         "model_name": "bert_randomly_init_embedding_classification",
         "model_performance": "bert_only_embedding_history",
-        "layers_to_train": ["bert.embeddings", "classifier"]
+        "layers_to_train": [
+          "bert.embeddings",
+          "classifier"
+        ]
       },
       "bert_only_classification": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.01,
         "model_name": "bert_only_classification",
         "model_performance": "bert_only_classification_history",
-        "layers_to_train": ["classifier"]
+        "layers_to_train": [
+          "classifier"
+        ]
       },
       "bert_only_embedding_classification": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.001,
         "model_name": "bert_only_embedding_classification",
         "model_performance": "bert_only_embedding_classification_history",
-        "layers_to_train": ["bert.embeddings", "classification"]
+        "layers_to_train": [
+          "bert.embeddings",
+          "classification"
+        ]
       },
       "bert_all": {
         "batch_size": 32,
         "epochs": 5,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.00001,
         "model_name": "bert_all",
         "model_performance": "bert_all_history",
         "layers_to_train": []
@@ -110,7 +159,9 @@
         "prediction_diff",
         "sentence_wise_attribution_diff"
       ],
-      "evaluation": ["mass_accuracy"]
+      "evaluation": [
+        "mass_accuracy"
+      ]
     }
   }
 }
