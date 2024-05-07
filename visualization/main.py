@@ -101,7 +101,7 @@ def plot_evaluation_results(
                 # row='num_gaussians',
                 col='dataset_type',
                 # col='mapped_model_name',
-                kind='violin',
+                kind='bar',
                 palette=sns.color_palette(palette='pastel'),
                 fill=True,
                 linewidth=0.0,
@@ -120,7 +120,7 @@ def plot_evaluation_results(
             )
 
             _plot_postprocessing(g=g)
-            file_path = join(base_output_dir, f'{metric}_{s}.png')
+            file_path = join(base_output_dir, f'{metric}_{s}_{model_version}.png')
             plt.savefig(file_path, dpi=300)
             plt.close()
 
@@ -886,7 +886,7 @@ def create_dataset_for_xai_plot(
         result = process_map(
             calculate_most_common_xai_attributions,
             grouped_data,
-            max_workers=1,
+            max_workers=8,
             desc="Preparing most common xai attributions",
         )
         return pd.concat(result)

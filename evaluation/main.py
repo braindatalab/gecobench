@@ -351,7 +351,7 @@ def evaluate_model_performance(config: Dict) -> None:
     logger.info(f"Loaded test data for trained on datasets: {test_data.keys()}")
 
     predictions_output_path = join(
-        artifacts_dir, evaluation_output_dir, "model_performance_predictions.pkl"
+        artifacts_dir, evaluation_output_dir, config["evaluation"]["prediction_records"]
     )
 
     logger.info("Compute prediction dataset.")

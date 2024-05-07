@@ -91,7 +91,8 @@
   "evaluation": {
     "output_dir": "evaluation_gender",
     "num_workers": 4,
-    "evaluation_records": "evaluation_records.pkl"
+    "evaluation_records": "evaluation_records.pkl",
+    "prediction_records": "predictions.pkl"
   },
   "visualization": {
     "output_dir": "visualization_gender",
