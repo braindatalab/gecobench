@@ -229,12 +229,15 @@ def create_attention_mask_from_bert_ids(
 
 
 def create_tensor_dataset(
-    data: List, target: List, tokenizer: BertTokenizer
+    data: List,
+    target: List,
+    tokenizer: BertTokenizer,
+    include_idx: bool = False,
 ) -> TensorDataset:
     max_sentence_length = max([len(ids) for ids in data])
     tokens = torch.zeros(size=(len(data), max_sentence_length))
     attention_mask = torch.zeros(size=(len(data), max_sentence_length))
-    for k, ids in enumerate(data):
+    for k, ids in tqdm(enumerate(data), total=len(data), desc='Creating BERT dataset'):
         tokens[k, :] = add_padding_if_necessary(
             tokenizer=tokenizer, ids=ids, max_sentence_length=max_sentence_length
         )
@@ -243,7 +246,19 @@ def create_tensor_dataset(
             ids=tokens[k, :],
         )
 
-    return TensorDataset(tokens.type(torch.long), attention_mask, torch.tensor(target))
+    if include_idx:
+        return TensorDataset(
+            tokens.type(torch.long),
+            attention_mask,
+            torch.tensor(target),
+            torch.arange(len(data)),
+        )
+
+    return TensorDataset(
+        tokens.type(torch.long),
+        attention_mask,
+        torch.tensor(target),
+    )
 
 
 def save_model(model: Any, model_name: str, config: dict) -> str:
@@ -277,7 +292,9 @@ def create_bert_ids(
 
     bert_ids = list()
     valid_idxs = list()
-    for k, sentence in enumerate(data):
+    for k, sentence in tqdm(
+        enumerate(data), total=len(data), desc=f'Creating BERT IDs {type}'
+    ):
         cur = create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
 
         if len(cur) <= MAX_TOKEN_LENGTH:

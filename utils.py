@@ -118,6 +118,22 @@ def save_to_cache(key: str, data: Any, config: dict):
         pickle.dump(data, file)
 
 
+def cache_dec(save_path: str, recalc=False):
+    def dec_func(func):
+        def f(*args, **kwargs):
+            if os.path.exists(save_path) and not recalc:
+                return load_pickle(save_path)
+            else:
+                result = func(*args, **kwargs)
+                with open(save_path, "wb") as f:
+                    pickle.dump(result, f)
+                return result
+
+        return f
+
+    return dec_func
+
+
 def is_hydra():
     return os.environ.get("SLURM_WORKING_CLUSTER", "").startswith("hydra")
 
