@@ -108,6 +108,9 @@ def main(config: Dict) -> None:
 
     male_terms = ['he']
     female_terms = ['she']
+    
+    # his, him
+    # her, her
 
     trained_models_dir_path = join(
         generate_artifacts_dir(config=config),
@@ -124,8 +127,8 @@ def main(config: Dict) -> None:
         # for sentence in temp_dataset['sentence']:
         #     print(" ".join(sentence))
 
-        # S_male = co_occurrence_matrix(dataset, corpus, male_terms, 1)
-        # S_female = co_occurrence_matrix(dataset, corpus, female_terms, 0)
+        S_male = co_occurrence_matrix(dataset, corpus, male_terms, 1)
+        S_female = co_occurrence_matrix(dataset, corpus, female_terms, 0)
 
         # print()
         # print(S_male)
@@ -137,10 +140,10 @@ def main(config: Dict) -> None:
         # print(f"Matrix norm of S_female = {S_female_norm}")
         # print("")
 
-        # S_male_sum, S_female_sum = S_male.sum(), S_female.sum()
-        # print(f"Matrix sum of S_male = {S_male_sum}")
-        # print(f"Matrix sum of S_female = {S_female_sum}")
-        # print("")
+        S_male_sum, S_female_sum = S_male.sum(), S_female.sum()
+        print(f"Matrix sum of S_male = {S_male_sum}")
+        print(f"Matrix sum of S_female = {S_female_sum}")
+        print("")
 
         # S_male_sum, S_female_sum = S_male.sum(0), S_female.sum(0)
         # print(f"Matrix sum(0) of S_male = {S_male_sum}")
@@ -252,7 +255,6 @@ def main(config: Dict) -> None:
             )
             y_test = [dataset_female["target"][i] for i in val_idxs]
 
-        break
 
 
 if __name__ == '__main__':
