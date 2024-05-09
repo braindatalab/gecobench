@@ -12,6 +12,7 @@ from utils import (
     filter_train_datasets,
     generate_data_dir,
     generate_artifacts_dir,
+    generate_evaluation_dir,
     generate_training_dir,
     load_model,
 )
@@ -69,10 +70,7 @@ def co_occurrence_matrix_sentence(sentence, corpus, gender_terms) -> None:
     return S
 
 
-def main(config: Dict) -> None:
-    # male: target == 1, female: target == 0
-    corpus = generate_corpus(config)
-
+def compute_co_occurrence_matrix_sum(config, corpus):
     male_terms = ['he']
     female_terms = ['she']
 
@@ -88,6 +86,20 @@ def main(config: Dict) -> None:
         print(f"Matrix sum of S_male = {S_male_sum}")
         print(f"Matrix sum of S_female = {S_female_sum}")
         print("")
+    return
+
+
+def main(config: Dict) -> None:
+    # male: target == 1, female: target == 0
+    corpus = generate_corpus(config)
+    compute_co_occurrence_matrix_sum(config, corpus)
+
+    artifacts_dir = generate_artifacts_dir(config=config)
+    evaluation_output_dir = generate_evaluation_dir(config=config)
+    filename = config["evaluation"]["prediction_records"]
+    print(artifacts_dir)
+    print(evaluation_output_dir)
+    print(filename)
 
 
 if __name__ == '__main__':
