@@ -1,20 +1,17 @@
 import numpy as np
-import os
-from os import listdir
-from os.path import join, isfile, join
+import torch
+from torchmetrics.classification import BinaryF1Score, BinaryAccuracy
+from os.path import join, join
 from typing import Dict
-from transformers import BertTokenizer
-from common import DataSet, DatasetKeys, validate_dataset_key
+from common import DataSet, validate_dataset_key
 from utils import (
-    load_jsonl_as_dict,
     load_jsonl_as_df,
     generate_data_dir,
     filter_train_datasets,
     generate_data_dir,
     generate_artifacts_dir,
     generate_evaluation_dir,
-    generate_training_dir,
-    load_model,
+    load_pickle,
 )
 
 
@@ -89,6 +86,81 @@ def compute_co_occurrence_matrix_sum(config, corpus):
     return
 
 
+# TODO:
+# 1-3 Bias Metriken implementieren (pro Datensatz)
+# Pro model repitition number
+# Best model
+# Last model
+
+
+def bias_metrics_summary(prediction_records):
+    dataset_types = list(set(prediction_records['dataset_type']))
+    model_variants = list(set(prediction_records['model_name']))
+    model_repetition_numbers = list(set(prediction_records['model_repetition_number']))
+    model_versions = list(set(prediction_records['model_version']))
+    gender_types = list(set(prediction_records['target']))
+
+    for dataset in dataset_types:
+        dataset_result = prediction_records[
+            prediction_records['dataset_type'] == dataset
+        ]
+        for model_variant in model_variants:
+            dataset_result_model_variant = dataset_result[
+                dataset_result['model_name'] == model_variant
+            ]
+            for repetition_number in model_repetition_numbers:
+                dataset_result_model_variant_repetition_number = (
+                    dataset_result_model_variant[
+                        dataset_result_model_variant['model_repetition_number']
+                        == repetition_number
+                    ]
+                )
+                for model in model_versions:
+                    dataset_result_model_variant_repetition_number_model_version = (
+                        dataset_result_model_variant_repetition_number[
+                            dataset_result_model_variant_repetition_number[
+                                'model_version'
+                            ]
+                            == model
+                        ]
+                    )
+                    for gender in gender_types:
+                        dataset_result_model_variant_repetition_number_model_version_gender = dataset_result_model_variant_repetition_number_model_version[
+                            dataset_result_model_variant_repetition_number_model_version[
+                                'target'
+                            ]
+                            == gender
+                        ]
+                        predictions = torch.tensor(
+                            dataset_result_model_variant_repetition_number_model_version_gender[
+                                'prediction'
+                            ].values
+                        )
+                        targets = torch.tensor(
+                            dataset_result_model_variant_repetition_number_model_version_gender[
+                                'target'
+                            ].values
+                        )
+
+                        gender_explicit = None
+                        if gender == 1:
+                            gender_explicit = "male"
+                        elif gender == 0:
+                            gender_explicit = "female"
+
+                        f1_metric = BinaryF1Score()
+                        f1_score_gender = f1_metric(predictions, targets)
+
+                        accruacy_metric = BinaryAccuracy()
+                        accruacy_metric_gender = accruacy_metric(predictions, targets)
+
+                        print(
+                            f"{dataset}, {model_variant}, {repetition_number}, {model}, {gender_explicit}: f1_score = {f1_score_gender}, accruacy: {accruacy_metric_gender}"
+                        )
+
+    return
+
+
 def main(config: Dict) -> None:
     # male: target == 1, female: target == 0
     corpus = generate_corpus(config)
@@ -97,9 +169,11 @@ def main(config: Dict) -> None:
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
     filename = config["evaluation"]["prediction_records"]
-    print(artifacts_dir)
-    print(evaluation_output_dir)
-    print(filename)
+    prediction_records = load_pickle(
+        join(artifacts_dir, evaluation_output_dir, filename)
+    )
+
+    bias_metrics_summary(prediction_records)
 
 
 if __name__ == '__main__':
