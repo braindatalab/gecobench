@@ -86,13 +86,6 @@ def compute_co_occurrence_matrix_sum(config, corpus):
     return
 
 
-# TODO:
-# 1-3 Bias Metriken implementieren (pro Datensatz)
-# Pro model repitition number
-# Best model
-# Last model
-
-
 def bias_metrics_summary(prediction_records):
     dataset_types = list(set(prediction_records['dataset_type']))
     model_variants = list(set(prediction_records['model_name']))
