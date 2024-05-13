@@ -136,7 +136,10 @@
         "prediction_diff",
         "sentence_wise_attribution_diff"
       ],
-      "evaluation": ["mass_accuracy"]
+      "evaluation": ["mass_accuracy"],
+      "model": [
+        "model_performance"
+      ]
     }
   }
 }
