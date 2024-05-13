@@ -28,7 +28,6 @@ from tqdm import tqdm
 from transformers import BertTokenizer
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.pipeline import Pipeline
-from scipy.stats import cov
 
 
 from training.bert import (
@@ -519,8 +518,7 @@ def calculate_covariance_between_words_target(
             x[:, pipeline.named_steps['count'].vocabulary_[word]].toarray().flatten()
         )
 
-        c = cov(word_representation, targets)[0]
-
+        c = np.cov(word_representation, targets)[0, 1]
         ret[word_to_bert_id_mapping[word]] = 0.0 if np.isnan(c) else c
 
     return ret
