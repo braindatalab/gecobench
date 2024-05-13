@@ -122,7 +122,7 @@ def get_captum_attributions(
                 data=embeddings(x),
                 target=target,
             )
-        elif 'Correlation' not in method_name:
+        elif 'Covariance' not in method_name:
             a = methods_dict.get(method_name)(
                 forward_function=forward_function,
                 baseline=baseline,
@@ -498,7 +498,7 @@ def get_input_x_gradient(
     return torch.abs(explanations).sum(dim=2)
 
 
-def calculate_correlation_between_words_target(
+def calculate_covariance_between_words_target(
     sentences: list,
     targets: list,
     vocabulary: set,
@@ -513,25 +513,27 @@ def calculate_correlation_between_words_target(
     pipeline.fit(sentences)
     x = pipeline.transform(sentences)
 
-    correlation = dict()
+    ret = dict()
     for word in pipeline.named_steps['count'].get_feature_names_out():
         word_representation = (
             x[:, pipeline.named_steps['count'].vocabulary_[word]].toarray().flatten()
         )
+
         c = cov(word_representation, targets)[0]
-        correlation[word_to_bert_id_mapping[word]] = 0.0 if np.isnan(c) else c
 
-    return correlation
+        ret[word_to_bert_id_mapping[word]] = 0.0 if np.isnan(c) else c
+
+    return ret
 
 
-def get_correlation_between_words_target(
-    correlation_between_words_target: dict,
+def get_covariance_between_words_target(
+    covariance_between_words_target: dict,
     token_ids: Tensor,
 ) -> dict:
     a = list()
     for tid in token_ids:
-        a += [correlation_between_words_target[tid.cpu().numpy().item()]]
-    return {'Correlation': normalize_attributions(a=np.array(a)[np.newaxis, :])}
+        a += [covariance_between_words_target[tid.cpu().numpy().item()]]
+    return {'Covariance': normalize_attributions(a=np.array(a)[np.newaxis, :])}
 
 
 # https://captum.ai/api/
@@ -550,5 +552,5 @@ methods_dict = {
     'PFI': get_pfi_attributions,
     'Uniform random': get_uniform_random_attributions,
     'InputXGradient': get_input_x_gradient,
-    'Correlation': get_correlation_between_words_target,
+    'Covariance': get_covariance_between_words_target,
 }
