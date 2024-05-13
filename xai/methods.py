@@ -28,7 +28,7 @@ from tqdm import tqdm
 from transformers import BertTokenizer
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.pipeline import Pipeline
-from scipy.stats import pearsonr
+from scipy.stats import cov
 
 
 from training.bert import (
@@ -155,7 +155,7 @@ def get_integrated_gradients_attributions(
         n_steps=200,
         return_convergence_delta=False,
     )
-    return explanations.sum(dim=2)
+    return torch.abs(explanations).sum(dim=2)
 
 
 def get_saliency_attributions(
@@ -169,7 +169,7 @@ def get_saliency_attributions(
     explanations = explainer.attribute(
         inputs=data, target=int(target), abs=True, additional_forward_args=None
     )
-    return explanations.sum(dim=2)
+    return torch.abs(explanations).sum(dim=2)
 
 
 def get_deeplift_attributions(
@@ -192,7 +192,7 @@ def get_deeplift_attributions(
         return_convergence_delta=False,
         custom_attribution_func=None,
     )
-    return explanations.sum(dim=2)
+    return torch.abs(explanations).sum(dim=2)
 
 
 def get_deepshap_attributions(
@@ -216,7 +216,7 @@ def get_gradient_shap_attributions(
         inputs=data, baselines=baseline, target=target
     )
 
-    return explanations.sum(dim=2)
+    return torch.abs(explanations).sum(dim=2)
 
 
 def get_guided_backprop_attributions(
@@ -231,7 +231,7 @@ def get_guided_backprop_attributions(
     explanations = explainer.attribute(
         inputs=data, target=int(target), additional_forward_args=None
     )
-    return explanations.sum(dim=2)
+    return torch.abs(explanations).sum(dim=2)
 
 
 def get_deconvolution_attributions(
@@ -245,7 +245,7 @@ def get_deconvolution_attributions(
     explanations = explainer.attribute(
         inputs=data, target=int(target), additional_forward_args=None
     )
-    return explanations.sum(dim=2)
+    return torch.abs(explanations).sum(dim=2)
 
 
 def get_shapley_sampling_attributions(
@@ -495,7 +495,7 @@ def get_input_x_gradient(
     explanations = explainer.attribute(
         inputs=data, target=int(target), additional_forward_args=None
     )
-    return explanations.sum(dim=2)
+    return torch.abs(explanations).sum(dim=2)
 
 
 def calculate_correlation_between_words_target(
@@ -518,7 +518,7 @@ def calculate_correlation_between_words_target(
         word_representation = (
             x[:, pipeline.named_steps['count'].vocabulary_[word]].toarray().flatten()
         )
-        c = pearsonr(word_representation, targets)[0]
+        c = cov(word_representation, targets)[0]
         correlation[word_to_bert_id_mapping[word]] = 0.0 if np.isnan(c) else c
 
     return correlation
