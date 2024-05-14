@@ -22,14 +22,12 @@ from training.bert import (
 from utils import (
     filter_eval_datasets,
     generate_training_dir,
-    load_json_file,
     load_jsonl_as_df,
     load_pickle,
     dump_as_pickle,
     generate_xai_dir,
     append_date,
     load_model,
-    load_jsonl_as_dict,
     generate_data_dir,
     generate_artifacts_dir,
     BERT_MODEL_TYPE,
@@ -38,8 +36,8 @@ from utils import (
 )
 from xai.methods import (
     get_captum_attributions,
-    calculate_correlation_between_words_target,
-    get_correlation_between_words_target,
+    calculate_covariance_between_words_target,
+    get_covariance_between_words_target,
 )
 
 DEVICE = 'cpu'
@@ -167,7 +165,7 @@ def apply_xai_methods_on_sentence(
     model_params: dict,
     config: dict,
     num_samples: int,
-    correlation_between_words_target: dict,
+    covariance_between_words_target: dict,
     index: int,
 ) -> list[XAIResult]:
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
@@ -197,10 +195,10 @@ def apply_xai_methods_on_sentence(
         target=xai_target,
         tokenizer=tokenizer,
     )
-    if correlation_between_words_target is not None:
+    if covariance_between_words_target is not None:
         attributions.update(
-            get_correlation_between_words_target(
-                correlation_between_words_target=correlation_between_words_target,
+            get_covariance_between_words_target(
+                covariance_between_words_target=covariance_between_words_target,
                 token_ids=token_ids,
             )
         )
@@ -216,7 +214,7 @@ def apply_xai_methods_on_sentence(
     return results
 
 
-def prepare_data_for_correlation_calculation(
+def prepare_data_for_covariance_calculation(
     dataset: pd.DataFrame, model_name: str, config: dict
 ) -> dict:
     model_type = determine_model_type(s=model_name)
@@ -256,13 +254,13 @@ def apply_xai_methods(
     results = list()
     num_samples = dataset.shape[0]
 
-    prepared_data = prepare_data_for_correlation_calculation(
+    prepared_data = prepare_data_for_covariance_calculation(
         dataset=dataset,
         model_name=model_params['model_name'],
         config=config,
     )
 
-    correlation_between_words_target = calculate_correlation_between_words_target(
+    covariance_between_words_target = calculate_covariance_between_words_target(
         sentences=prepared_data['sentences'],
         targets=prepared_data['targets'],
         vocabulary=prepared_data['vocabulary'],
@@ -279,7 +277,7 @@ def apply_xai_methods(
             model_params,
             config,
             num_samples,
-            correlation_between_words_target,
+            covariance_between_words_target,
             k,
         )
         for k, (_, row) in enumerate(dataset.iterrows())
