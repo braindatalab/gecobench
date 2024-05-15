@@ -1,6 +1,14 @@
 import numpy as np
 import torch
-from torchmetrics.classification import BinaryF1Score, BinaryAccuracy
+from torchmetrics.classification import (
+    BinaryF1Score,
+    BinaryAccuracy,
+    BinaryRecall,
+    BinarySpecificity,
+    BinaryAUROC,
+    ConfusionMatrix,
+)
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from os.path import join, join
 from typing import Dict
 from common import DataSet, validate_dataset_key
@@ -13,6 +21,7 @@ from utils import (
     generate_evaluation_dir,
     load_pickle,
 )
+import pandas as pd
 
 
 def load_dataset_raw(config: Dict, dataset_key: str) -> DataSet:
@@ -94,6 +103,7 @@ def bias_metrics_summary(prediction_records):
     gender_types = list(set(prediction_records['target']))
 
     for dataset in dataset_types:
+        print(dataset)
         dataset_result = prediction_records[
             prediction_records['dataset_type'] == dataset
         ]
@@ -101,57 +111,40 @@ def bias_metrics_summary(prediction_records):
             dataset_result_model_variant = dataset_result[
                 dataset_result['model_name'] == model_variant
             ]
-            for repetition_number in model_repetition_numbers:
-                dataset_result_model_variant_repetition_number = (
+            # model_version = last or model_version = best
+            for model in model_versions:
+                dataset_result_model_variant_model_version = (
                     dataset_result_model_variant[
-                        dataset_result_model_variant['model_repetition_number']
-                        == repetition_number
+                        dataset_result_model_variant['model_version'] == model
                     ]
                 )
-                for model in model_versions:
-                    dataset_result_model_variant_repetition_number_model_version = (
-                        dataset_result_model_variant_repetition_number[
-                            dataset_result_model_variant_repetition_number[
-                                'model_version'
+                cm_repetitions = []
+                for repetition_number in model_repetition_numbers:
+                    dataset_result_model_variant_model_version_repetition_number = (
+                        dataset_result_model_variant_model_version[
+                            dataset_result_model_variant_model_version[
+                                'model_repetition_number'
                             ]
-                            == model
+                            == repetition_number
                         ]
                     )
-                    for gender in gender_types:
-                        dataset_result_model_variant_repetition_number_model_version_gender = dataset_result_model_variant_repetition_number_model_version[
-                            dataset_result_model_variant_repetition_number_model_version[
-                                'target'
-                            ]
-                            == gender
-                        ]
-                        predictions = torch.tensor(
-                            dataset_result_model_variant_repetition_number_model_version_gender[
-                                'prediction'
-                            ].values
-                        )
-                        targets = torch.tensor(
-                            dataset_result_model_variant_repetition_number_model_version_gender[
-                                'target'
-                            ].values
-                        )
+                    predictions = (
+                        dataset_result_model_variant_model_version_repetition_number[
+                            'prediction'
+                        ].values
+                    )
+                    targets = (
+                        dataset_result_model_variant_model_version_repetition_number[
+                            'target'
+                        ].values
+                    )
+                    cm = confusion_matrix(targets, predictions)
+                    cm_repetitions.append(cm)
+                cm_repetitions_stacked = np.stack(cm_repetitions, axis=0)
+                cm_repetitions_average = np.mean(cm_repetitions_stacked, axis=0)
+                cm_repetitions_std = np.std(cm_repetitions_stacked, axis=0)
 
-                        gender_explicit = None
-                        if gender == 1:
-                            gender_explicit = "male"
-                        elif gender == 0:
-                            gender_explicit = "female"
-
-                        f1_metric = BinaryF1Score()
-                        f1_score_gender = f1_metric(predictions, targets)
-
-                        accruacy_metric = BinaryAccuracy()
-                        accruacy_metric_gender = accruacy_metric(predictions, targets)
-
-                        print(
-                            f"{dataset}, {model_variant}, {repetition_number}, {model}, {gender_explicit}: f1_score = {f1_score_gender}, accruacy: {accruacy_metric_gender}"
-                        )
-
-    return
+        return
 
 
 def main(config: Dict) -> None:
