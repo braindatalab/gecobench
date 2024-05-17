@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
 import torch
 from torchmetrics.classification import (
     BinaryF1Score,
@@ -19,6 +21,7 @@ from utils import (
     generate_data_dir,
     generate_artifacts_dir,
     generate_evaluation_dir,
+    generate_bias_dir,
     load_pickle,
 )
 import pandas as pd
@@ -95,7 +98,7 @@ def compute_co_occurrence_matrix_sum(config, corpus):
     return
 
 
-def bias_metrics_summary(prediction_records):
+def bias_metrics_summary(prediction_records, bias_dir):
     dataset_types = list(set(prediction_records['dataset_type']))
     model_variants = list(set(prediction_records['model_name']))
     model_repetition_numbers = list(set(prediction_records['model_repetition_number']))
@@ -103,48 +106,97 @@ def bias_metrics_summary(prediction_records):
     gender_types = list(set(prediction_records['target']))
 
     for dataset in dataset_types:
-        print(dataset)
         dataset_result = prediction_records[
             prediction_records['dataset_type'] == dataset
         ]
-        for model_variant in model_variants:
-            dataset_result_model_variant = dataset_result[
-                dataset_result['model_name'] == model_variant
+
+        dataset_result_model_version = dataset_result[
+            dataset_result['model_version'] == "best"
+        ]
+
+        fig, axs = plt.subplots(ncols=len(model_variants), figsize=(16, 8))
+
+        for i, model_variant in enumerate(model_variants):
+            dataset_result_model_version_model_variant = dataset_result_model_version[
+                dataset_result_model_version['model_name'] == model_variant
             ]
-            # model_version = last or model_version = best
-            for model in model_versions:
-                dataset_result_model_variant_model_version = (
-                    dataset_result_model_variant[
-                        dataset_result_model_variant['model_version'] == model
+            cm_repetitions = []
+            binary_accruacy_repetitions = []
+            
+            for repetition_number in model_repetition_numbers:
+                dataset_result_model_version_model_variant_repetition_number = (
+                    dataset_result_model_version_model_variant[
+                        dataset_result_model_version_model_variant[
+                            'model_repetition_number'
+                        ]
+                        == repetition_number
                     ]
                 )
-                cm_repetitions = []
-                for repetition_number in model_repetition_numbers:
-                    dataset_result_model_variant_model_version_repetition_number = (
-                        dataset_result_model_variant_model_version[
-                            dataset_result_model_variant_model_version[
-                                'model_repetition_number'
-                            ]
-                            == repetition_number
-                        ]
-                    )
-                    predictions = (
-                        dataset_result_model_variant_model_version_repetition_number[
-                            'prediction'
-                        ].values
-                    )
-                    targets = (
-                        dataset_result_model_variant_model_version_repetition_number[
-                            'target'
-                        ].values
-                    )
-                    cm = confusion_matrix(targets, predictions)
-                    cm_repetitions.append(cm)
-                cm_repetitions_stacked = np.stack(cm_repetitions, axis=0)
-                cm_repetitions_average = np.mean(cm_repetitions_stacked, axis=0)
-                cm_repetitions_std = np.std(cm_repetitions_stacked, axis=0)
+                predictions = (
+                    dataset_result_model_version_model_variant_repetition_number[
+                        'prediction'
+                    ].values
+                )
+                targets = dataset_result_model_version_model_variant_repetition_number[
+                    'target'
+                ].values
 
-        return
+                predictions_tensor = torch.tensor(predictions)
+                targets_tensor = torch.tensor(targets)
+
+                label_mapping = {1: 'male', 0: 'female'}
+                predictions = [label_mapping[pred] for pred in predictions]
+                targets = [label_mapping[pred] for pred in targets]
+
+                cm = confusion_matrix(targets, predictions, labels=['male', 'female'])
+                cm_repetitions.append(cm)
+
+                binary_acc_metric = BinaryAccuracy()
+                binary_acc_score = binary_acc_metric(predictions_tensor, targets_tensor)
+
+                binary_accruacy_repetitions.append(binary_acc_score)
+
+            binary_acc_score_avg_repetitions = sum(binary_accruacy_repetitions) / len(
+                binary_accruacy_repetitions
+            )
+            # print(cm_repetitions)
+            cm_repetitions_stacked = np.stack(cm_repetitions, axis=0)
+            # print(cm_repetitions_stacked,cm_repetitions_stacked.shape)
+
+            cm_repetitions_average = np.mean(cm_repetitions_stacked, axis=0)
+            cm_repetitions_std = np.std(cm_repetitions_stacked, axis=0)
+
+            disp = ConfusionMatrixDisplay(
+                confusion_matrix=cm_repetitions_average,
+                display_labels=['male', 'female'],
+            )
+            # print(cm_repetitions_std)
+            # exit()
+            disp.plot(
+                ax=axs[i],
+                xticks_rotation='vertical',
+                values_format='.1f',
+                colorbar=False,
+            )
+            model_variants_mapping = {
+                "bert_only_embedding_classification": "BERT-CEf",
+                "one_layer_attention_classification": "OLA-CEA",
+                "bert_randomly_init_embedding_classification": "BERT-CE",
+                "bert_all": "BERT-CEfAf",
+                "bert_only_classification": "BERT-C",
+            }
+            model_variant_explicit_name = model_variants_mapping[model_variant]
+
+            formatted_acc = "{:.2f}".format(binary_acc_score_avg_repetitions * 100)
+            axs[i].set_title(
+                f"{model_variant_explicit_name} \n accruacy: {formatted_acc}"
+            )
+
+        savedir = f"{bias_dir}/confusion_matrix_{dataset}.png"
+        plt.tight_layout()
+        plt.savefig(savedir, dpi=300, bbox_inches='tight')
+
+    return
 
 
 def main(config: Dict) -> None:
@@ -158,8 +210,9 @@ def main(config: Dict) -> None:
     prediction_records = load_pickle(
         join(artifacts_dir, evaluation_output_dir, filename)
     )
-
-    bias_metrics_summary(prediction_records)
+    bias_dir = generate_bias_dir(config=config)
+    Path(bias_dir).mkdir(parents=True, exist_ok=True)
+    bias_metrics_summary(prediction_records, bias_dir)
 
 
 if __name__ == '__main__':
