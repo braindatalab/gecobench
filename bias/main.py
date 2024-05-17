@@ -121,8 +121,13 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 dataset_result_model_version['model_name'] == model_variant
             ]
             cm_repetitions = []
-            binary_accruacy_repetitions = []
-            
+            (
+                binary_accruacy_repetitions,
+                binary_recall_repetitions,
+                binary_specificity_repetitions,
+                binary_f1_repetitions,
+            ) = ([] for i in range(4))
+
             for repetition_number in model_repetition_numbers:
                 dataset_result_model_version_model_variant_repetition_number = (
                     dataset_result_model_version_model_variant[
@@ -154,14 +159,38 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 binary_acc_metric = BinaryAccuracy()
                 binary_acc_score = binary_acc_metric(predictions_tensor, targets_tensor)
 
+                binary_recall_metric = BinaryRecall()
+                binary_recall_score = binary_recall_metric(
+                    predictions_tensor, targets_tensor
+                )
+
+                binary_specificity_metric = BinarySpecificity()
+                binary_specificity_score = binary_specificity_metric(
+                    predictions_tensor, targets_tensor
+                )
+
+                binary_f1_metric = BinaryF1Score()
+                binary_f1_score = binary_f1_metric(predictions_tensor, targets_tensor)
+
+                binary_recall_repetitions.append(binary_recall_score)
+                binary_specificity_repetitions.append(binary_specificity_score)
+                binary_f1_repetitions.append(binary_f1_score)
                 binary_accruacy_repetitions.append(binary_acc_score)
 
             binary_acc_score_avg_repetitions = sum(binary_accruacy_repetitions) / len(
                 binary_accruacy_repetitions
             )
-            # print(cm_repetitions)
+            binary_recall_score_avg_repetitions = sum(binary_recall_repetitions) / len(
+                binary_recall_repetitions
+            )
+            binary_specificity_score_avg_repetitions = sum(
+                binary_specificity_repetitions
+            ) / len(binary_specificity_repetitions)
+            binary_f1_score_avg_repetitions = sum(binary_f1_repetitions) / len(
+                binary_f1_repetitions
+            )
+
             cm_repetitions_stacked = np.stack(cm_repetitions, axis=0)
-            # print(cm_repetitions_stacked,cm_repetitions_stacked.shape)
 
             cm_repetitions_average = np.mean(cm_repetitions_stacked, axis=0)
             cm_repetitions_std = np.std(cm_repetitions_stacked, axis=0)
@@ -170,8 +199,7 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 confusion_matrix=cm_repetitions_average,
                 display_labels=['male', 'female'],
             )
-            # print(cm_repetitions_std)
-            # exit()
+
             disp.plot(
                 ax=axs[i],
                 xticks_rotation='vertical',
@@ -187,9 +215,17 @@ def bias_metrics_summary(prediction_records, bias_dir):
             }
             model_variant_explicit_name = model_variants_mapping[model_variant]
 
+            formatted_f1 = "{:.2f}".format(binary_f1_score_avg_repetitions * 100)
+            formatted_recall = "{:.2f}".format(
+                binary_recall_score_avg_repetitions * 100
+            )
+            formatted_specificity = "{:.2f}".format(
+                binary_specificity_score_avg_repetitions * 100
+            )
             formatted_acc = "{:.2f}".format(binary_acc_score_avg_repetitions * 100)
+
             axs[i].set_title(
-                f"{model_variant_explicit_name} \n accruacy: {formatted_acc}"
+                f"{model_variant_explicit_name} \n accruacy: {formatted_acc} \n specificity: {formatted_specificity} \n recall: {formatted_recall} \n f1: {formatted_f1}"
             )
 
         savedir = f"{bias_dir}/confusion_matrix_{dataset}.png"
