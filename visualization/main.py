@@ -15,6 +15,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from common import DatasetKeys, EvaluationResult, SaveVersion
+from matplotlib import rc
+
+rc('text', usetex=True)
+
 
 from utils import (
     generate_visualization_dir,
@@ -29,15 +33,45 @@ from utils import (
 )
 
 MODEL_NAME_MAP = dict(
-    bert_only_classification='newly initialized\nclassification',
-    bert_only_embedding_classification='fine-tuned embedding,\nnewly initialized classification',
-    bert_all='fine-tuned all',
-    bert_only_embedding='fine-tuned embedding',
-    bert_randomly_init_embedding_classification='newly initialized embedding,\nclassification',
-    one_layer_attention_classification='one layer atttention',
+    bert_only_classification='\\textit{BERT}-C',
+    bert_randomly_init_embedding_classification='\\textit{BERT}-CE',
+    bert_only_embedding_classification='\\textit{BERT}-CEf',
+    bert_all='\\textit{BERT}-CEfAf',
+    one_layer_attention_classification='\\textit{OLA}-CEA',
+    bert_only_embedding='\\textit{BERT}-Ef',
 )
 
-DATASET_NAME_MAP = dict(subject='$\mathcal{D}_{S}$', all='$\mathcal{D}_{SO}$')
+METRIC_NAME_MAP = dict(
+    roc_auc='ROC AUC',
+    precision_recall_auc='Precision-Recall AUC',
+    avg_precision='Precision',
+    precision_specificity='Precision-Specificity',
+    top_k_precision='Top-K Precision',
+    mass_accuracy='Mass Accuracy',
+)
+
+MODEL_ORDER = [
+    MODEL_NAME_MAP["bert_only_classification"],
+    MODEL_NAME_MAP["bert_only_embedding_classification"],
+    MODEL_NAME_MAP["bert_randomly_init_embedding_classification"],
+    MODEL_NAME_MAP["bert_all"],
+    MODEL_NAME_MAP["one_layer_attention_classification"],
+]
+
+HUE_ORDER = [
+    'Uniform random',
+    'Saliency',
+    'Kernel SHAP',
+    'Guided Backprop',
+    'DeepLift',
+    'InputXGradient',
+    'LIME',
+    'Gradient SHAP',
+    'Integrated Gradients',
+    'Covariance',
+]
+
+DATASET_NAME_MAP = dict(gender_subj='$\mathcal{D}_{S}$', gender_all='$\mathcal{D}_{A}$')
 GENDER = {0.0: 'female', 1.0: 'male'}
 
 MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES = dict(
@@ -49,10 +83,10 @@ MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES = dict(
 
 def compute_average_score_per_repetition(data: pd.DataFrame) -> pd.DataFrame:
     results = list()
-    for k, df_dataset_type in data.groupby(by='dataset_type'):
-        for l, df_model_type in df_dataset_type.groupby(by='model_name'):
+    for k, df_dataset_type in data.groupby(by='Dataset'):
+        for l, df_model_type in df_dataset_type.groupby(by='Model'):
             for j, df_repetition in df_model_type.groupby(by='model_repetition_number'):
-                for i, df_xai_method in df_repetition.groupby(by='attribution_method'):
+                for i, df_xai_method in df_repetition.groupby(by='XAI Method'):
                     average_scores = (
                         df_xai_method._get_numeric_data().aggregate(['mean']).iloc[0, :]
                     )
@@ -73,55 +107,61 @@ def plot_evaluation_results(
         for k in range(g.axes.shape[0]):
             for j in range(g.axes.shape[1]):
                 g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
-                # g.axes[k, j].title.set_size(6)
-                # g.axes[k, j].set_xticklabels('')
-                # g.axes[k, j].set_xlabel('')
                 if 0 == k and 'top_k_precision' == metric:
-                    g.axes[k, j].set_ylabel(f'Average {metric}')
+                    g.axes[k, j].set_ylabel(f'Average {METRIC_NAME_MAP[metric]}')
                 g.axes[k, j].set_ylim(0, 1)
                 g.axes[k, j].set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
-                for label in (
-                    g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
-                ):
-                    label.set_fontsize(4)
+                # for label in (
+                #     g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+                # ):
+                #     label.set_fontsize(6)
 
     data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
-    if 'top_k_precision' != metric:
+    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+
+    data = data.rename(
+        columns={
+            "mapped_model_name": "Model",
+            "dataset_type": "Dataset",
+            "attribution_method": "XAI Method",
+            **METRIC_NAME_MAP,
+        }
+    )
+
+    if metric != 'top_k_precision':
         average_data = compute_average_score_per_repetition(data=data)
         datasets = [('', data), ('averaged', average_data)]
+
         for s, d in datasets:
             g = sns.catplot(
                 data=d,
-                x='mapped_model_name',
-                # x='attribution_method',
-                y=metric,
-                hue='attribution_method',
-                # hue='dataset_type',
-                # split=True,
-                # row='num_gaussians',
-                col='dataset_type',
-                # col='mapped_model_name',
-                kind='bar',
+                x='Model',
+                y=METRIC_NAME_MAP[metric],
+                order=MODEL_ORDER,
+                hue_order=HUE_ORDER,
+                hue='XAI Method',
+                col='Dataset',
+                kind='box',
                 palette=sns.color_palette(palette='pastel'),
                 fill=True,
-                linewidth=0.0,
-                height=2.5,
-                inner_kws=dict(box_width=2, whis_width=0.2, color='0.4', marker='o'),
-                # inner='stick',
+                height=3,
+                fliersize=0,
                 estimator='median',
-                # errorbar=('pi', 95) if 'top_k_precision' != metric else 'sd',
-                # errorbar='sd',
-                # showfliers=False,
-                # medianprops={'color': 'white', 'linewidth': 1.0},
                 aspect=2.0,
                 margin_titles=True,
-                # line_kws={'linewidth': 1.5},
-                facet_kws={'gridspec_kws': {'wspace': 0.1, 'hspace': 0.1}},
+                legend="full",
+                legend_out=False,
+            )
+            sns.move_legend(
+                g,
+                "lower center",
+                bbox_to_anchor=(0.5, -0.2),
+                ncol=5,
             )
 
             _plot_postprocessing(g=g)
             file_path = join(base_output_dir, f'{metric}_{s}_{model_version}.png')
-            plt.savefig(file_path, dpi=300)
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
             plt.close()
 
     else:
@@ -130,33 +170,32 @@ def plot_evaluation_results(
         for s, d in datasets:
             g = sns.catplot(
                 data=d,
-                x='mapped_model_name',
-                y=metric,
-                hue='attribution_method',
-                # row='num_gaussians',
-                col='dataset_type',
+                x='Model',
+                y=METRIC_NAME_MAP[metric],
+                order=MODEL_ORDER,
+                hue_order=HUE_ORDER,
+                hue='XAI Method',
+                col='Dataset',
                 kind='bar',
-                # linewidth=0.3,
                 palette=sns.color_palette('pastel'),
-                height=2.5,
-                # inner='stick',
+                height=3,
                 estimator='mean',
-                # errorbar=('pi', 95) if 'top_k_precision' != metric else 'sd',
-                errorbar='sd',
-                # errorbar=None,
-                # errwidth=0.9,
-                err_kws={'linewidth': 2.0},
-                # showfliers=False,
-                # medianprops={'color': 'black', 'linewidth': 1.0},
-                aspect=1.0,
+                # errorbar='sd',
+                # err_kws={'linewidth': 2.0},
                 margin_titles=True,
-                # line_kws={'linewidth': 1.5},
-                facet_kws={'gridspec_kws': {'wspace': 0.1, 'hspace': 0.1}},
+                aspect=2.0,
+            )
+
+            sns.move_legend(
+                g,
+                "lower center",
+                bbox_to_anchor=(0.5, -0.2),
+                ncol=5,
             )
 
             _plot_postprocessing(g=g)
             file_path = join(base_output_dir, f'{metric}_{s}_{model_version}.png')
-            plt.savefig(file_path, dpi=300)
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
             plt.close()
 
 
@@ -169,16 +208,25 @@ def plot_model_performance(
     training_history['mapped_model_name'] = training_history['model_name'].map(
         lambda x: MODEL_NAME_MAP[x]
     )
+    training_history = training_history.rename(
+        columns={
+            'mapped_model_name': 'Model',
+            'dataset_type': 'Dataset',
+            'accuracy': 'Accuracy',
+            'data_split': 'Data Split',
+        }
+    )
+
     g = sns.catplot(
         data=training_history,
-        x='mapped_model_name',
+        x='Model',
         # x='attribution_method',
-        y='accuracy',
-        hue='data_split',
+        y='Accuracy',
+        hue='Data Split',
         # hue='dataset_type',
         # split=True,
         # row='num_gaussians',
-        col='dataset_type',
+        col='Dataset',
         # col='mapped_model_name',
         kind='bar',
         palette=sns.color_palette(palette='pastel'),
@@ -195,7 +243,6 @@ def plot_model_performance(
         aspect=2.0,
         margin_titles=True,
         # line_kws={'linewidth': 1.5},
-        facet_kws={'gridspec_kws': {'wspace': 0.1, 'hspace': 0.1}},
     )
     for k in range(g.axes.shape[0]):
         for j in range(g.axes.shape[1]):
@@ -207,13 +254,20 @@ def plot_model_performance(
             g.axes[k, j].set_ylim(0, 1)
             # g.axes[k, j].set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
             g.axes[k, j].set_yticks(np.arange(start=0.1, step=0.1, stop=1.1))
-            for label in (
-                g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
-            ):
-                label.set_fontsize(4)
+            # for label in (
+            #     g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+            # ):
+            #     label.set_fontsize(4)
+
+    sns.move_legend(
+        g,
+        "lower center",
+        bbox_to_anchor=(0.5, -0.2),
+        ncol=3,
+    )
 
     file_path = join(base_output_dir, f'{plot_type}_{model_version}.png')
-    plt.savefig(file_path, dpi=300)
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
     plt.close()
 
 
@@ -1059,7 +1113,7 @@ def plot_correlation_between_words_and_labels(
             axs[k].spines['left'].set_linewidth(0.5)
             axs[k].grid(linewidth=0.1)
             axs[k].set_title(
-                f'Dataset: {DATASET_NAME_MAP[c]}',
+                f'Dataset = {DATASET_NAME_MAP[c]}',
                 fontsize=4,
             )
 
@@ -1082,7 +1136,7 @@ def create_data_plots(base_output_dir: str, config: dict) -> None:
     dataset_all = load_jsonl_as_df(filename_all)
     dataset_subject = load_jsonl_as_df(filename_subj)
 
-    data = dict(all=dataset_all, subject=dataset_subject)
+    data = dict(gender_all=dataset_all, gender_subj=dataset_subject)
     visualization_methods = dict(
         correlation_plot=plot_correlation_between_words_and_labels,
     )
