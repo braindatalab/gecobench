@@ -130,8 +130,6 @@ def bias_metrics_summary(prediction_records, bias_dir):
     dataset_types = list(set(prediction_records['dataset_type']))
     model_variants = list(set(prediction_records['model_name']))
     model_repetition_numbers = list(set(prediction_records['model_repetition_number']))
-    model_versions = list(set(prediction_records['model_version']))
-    gender_types = list(set(prediction_records['target']))
 
     for dataset in dataset_types:
         dataset_result = prediction_records[
@@ -142,8 +140,10 @@ def bias_metrics_summary(prediction_records, bias_dir):
             dataset_result['model_version'] == "best"
         ]
 
-        sns.set_theme(style="darkgrid")
-        fig, axs = plt.subplots(ncols=len(model_variants), figsize=(16, 8))
+        sns.set_theme(style="whitegrid")
+        palette = sns.color_palette(palette='pastel')
+
+        fig1, axs1 = plt.subplots(ncols=len(model_variants), figsize=(25, 5))
         fig2, axs2 = plt.subplots(ncols=len(model_variants), figsize=(25, 5))
 
         for i, model_variant in enumerate(model_variants):
@@ -156,12 +156,19 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 binary_recall_repetitions,
                 binary_specificity_repetitions,
                 binary_f1_repetitions,
-                binary_roc_repetitions,
-                fpr_repetitions,
-                tpr_repetitions,
-            ) = ([] for i in range(7))
+                roc_auc_repetitions,
+            ) = ([] for i in range(5))
 
-            for repetition_number in model_repetition_numbers:
+            model_variants_mapping = {
+                "bert_only_embedding_classification": "BERT-CEf",
+                "one_layer_attention_classification": "OLA-CEA",
+                "bert_randomly_init_embedding_classification": "BERT-CE",
+                "bert_all": "BERT-CEfAf",
+                "bert_only_classification": "BERT-C",
+            }
+            model_variant_explicit_name = model_variants_mapping[model_variant]
+
+            for j, repetition_number in enumerate(model_repetition_numbers):
                 dataset_result_model_version_model_variant_repetition_number = (
                     dataset_result_model_version_model_variant[
                         dataset_result_model_version_model_variant[
@@ -179,32 +186,38 @@ def bias_metrics_summary(prediction_records, bias_dir):
                     'target'
                 ].values
 
-                predictions_tensor = torch.tensor(predictions)
-                targets_tensor = torch.tensor(targets)
-
+                # Computation: confusion matrix
                 label_mapping = {1: 'male', 0: 'female'}
-                predictions = [label_mapping[pred] for pred in predictions]
-                targets = [label_mapping[pred] for pred in targets]
+                predictions_cm = [label_mapping[pred] for pred in predictions]
+                targets_cm = [label_mapping[pred] for pred in targets]
 
-                cm = confusion_matrix(targets, predictions, labels=['male', 'female'])
+                cm = confusion_matrix(
+                    targets_cm, predictions_cm, labels=['male', 'female']
+                )
                 cm_repetitions.append(cm)
 
+                # Computation: accruacy, recall, specificity, f1
                 binary_acc_metric = BinaryAccuracy()
-                binary_acc_score = binary_acc_metric(predictions_tensor, targets_tensor)
+                binary_acc_score = binary_acc_metric(
+                    torch.tensor(predictions), torch.tensor(targets)
+                )
 
                 binary_recall_metric = BinaryRecall()
                 binary_recall_score = binary_recall_metric(
-                    predictions_tensor, targets_tensor
+                    torch.tensor(predictions), torch.tensor(targets)
                 )
 
                 binary_specificity_metric = BinarySpecificity()
                 binary_specificity_score = binary_specificity_metric(
-                    predictions_tensor, targets_tensor
+                    torch.tensor(predictions), torch.tensor(targets)
                 )
 
                 binary_f1_metric = BinaryF1Score()
-                binary_f1_score = binary_f1_metric(predictions_tensor, targets_tensor)
+                binary_f1_score = binary_f1_metric(
+                    torch.tensor(predictions), torch.tensor(targets)
+                )
 
+                # Computation: roc curve
                 predictions_series = (
                     dataset_result_model_version_model_variant_repetition_number[
                         'logits'
@@ -217,36 +230,26 @@ def bias_metrics_summary(prediction_records, bias_dir):
                     predictions_tensor, dim=1
                 )
                 prediction_probabilites, _ = torch.max(prediction_probabilites, 1)
-                targets_tensor = targets_tensor.int()
 
                 fpr, tpr, thresholds = metrics.roc_curve(
-                    targets_tensor.numpy(), prediction_probabilites.numpy()
+                    torch.tensor(targets).int().numpy(), prediction_probabilites.numpy()
                 )
                 roc_auc = metrics.auc(fpr, tpr)
-                
-                axs2[i].plot(fpr, tpr, label=f"model repetition {repetition_number}")
 
-                # palette = sns.color_palette(palette='pastel')
-
-                # plt.title('Receiver Operating Characteristic')
-                # plt.step(
-                #     fpr,
-                #     tpr,
-                #     color=palette[0],
-                #     where='mid',
-                #     label='AUC = %0.2f' % roc_auc,
-                # )
-                # plt.legend(loc='lower right')
-                # plt.plot([0, 1], [0, 1], 'r--')
-
-                # plt.ylabel('True Positive Rate')
-                # plt.xlabel('False Positive Rate')
+                axs2[i].plot(
+                    fpr,
+                    tpr,
+                    color=palette[j],
+                    label=f"model repetition {repetition_number}",
+                )
 
                 binary_recall_repetitions.append(binary_recall_score)
                 binary_specificity_repetitions.append(binary_specificity_score)
                 binary_f1_repetitions.append(binary_f1_score)
                 binary_accruacy_repetitions.append(binary_acc_score)
+                roc_auc_repetitions.append(roc_auc)
 
+            # Average accruacy, recall, specificity, f1, roc_auc
             binary_acc_score_avg_repetitions = sum(binary_accruacy_repetitions) / len(
                 binary_accruacy_repetitions
             )
@@ -259,31 +262,25 @@ def bias_metrics_summary(prediction_records, bias_dir):
             binary_f1_score_avg_repetitions = sum(binary_f1_repetitions) / len(
                 binary_f1_repetitions
             )
+            roc_auc_score_avg_repetitions = sum(roc_auc_repetitions) / len(
+                roc_auc_repetitions
+            )
 
+            # Average tp, fp, tn, fn
             cm_repetitions_stacked = np.stack(cm_repetitions, axis=0)
             cm_repetitions_average = np.mean(cm_repetitions_stacked, axis=0)
             cm_repetitions_std = np.std(cm_repetitions_stacked, axis=0)
 
-            disp = ConfusionMatrixDisplay(
-                confusion_matrix=cm_repetitions_average,
-                display_labels=['male', 'female'],
+            # Plot: confusion matrix
+            sns.heatmap(
+                cm_repetitions_average,
+                annot=True,
+                cmap=palette,
+                fmt='g',
+                ax=axs1[i],
+                xticklabels=['male', 'female'],
+                yticklabels=['male', 'female'],
             )
-
-            disp.plot(
-                ax=axs[i],
-                xticks_rotation='vertical',
-                values_format='.1f',
-                colorbar=False,
-            )
-
-            model_variants_mapping = {
-                "bert_only_embedding_classification": "BERT-CEf",
-                "one_layer_attention_classification": "OLA-CEA",
-                "bert_randomly_init_embedding_classification": "BERT-CE",
-                "bert_all": "BERT-CEfAf",
-                "bert_only_classification": "BERT-C",
-            }
-            model_variant_explicit_name = model_variants_mapping[model_variant]
 
             formatted_f1 = "{:.2f}".format(binary_f1_score_avg_repetitions * 100)
             formatted_recall = "{:.2f}".format(
@@ -294,23 +291,30 @@ def bias_metrics_summary(prediction_records, bias_dir):
             )
             formatted_acc = "{:.2f}".format(binary_acc_score_avg_repetitions * 100)
 
-            axs[i].set_title(
+            axs1[i].set_title(
                 f"{model_variant_explicit_name} \n accruacy: {formatted_acc} \n specificity: {formatted_specificity} \n recall: {formatted_recall} \n f1: {formatted_f1}"
             )
-            
-            axs2[i].set_xlabel('X-axis')
-            axs2[i].set_ylabel('Y-axis')
-            axs2[i].set_title(f'Test')
-            axs2[i].legend()
-        
-        savedir = f"{bias_dir}/roc_curve_{dataset}.png"
-        plt.tight_layout()
-        fig2.savefig(savedir)
-        plt.close(fig2)
+
+            # Plot: ROC curve
+            formatted_roc_auc = "{:.2f}".format(roc_auc_score_avg_repetitions)
+
+            axs2[i].set_xlabel('False Positive Rate')
+            axs2[i].set_ylabel('True Positive Rate')
+            axs2[i].set_title(
+                f"{model_variant_explicit_name} \n Average ROC-AUC: {formatted_roc_auc}"
+            )
+            axs2[i].plot([0, 1], [0, 1], linestyle='--', color='grey')
+            if i == 0:
+                axs2[i].legend(loc='upper left')
 
         savedir = f"{bias_dir}/confusion_matrix_{dataset}.png"
-        fig.tight_layout()
-        fig.savefig(savedir, dpi=300, bbox_inches='tight')
+        fig1.tight_layout()
+        fig1.savefig(savedir, dpi=300, bbox_inches='tight')
+
+        savedir = f"{bias_dir}/roc_curve_{dataset}.png"
+        plt.tight_layout()
+        fig2.savefig(savedir, dpi=300, bbox_inches='tight')
+        plt.close(fig2)
 
     return
 
