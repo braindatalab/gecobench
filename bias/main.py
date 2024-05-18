@@ -6,15 +6,11 @@ from torchmetrics.classification import (
     BinaryF1Score,
     BinaryAccuracy,
     BinaryRecall,
-    BinarySpecificity,
-    BinaryAUROC,
-    ConfusionMatrix,
-    BinaryROC,
+    BinarySpecificity
 )
-import statistics
 import seaborn as sns
 from sklearn import metrics
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix
 from os.path import join, join
 from typing import Dict
 from common import DataSet, validate_dataset_key
@@ -28,7 +24,6 @@ from utils import (
     generate_bias_dir,
     load_pickle,
 )
-import pandas as pd
 
 
 def load_dataset_raw(config: Dict, dataset_key: str) -> DataSet:
@@ -312,9 +307,8 @@ def bias_metrics_summary(prediction_records, bias_dir):
         fig1.savefig(savedir, dpi=300, bbox_inches='tight')
 
         savedir = f"{bias_dir}/roc_curve_{dataset}.png"
-        plt.tight_layout()
+        fig2.tight_layout()
         fig2.savefig(savedir, dpi=300, bbox_inches='tight')
-        plt.close(fig2)
 
     return
 
@@ -323,7 +317,6 @@ def main(config: Dict) -> None:
     # male: target == 1, female: target == 0
     gender_terms = ['he', 'him', 'his', 'she', 'her']
     corpus = generate_corpus(config, gender_terms)
-
     compute_co_occurrence_matrix_sum(config, corpus)
 
     artifacts_dir = generate_artifacts_dir(config=config)
