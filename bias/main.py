@@ -9,7 +9,11 @@ from torchmetrics.classification import (
     BinarySpecificity,
     BinaryAUROC,
     ConfusionMatrix,
+    BinaryROC,
 )
+import statistics
+import seaborn as sns
+from sklearn import metrics
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from os.path import join, join
 from typing import Dict
@@ -28,19 +32,26 @@ import pandas as pd
 
 
 def load_dataset_raw(config: Dict, dataset_key: str) -> DataSet:
-    path = join(generate_data_dir(config), dataset_key, "test.jsonl")
+    path = join(generate_data_dir(config), dataset_key, "train.jsonl")
     raw_data = load_jsonl_as_df(path)
+    # print(raw_data)
+    # print(raw_data['sentence'])
+    raw_data['sentence'] = raw_data['sentence'].apply(
+        lambda sentence: [word.lower().replace(" ", "") for word in sentence]
+    )
+    # print(raw_data)
     return raw_data
 
 
-def generate_corpus(config) -> list:
+def generate_corpus(config, gender_terms) -> list:
     corpus = []
     for name in filter_train_datasets(config):
         validate_dataset_key(name)
         dataset = load_dataset_raw(config, name)
         for sentence in dataset['sentence']:
             for word in sentence:
-                corpus.append(word.lower().replace(" ", ""))
+                if word.lower().replace(" ", "") not in gender_terms:
+                    corpus.append(word.lower().replace(" ", ""))
     return list(set(corpus))
 
 
@@ -51,18 +62,23 @@ def get_gender_terms(dataset) -> list:
 
 def co_occurrence_matrix(dataset, corpus, gender_terms, gender) -> None:
     S = np.zeros((len(corpus), len(gender_terms)))
+
     for x, term in enumerate(gender_terms):
         for target, sentence in zip(dataset['target'], dataset['sentence']):
             elements_to_remove = {',', '.'}
             sentence = [item.lower().replace(" ", "") for item in sentence]
             sentence = [word for word in sentence if word not in elements_to_remove]
-            # print(sentence)
+            her_counts = sentence.count("her")
             if target == gender:
                 if term in sentence:
-                    # print(term)
-                    # print(sentence)
                     for word in sentence:
-                        S[corpus.index(word.lower().replace(" ", "")), x] += 1
+                        if word in corpus:
+                            if term == 'her':
+                                S[
+                                    corpus.index(word.lower().replace(" ", "")), x
+                                ] += her_counts
+                            else:
+                                S[corpus.index(word.lower().replace(" ", "")), x] += 1
 
     return S
 
@@ -74,14 +90,18 @@ def co_occurrence_matrix_sentence(sentence, corpus, gender_terms) -> None:
             elements_to_remove = {',', '.'}
             sentence = [word for word in sentence if word not in elements_to_remove]
             sentence = [item.lower().replace(" ", "") for item in sentence]
+            her_counts = sentence.count("her")
             for word in sentence:
-                S[corpus.index(word.lower().replace(" ", "")), x] += 1
+                if word == 'her':
+                    S[corpus.index(word.lower().replace(" ", "")), x] += her_counts
+                else:
+                    S[corpus.index(word.lower().replace(" ", "")), x] += 1
     return S
 
 
 def compute_co_occurrence_matrix_sum(config, corpus):
-    male_terms = ['he']
-    female_terms = ['she']
+    male_terms = ['he', 'him', 'his']
+    female_terms = ['she', 'her']
 
     for name in filter_train_datasets(config):
         validate_dataset_key(name)
@@ -92,8 +112,16 @@ def compute_co_occurrence_matrix_sum(config, corpus):
 
         print(f"Dataset: {name}")
         S_male_sum, S_female_sum = S_male.sum(), S_female.sum()
+
         print(f"Matrix sum of S_male = {S_male_sum}")
+        print(
+            f"Normalized matrix sum of S_male = {S_male_sum/(S_male_sum+S_female_sum)}"
+        )
+
         print(f"Matrix sum of S_female = {S_female_sum}")
+        print(
+            f"Normalized matrix sum of S_female = {S_female_sum/(S_male_sum+S_female_sum)}"
+        )
         print("")
     return
 
@@ -114,7 +142,9 @@ def bias_metrics_summary(prediction_records, bias_dir):
             dataset_result['model_version'] == "best"
         ]
 
+        sns.set_theme(style="darkgrid")
         fig, axs = plt.subplots(ncols=len(model_variants), figsize=(16, 8))
+        fig2, axs2 = plt.subplots(ncols=len(model_variants), figsize=(25, 5))
 
         for i, model_variant in enumerate(model_variants):
             dataset_result_model_version_model_variant = dataset_result_model_version[
@@ -126,7 +156,10 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 binary_recall_repetitions,
                 binary_specificity_repetitions,
                 binary_f1_repetitions,
-            ) = ([] for i in range(4))
+                binary_roc_repetitions,
+                fpr_repetitions,
+                tpr_repetitions,
+            ) = ([] for i in range(7))
 
             for repetition_number in model_repetition_numbers:
                 dataset_result_model_version_model_variant_repetition_number = (
@@ -172,6 +205,43 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 binary_f1_metric = BinaryF1Score()
                 binary_f1_score = binary_f1_metric(predictions_tensor, targets_tensor)
 
+                predictions_series = (
+                    dataset_result_model_version_model_variant_repetition_number[
+                        'logits'
+                    ]
+                )
+
+                predictions_array = np.vstack(predictions_series).astype(float)
+                predictions_tensor = torch.tensor(predictions_array)
+                prediction_probabilites = torch.nn.functional.softmax(
+                    predictions_tensor, dim=1
+                )
+                prediction_probabilites, _ = torch.max(prediction_probabilites, 1)
+                targets_tensor = targets_tensor.int()
+
+                fpr, tpr, thresholds = metrics.roc_curve(
+                    targets_tensor.numpy(), prediction_probabilites.numpy()
+                )
+                roc_auc = metrics.auc(fpr, tpr)
+                
+                axs2[i].plot(fpr, tpr, label=f"model repetition {repetition_number}")
+
+                # palette = sns.color_palette(palette='pastel')
+
+                # plt.title('Receiver Operating Characteristic')
+                # plt.step(
+                #     fpr,
+                #     tpr,
+                #     color=palette[0],
+                #     where='mid',
+                #     label='AUC = %0.2f' % roc_auc,
+                # )
+                # plt.legend(loc='lower right')
+                # plt.plot([0, 1], [0, 1], 'r--')
+
+                # plt.ylabel('True Positive Rate')
+                # plt.xlabel('False Positive Rate')
+
                 binary_recall_repetitions.append(binary_recall_score)
                 binary_specificity_repetitions.append(binary_specificity_score)
                 binary_f1_repetitions.append(binary_f1_score)
@@ -191,7 +261,6 @@ def bias_metrics_summary(prediction_records, bias_dir):
             )
 
             cm_repetitions_stacked = np.stack(cm_repetitions, axis=0)
-
             cm_repetitions_average = np.mean(cm_repetitions_stacked, axis=0)
             cm_repetitions_std = np.std(cm_repetitions_stacked, axis=0)
 
@@ -206,6 +275,7 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 values_format='.1f',
                 colorbar=False,
             )
+
             model_variants_mapping = {
                 "bert_only_embedding_classification": "BERT-CEf",
                 "one_layer_attention_classification": "OLA-CEA",
@@ -227,17 +297,29 @@ def bias_metrics_summary(prediction_records, bias_dir):
             axs[i].set_title(
                 f"{model_variant_explicit_name} \n accruacy: {formatted_acc} \n specificity: {formatted_specificity} \n recall: {formatted_recall} \n f1: {formatted_f1}"
             )
+            
+            axs2[i].set_xlabel('X-axis')
+            axs2[i].set_ylabel('Y-axis')
+            axs2[i].set_title(f'Test')
+            axs2[i].legend()
+        
+        savedir = f"{bias_dir}/roc_curve_{dataset}.png"
+        plt.tight_layout()
+        fig2.savefig(savedir)
+        plt.close(fig2)
 
         savedir = f"{bias_dir}/confusion_matrix_{dataset}.png"
-        plt.tight_layout()
-        plt.savefig(savedir, dpi=300, bbox_inches='tight')
+        fig.tight_layout()
+        fig.savefig(savedir, dpi=300, bbox_inches='tight')
 
     return
 
 
 def main(config: Dict) -> None:
     # male: target == 1, female: target == 0
-    corpus = generate_corpus(config)
+    gender_terms = ['he', 'him', 'his', 'she', 'her']
+    corpus = generate_corpus(config, gender_terms)
+
     compute_co_occurrence_matrix_sum(config, corpus)
 
     artifacts_dir = generate_artifacts_dir(config=config)
