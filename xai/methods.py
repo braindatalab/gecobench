@@ -154,7 +154,7 @@ def get_integrated_gradients_attributions(
         n_steps=200,
         return_convergence_delta=False,
     )
-    return torch.abs(explanations).sum(dim=2)
+    return explanations.sum(dim=2)
 
 
 def get_saliency_attributions(
@@ -168,7 +168,7 @@ def get_saliency_attributions(
     explanations = explainer.attribute(
         inputs=data, target=int(target), abs=True, additional_forward_args=None
     )
-    return torch.abs(explanations).sum(dim=2)
+    return explanations.sum(dim=2)
 
 
 def get_deeplift_attributions(
@@ -191,7 +191,7 @@ def get_deeplift_attributions(
         return_convergence_delta=False,
         custom_attribution_func=None,
     )
-    return torch.abs(explanations).sum(dim=2)
+    return explanations.sum(dim=2)
 
 
 def get_deepshap_attributions(
@@ -215,7 +215,7 @@ def get_gradient_shap_attributions(
         inputs=data, baselines=baseline, target=target
     )
 
-    return torch.abs(explanations).sum(dim=2)
+    return explanations.sum(dim=2)
 
 
 def get_guided_backprop_attributions(
@@ -230,7 +230,7 @@ def get_guided_backprop_attributions(
     explanations = explainer.attribute(
         inputs=data, target=int(target), additional_forward_args=None
     )
-    return torch.abs(explanations).sum(dim=2)
+    return explanations.sum(dim=2)
 
 
 def get_deconvolution_attributions(
@@ -244,7 +244,7 @@ def get_deconvolution_attributions(
     explanations = explainer.attribute(
         inputs=data, target=int(target), additional_forward_args=None
     )
-    return torch.abs(explanations).sum(dim=2)
+    return explanations.sum(dim=2)
 
 
 def get_shapley_sampling_attributions(
@@ -494,7 +494,7 @@ def get_input_x_gradient(
     explanations = explainer.attribute(
         inputs=data, target=int(target), additional_forward_args=None
     )
-    return torch.abs(explanations).sum(dim=2)
+    return explanations.sum(dim=2)
 
 
 def calculate_covariance_between_words_target(

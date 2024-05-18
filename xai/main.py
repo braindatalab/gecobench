@@ -6,6 +6,7 @@ from typing import Dict, Any
 import pandas as pd
 import torch
 import torch.nn.functional as F
+import time
 from captum.attr import TokenReferenceBase
 from joblib import Parallel, delayed
 from loguru import logger
@@ -13,7 +14,7 @@ from torch import Tensor
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-from common import XAIResult, validate_dataset_key
+from common import XAIResult, validate_dataset_key, SaveVersion
 from training.bert import (
     create_bert_ids,
     get_bert_ids,
@@ -140,6 +141,8 @@ def map_raw_attributions_to_original_tokens(
     output = list()
     artifacts_dir = generate_artifacts_dir(config)
     for path in xai_results_paths:
+        start_time = time.time()
+
         results = load_pickle(file_path=join(artifacts_dir, path))
         for result in results:
             model_type = determine_model_type(s=result.model_name)
@@ -148,11 +151,13 @@ def map_raw_attributions_to_original_tokens(
             ](model_type, result, config)
 
         output_dir = generate_xai_dir(config=config)
-        filename = append_date(s=config['xai']['intermediate_xai_result_prefix'])
+        filename = append_date(s=f"{config['xai']['intermediate_xai_result_prefix']}_{config['xai']['model_key']}") + ".pkl"
         dump_as_pickle(
             data=results, output_dir=join(artifacts_dir, output_dir), filename=filename
         )
         output += [join(output_dir, filename)]
+
+        logger.info(f'Elapsed time Mapping: {time.time() - start_time} seconds. Total Iterations: {len(xai_results_paths)}')
 
     return output
 
@@ -177,13 +182,14 @@ def apply_xai_methods_on_sentence(
     reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
 
     # Incase the dataset_type differs from trained_on_dataset_name e.g trained on sentiment, evaluated on gender_all
-    pred_probabilities = None
+
+    logits = model(token_ids.unsqueeze(0))[0]
+    probabilities = F.softmax(logits, dim=-1).squeeze()
+    pred_probabilities = probabilities.detach().tolist()
+
     xai_target = int(row["target"])
     if trained_on_dataset_name != dataset_type:
-        logits = model(token_ids.unsqueeze(0))[0]
-        probabilities = F.softmax(logits, dim=-1).squeeze()
         xai_target = torch.argmax(probabilities).item()
-        pred_probabilities = probabilities.detach().tolist()
         logger.info(f"XAI Target: {pred_probabilities}, {xai_target}")
 
     attributions = get_captum_attributions(
@@ -268,7 +274,7 @@ def apply_xai_methods(
     )
 
     # results = Parallel(n_jobs=config["xai"]["num_workers"])(
-    results = Parallel(n_jobs=1)(
+    results = Parallel(n_jobs=2)(
         delayed(apply_xai_methods_on_sentence)(
             model,
             row,
@@ -293,6 +299,14 @@ def loop_over_training_records(
     torch.set_num_threads(1)
     artifacts_dir = generate_artifacts_dir(config)
     for trained_on_dataset_name, model_params, model_path, _ in tqdm(training_records):
+        start_time = time.time()
+
+        if model_params["save_version"] != SaveVersion.best:
+            continue
+
+        if model_params["model_name"] != config["xai"]["model_key"]:
+            continue
+
         # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
         # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
         datasets = [trained_on_dataset_name]
@@ -315,14 +329,19 @@ def loop_over_training_records(
                 model_params=model_params,
             )
 
+            model_key = config["xai"]["model_key"]
+            file_prefix = config["xai"]["intermediate_raw_xai_result_prefix"]
+
             xai_output_dir = generate_xai_dir(config=config)
-            filename = f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
+            filename = append_date(s=f"{file_prefix}_{model_key}") + ".pkl"
             dump_as_pickle(
                 data=result,
                 output_dir=join(artifacts_dir, xai_output_dir),
                 filename=filename,
             )
             output += [join(xai_output_dir, filename)]
+
+        logger.info(f'Elapsed time: {time.time() - start_time} seconds. Total Iterations: {len(training_records)}')
 
     return output
 
@@ -389,7 +408,7 @@ def main(config: Dict) -> None:
         generate_artifacts_dir(config=config), generate_xai_dir(config=config)
     )
     dump_as_pickle(
-        data=results, output_dir=output_dir, filename=config['xai']['xai_records']
+        data=results, output_dir=output_dir, filename=config['xai']['xai_records'] + "_" + config["xai"]["model_key"]
     )
 
 
