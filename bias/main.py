@@ -35,7 +35,8 @@ def load_dataset_raw(config: Dict, dataset_key: str) -> DataSet:
     return raw_data
 
 
-def generate_corpus(config, gender_terms) -> list:
+def generate_corpus(config, male_terms, female_terms) -> list:
+    gender_terms = male_terms + female_terms
     corpus = []
     for name in filter_train_datasets(config):
         validate_dataset_key(name)
@@ -47,14 +48,8 @@ def generate_corpus(config, gender_terms) -> list:
     return list(set(corpus))
 
 
-def get_gender_terms(dataset) -> list:
-    # TODO: Get gender terms from the data
-    return
-
-
 def co_occurrence_matrix(dataset, corpus, gender_terms, gender) -> None:
     S = np.zeros((len(corpus), len(gender_terms)))
-
     for x, gender_group in enumerate(gender_terms):
         for target, sentence in zip(dataset['target'], dataset['sentence']):
             elements_to_remove = {',', '.'}
@@ -70,8 +65,8 @@ def co_occurrence_matrix(dataset, corpus, gender_terms, gender) -> None:
     return S
 
 
-# For debugging
 def co_occurrence_matrix_sentence(sentence, corpus, gender_terms) -> None:
+    # Compute matrix for each sentence
     S = np.zeros((len(corpus), len(gender_terms)))
     for x, gender_group in enumerate(gender_terms):
         elements_to_remove = {',', '.'}
@@ -86,14 +81,12 @@ def co_occurrence_matrix_sentence(sentence, corpus, gender_terms) -> None:
     return S
 
 
-def compute_co_occurrence_matrix_sum(config, corpus):
-    male_terms = [['he'], ['him', 'his']]
-    female_terms = [['she'], ['her']]
-
+def compute_co_occurrence_matrix_sum(config, corpus, male_terms, female_terms):
     for name in filter_train_datasets(config):
         validate_dataset_key(name)
         dataset = load_dataset_raw(config, name)
 
+        # male: target == 1, female: target == 0
         S_male = co_occurrence_matrix(dataset, corpus, male_terms, 1)
         S_female = co_occurrence_matrix(dataset, corpus, female_terms, 0)
 
@@ -309,41 +302,8 @@ def main(config: Dict) -> None:
     male_terms = [['he'], ['him', 'his']]
     female_terms = [['she'], ['her']]
 
-    gender_terms = male_terms + female_terms
-    corpus = generate_corpus(config, gender_terms)
-
-    for name in filter_train_datasets(config):
-        validate_dataset_key(name)
-        dataset = load_dataset_raw(config, name)
-
-        if name == 'gender_all':
-
-            print("")
-            print(f"Dataset: {name}")
-
-            dataset_female = dataset[dataset['target'] == 0]
-            dataset_male = dataset[dataset['target'] == 1]
-
-            for sentence_female, sentence_male in zip(
-                dataset_female['sentence'], dataset_male['sentence']
-            ):
-
-                S_male = co_occurrence_matrix_sentence(
-                    sentence_male, corpus, male_terms
-                )
-                S_female = co_occurrence_matrix_sentence(
-                    sentence_female, corpus, female_terms
-                )
-
-                S_male_sum, S_female_sum = S_male.sum(), S_female.sum()
-                if S_male_sum != S_female_sum:
-                    print(f"Matrix sum of S_male = {S_male_sum}")
-                    print(f"Matrix sum of S_female = {S_female_sum}")
-                    print(sentence_male)
-                    print(sentence_female)
-
-    # male: target == 1, female: target == 0
-    compute_co_occurrence_matrix_sum(config, corpus)
+    corpus = generate_corpus(config, male_terms, female_terms)
+    compute_co_occurrence_matrix_sum(config, corpus, male_terms, female_terms)
 
     # artifacts_dir = generate_artifacts_dir(config=config)
     # evaluation_output_dir = generate_evaluation_dir(config=config)
