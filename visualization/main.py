@@ -47,8 +47,10 @@ METRIC_NAME_MAP = dict(
     avg_precision='Precision',
     precision_specificity='Precision-Specificity',
     top_k_precision='Top-K Precision',
-    mass_accuracy='Mass Accuracy',
+    mass_accuracy='Mass Accuracy (MA)',
 )
+
+METHOD_NAME_MAP = dict(Covariance="Pattern Variant")
 
 MODEL_ORDER = [
     MODEL_NAME_MAP["bert_only_classification"],
@@ -57,6 +59,7 @@ MODEL_ORDER = [
     MODEL_NAME_MAP["bert_all"],
     MODEL_NAME_MAP["one_layer_attention_classification"],
 ]
+
 
 HUE_ORDER = [
     'Uniform random',
@@ -68,10 +71,12 @@ HUE_ORDER = [
     'LIME',
     'Gradient SHAP',
     'Integrated Gradients',
-    'Covariance',
+    'Pattern Variant',
 ]
 
 DATASET_NAME_MAP = dict(gender_subj='$\mathcal{D}_{S}$', gender_all='$\mathcal{D}_{A}$')
+ROW_ORDER = [DATASET_NAME_MAP['gender_all'], DATASET_NAME_MAP['gender_subj']]
+
 GENDER = {0.0: 'female', 1.0: 'male'}
 
 MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES = dict(
@@ -104,20 +109,42 @@ def plot_evaluation_results(
     base_output_dir: str,
 ) -> None:
     def _plot_postprocessing(g):
+        print(g)
+        g.set_titles(row_template="")
+        print("Shape", g.axes.shape)
         for k in range(g.axes.shape[0]):
             for j in range(g.axes.shape[1]):
                 g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
+
                 if 0 == k and 'top_k_precision' == metric:
-                    g.axes[k, j].set_ylabel(f'Average {METRIC_NAME_MAP[metric]}')
+                    g.axes[k, j].set_ylabel(
+                        f'Average {METRIC_NAME_MAP[metric]} for {ROW_ORDER[k]}',
+                        fontsize=13,
+                    )
+                else:
+                    g.axes[k, j].set_ylabel(
+                        f'{METRIC_NAME_MAP[metric]} for {ROW_ORDER[k]}',
+                        fontsize=13,
+                    )
+                g.axes[k, j].set_xlabel('', fontsize=12)
                 g.axes[k, j].set_ylim(0, 1)
                 g.axes[k, j].set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
-                # for label in (
-                #     g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
-                # ):
-                #     label.set_fontsize(6)
+
+                for label in (
+                    g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+                ):
+                    label.set_fontsize(12)
+
+        # Set legend font size
+        g._legend.set_title('XAI Method', prop={'size': 12})
+        for t in g._legend.texts:
+            t.set_fontsize(12)
 
     data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
     data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+    data['attribution_method'] = data['attribution_method'].map(
+        lambda x: METHOD_NAME_MAP.get(x, x)
+    )
 
     data = data.rename(
         columns={
@@ -132,6 +159,7 @@ def plot_evaluation_results(
         average_data = compute_average_score_per_repetition(data=data)
         datasets = [('', data), ('averaged', average_data)]
 
+        height = 2.5
         for s, d in datasets:
             g = sns.catplot(
                 data=d,
@@ -139,24 +167,26 @@ def plot_evaluation_results(
                 y=METRIC_NAME_MAP[metric],
                 order=MODEL_ORDER,
                 hue_order=HUE_ORDER,
+                row_order=ROW_ORDER,
                 hue='XAI Method',
-                col='Dataset',
+                row='Dataset',
                 kind='box',
                 palette=sns.color_palette(palette='pastel'),
                 fill=True,
-                height=3,
+                height=height,
                 fliersize=0,
                 estimator='median',
-                aspect=2.0,
+                aspect=9.5 / height,
                 margin_titles=True,
-                legend="full",
-                legend_out=False,
+                legend_out=True,
             )
+
             sns.move_legend(
                 g,
                 "lower center",
-                bbox_to_anchor=(0.5, -0.2),
+                bbox_to_anchor=(0.41, -0.13),
                 ncol=5,
+                frameon=True,
             )
 
             _plot_postprocessing(g=g)
