@@ -209,7 +209,7 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 prediction_probabilites = torch.nn.functional.softmax(
                     predictions_tensor, dim=1
                 )
-                prediction_probabilites, _ = torch.max(prediction_probabilites, 1)
+                prediction_probabilites = prediction_probabilites[:, 1]
 
                 fpr, tpr, thresholds = metrics.roc_curve(
                     torch.tensor(targets).int().numpy(), prediction_probabilites.numpy()
@@ -305,15 +305,16 @@ def main(config: Dict) -> None:
     corpus = generate_corpus(config, male_terms, female_terms)
     compute_co_occurrence_matrix_sum(config, corpus, male_terms, female_terms)
 
-    # artifacts_dir = generate_artifacts_dir(config=config)
-    # evaluation_output_dir = generate_evaluation_dir(config=config)
-    # filename = config["evaluation"]["prediction_records"]
-    # prediction_records = load_pickle(
-    #     join(artifacts_dir, evaluation_output_dir, filename)
-    # )
-    # bias_dir = generate_bias_dir(config=config)
-    # Path(bias_dir).mkdir(parents=True, exist_ok=True)
-    # bias_metrics_summary(prediction_records, bias_dir)
+    artifacts_dir = generate_artifacts_dir(config=config)
+    evaluation_output_dir = generate_evaluation_dir(config=config)
+    filename = config["evaluation"]["prediction_records"]
+    prediction_records = load_pickle(
+        join(artifacts_dir, evaluation_output_dir, filename)
+    )
+    print(join(artifacts_dir, evaluation_output_dir, filename))
+    bias_dir = generate_bias_dir(config=config)
+    Path(bias_dir).mkdir(parents=True, exist_ok=True)
+    bias_metrics_summary(prediction_records, bias_dir)
 
 
 if __name__ == '__main__':
