@@ -6,7 +6,7 @@ from torchmetrics.classification import (
     BinaryF1Score,
     BinaryAccuracy,
     BinaryRecall,
-    BinarySpecificity
+    BinarySpecificity,
 )
 import seaborn as sns
 from sklearn import metrics
@@ -29,12 +29,9 @@ from utils import (
 def load_dataset_raw(config: Dict, dataset_key: str) -> DataSet:
     path = join(generate_data_dir(config), dataset_key, "train.jsonl")
     raw_data = load_jsonl_as_df(path)
-    # print(raw_data)
-    # print(raw_data['sentence'])
     raw_data['sentence'] = raw_data['sentence'].apply(
         lambda sentence: [word.lower().replace(" ", "") for word in sentence]
     )
-    # print(raw_data)
     return raw_data
 
 
@@ -58,45 +55,40 @@ def get_gender_terms(dataset) -> list:
 def co_occurrence_matrix(dataset, corpus, gender_terms, gender) -> None:
     S = np.zeros((len(corpus), len(gender_terms)))
 
-    for x, term in enumerate(gender_terms):
+    for x, gender_group in enumerate(gender_terms):
         for target, sentence in zip(dataset['target'], dataset['sentence']):
             elements_to_remove = {',', '.'}
             sentence = [item.lower().replace(" ", "") for item in sentence]
             sentence = [word for word in sentence if word not in elements_to_remove]
-            her_counts = sentence.count("her")
+
             if target == gender:
-                if term in sentence:
+                if any(item in gender_group for item in sentence):
                     for word in sentence:
                         if word in corpus:
-                            if term == 'her':
-                                S[
-                                    corpus.index(word.lower().replace(" ", "")), x
-                                ] += her_counts
-                            else:
-                                S[corpus.index(word.lower().replace(" ", "")), x] += 1
+                            S[corpus.index(word.lower().replace(" ", "")), x] += 1
 
     return S
 
 
+# For debugging
 def co_occurrence_matrix_sentence(sentence, corpus, gender_terms) -> None:
     S = np.zeros((len(corpus), len(gender_terms)))
-    for x, term in enumerate(gender_terms):
-        if term in sentence:
-            elements_to_remove = {',', '.'}
-            sentence = [word for word in sentence if word not in elements_to_remove]
-            sentence = [item.lower().replace(" ", "") for item in sentence]
-            her_counts = sentence.count("her")
+    for x, gender_group in enumerate(gender_terms):
+        elements_to_remove = {',', '.'}
+        sentence = [item.lower().replace(" ", "") for item in sentence]
+        sentence = [word for word in sentence if word not in elements_to_remove]
+
+        if any(item in gender_group for item in sentence):
             for word in sentence:
-                if word == 'her':
-                    S[corpus.index(word.lower().replace(" ", "")), x] += her_counts
-                else:
+                if word in corpus:
                     S[corpus.index(word.lower().replace(" ", "")), x] += 1
+
     return S
 
 
 def compute_co_occurrence_matrix_sum(config, corpus):
-    male_terms = ['he', 'him', 'his']
-    female_terms = ['she', 'her']
+    male_terms = [['he'], ['him', 'his']]
+    female_terms = [['she'], ['her']]
 
     for name in filter_train_datasets(config):
         validate_dataset_key(name)
@@ -314,20 +306,54 @@ def bias_metrics_summary(prediction_records, bias_dir):
 
 
 def main(config: Dict) -> None:
-    # male: target == 1, female: target == 0
-    gender_terms = ['he', 'him', 'his', 'she', 'her']
+    male_terms = [['he'], ['him', 'his']]
+    female_terms = [['she'], ['her']]
+
+    gender_terms = male_terms + female_terms
     corpus = generate_corpus(config, gender_terms)
+
+    for name in filter_train_datasets(config):
+        validate_dataset_key(name)
+        dataset = load_dataset_raw(config, name)
+
+        if name == 'gender_all':
+
+            print("")
+            print(f"Dataset: {name}")
+
+            dataset_female = dataset[dataset['target'] == 0]
+            dataset_male = dataset[dataset['target'] == 1]
+
+            for sentence_female, sentence_male in zip(
+                dataset_female['sentence'], dataset_male['sentence']
+            ):
+
+                S_male = co_occurrence_matrix_sentence(
+                    sentence_male, corpus, male_terms
+                )
+                S_female = co_occurrence_matrix_sentence(
+                    sentence_female, corpus, female_terms
+                )
+
+                S_male_sum, S_female_sum = S_male.sum(), S_female.sum()
+                if S_male_sum != S_female_sum:
+                    print(f"Matrix sum of S_male = {S_male_sum}")
+                    print(f"Matrix sum of S_female = {S_female_sum}")
+                    print(sentence_male)
+                    print(sentence_female)
+
+    # male: target == 1, female: target == 0
     compute_co_occurrence_matrix_sum(config, corpus)
 
-    artifacts_dir = generate_artifacts_dir(config=config)
-    evaluation_output_dir = generate_evaluation_dir(config=config)
-    filename = config["evaluation"]["prediction_records"]
-    prediction_records = load_pickle(
-        join(artifacts_dir, evaluation_output_dir, filename)
-    )
-    bias_dir = generate_bias_dir(config=config)
-    Path(bias_dir).mkdir(parents=True, exist_ok=True)
-    bias_metrics_summary(prediction_records, bias_dir)
+    # artifacts_dir = generate_artifacts_dir(config=config)
+    # evaluation_output_dir = generate_evaluation_dir(config=config)
+    # filename = config["evaluation"]["prediction_records"]
+    # prediction_records = load_pickle(
+    #     join(artifacts_dir, evaluation_output_dir, filename)
+    # )
+    # bias_dir = generate_bias_dir(config=config)
+    # Path(bias_dir).mkdir(parents=True, exist_ok=True)
+    # bias_metrics_summary(prediction_records, bias_dir)
 
 
 if __name__ == '__main__':
