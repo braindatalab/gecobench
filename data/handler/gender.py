@@ -9,8 +9,6 @@ from common import DatasetKeys
 
 SPACE = ' '
 JOIN_STRING = ''
-START_PADDING_COLUMNS = [0, 1, 2]
-END_PADDING_COLUMNS = ['tmp1', 'tmp2', 'tmp3']
 
 
 def join_punctuation_with_previews_word(words: List) -> List:
@@ -53,7 +51,6 @@ def preprocess_training_datasets(dataset_config: Dict, output_dir: str) -> None:
     ground_truth = load_pickle(
         file_path=dataset_config['raw_data'][f'ground_truth_train']
     )
-    ground_truth = reformat_columns(data=ground_truth)
     ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
 
     train_set = [
@@ -87,13 +84,6 @@ def ground_truth_to_list(data: pd.DataFrame, word_list: list) -> list:
     return output
 
 
-def reformat_columns(data: pd.DataFrame) -> pd.DataFrame:
-    columns = data[START_PADDING_COLUMNS]
-    tmp = data.drop(START_PADDING_COLUMNS, axis=1)
-    tmp[END_PADDING_COLUMNS] = columns
-    return tmp
-
-
 def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
     sets = list()
     for data_name, file_path in dataset_config['raw_data'].items():
@@ -109,7 +99,6 @@ def preprocess_test_datasets(dataset_config: Dict, output_dir: str) -> list:
         ground_truth = load_pickle(
             file_path=dataset_config['raw_data'][f'ground_truth_test']
         )
-        ground_truth = reformat_columns(data=ground_truth)
         ground_truth_list = ground_truth_to_list(data=ground_truth, word_list=word_list)
 
         test_set = [

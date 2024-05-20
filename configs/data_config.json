@@ -31,13 +31,6 @@
                 "test": "test.jsonl"
             }
         },
-        "sentiment_twitter": {
-            "num_labels": 2,
-            "output_filenames": {
-                "train": "train.jsonl",
-                "test": "test.jsonl"
-            }
-        },
         "sentiment_imdb": {
             "num_labels": 2,
             "output_filenames": {
