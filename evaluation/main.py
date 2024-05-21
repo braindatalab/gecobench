@@ -220,7 +220,6 @@ def create_dataset_with_predictions(
     for trained_on_dataset_name, model_params, model_path, _ in tqdm(
         records, desc='Evaluate model predictions'
     ):
-
         # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
         # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
         datasets = [trained_on_dataset_name]
@@ -295,7 +294,6 @@ def load_xai_results(config: dict) -> list:
 def get_correctly_classified_samples(
     xai_data: pd.DataFrame, predication_data: pd.DataFrame
 ) -> pd.DataFrame:
-
     predication_data = predication_data[
         predication_data["model_version"] == SaveVersion.best.value
     ]
@@ -312,31 +310,19 @@ def get_correctly_classified_samples(
         xai_data, predication_data, how='outer', on=merge_columns
     )
 
-    correctly_classified_mask = (
-        data_for_evaluation['target'] == data_for_evaluation['prediction']
+    correctly_classified = list()
+    for (d_type, s_id), df in data_for_evaluation.groupby(
+        ['dataset_type', 'sentence_idx']
+    ):
+        predictions = df['pred_probabilities'].map(lambda x: np.argmax(x))
+        if 1 == np.prod(df['target'] == predictions):
+            correctly_classified += [(d_type, s_id)]
+
+    correctly_classified_mask = data_for_evaluation.apply(
+        lambda x: (x['dataset_type'], x['sentence_idx']) in correctly_classified, axis=1
     )
 
-    repetiton_numbers = data_for_evaluation['model_repetition_number'].unique()
-    model_versions = data_for_evaluation['model_version'].unique()
-    model_names = data_for_evaluation['model_name'].unique()
-    dataset_types = data_for_evaluation['dataset_type'].unique()
-    masks = list()
-    for r in repetiton_numbers:
-        for v in model_versions:
-            for m in model_names:
-                for d in dataset_types:
-                    mask = (
-                        (data_for_evaluation['model_repetition_number'] == r)
-                        & (data_for_evaluation['model_version'] == v)
-                        & (data_for_evaluation['model_name'] == m)
-                        & (data_for_evaluation['dataset_type'] == d)
-                    )
-                    correctly_classified = mask & correctly_classified_mask
-                    masks.append(correctly_classified)
-
-    correctly_classified_mask_intersection = np.logical_and(masks)
-
-    return data_for_evaluation[correctly_classified_mask_intersection]
+    return data_for_evaluation[correctly_classified_mask]
 
 
 def create_prediction_data(config: dict) -> pd.DataFrame:
