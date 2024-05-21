@@ -1,5 +1,3 @@
-import os
-import pickle
 from collections import Counter
 from copy import deepcopy
 from dataclasses import asdict
@@ -7,6 +5,7 @@ from os.path import join, exists
 from pathlib import Path
 from typing import Tuple
 
+from matplotlib import rc
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -17,7 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from common import DatasetKeys, EvaluationResult, SaveVersion
-from matplotlib import rc
+from utils import cache_dec
 
 rc('text', usetex=True)
 
@@ -1036,23 +1035,7 @@ def create_dataset_for_xai_plot(
     return output
 
 
-def cache_dec(save_path: str, recalc=False):
-    def dec_func(func):
-        def f(*args, **kwargs):
-            if os.path.exists(save_path) and not recalc:
-                return load_pickle(save_path)
-            else:
-                result = func(*args, **kwargs)
-                with open(save_path, "wb") as f:
-                    pickle.dump(result, f)
-                return result
-
-        return f
-
-    return dec_func
-
-
-@cache_dec(save_path="xai_records.pkl", recalc=False)
+# @cache_dec(save_path="xai_records.pkl", recalc=False)
 def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     artifacts_dir = generate_artifacts_dir(config=config)

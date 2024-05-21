@@ -224,3 +224,19 @@ def determine_model_type(s: str) -> str:
     elif ONE_LAYER_ATTENTION_MODEL_TYPE in s:
         result = ONE_LAYER_ATTENTION_MODEL_TYPE
     return result
+
+
+def cache_dec(save_path: str, recalc=False):
+    def dec_func(func):
+        def f(*args, **kwargs):
+            if os.path.exists(save_path) and not recalc:
+                return load_pickle(save_path)
+            else:
+                result = func(*args, **kwargs)
+                with open(save_path, "wb") as f:
+                    pickle.dump(result, f)
+                return result
+
+        return f
+
+    return dec_func
