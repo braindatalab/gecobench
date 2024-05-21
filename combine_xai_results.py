@@ -1,7 +1,8 @@
 import os
 import pickle
 
-path = "./artifacts/xai-nlp-benchmark-2024-04-23-21-20-02/xai_sentiment_abs_sum"
+path = "./artifacts/xai-nlp-benchmark-2024-04-23-21-20-02/xai_sentiment"
+path = "./artifacts/xai-nlp-benchmark-2024-04-23-21-20-02/xai_gender_no_sub_samp"
 records_name = "xai_records.pkl"
 
 out = []
