@@ -1,3 +1,5 @@
+import os
+import pickle
 from collections import Counter
 from copy import deepcopy
 from dataclasses import asdict
@@ -39,6 +41,15 @@ MODEL_NAME_MAP = dict(
     bert_all='\\textit{BERT}-CEfAf',
     one_layer_attention_classification='\\textit{OLA}-CEA',
     bert_only_embedding='\\textit{BERT}-Ef',
+)
+
+MODEL_NAME_HTML_MAP = dict(
+    bert_only_classification='<p><i>BERT</i>-C</p>',
+    bert_randomly_init_embedding_classification='<p><i>BERT</i>-CE</p>',
+    bert_only_embedding_classification='<p><i>BERT</i>-CEf</p>',
+    bert_all='<p><i>BERT</i>-CEfAf</p>',
+    one_layer_attention_classification='<p><i>OLA</i>-CEA</p>',
+    bert_only_embedding='<p><i>BERT</i>-Ef</p>',
 )
 
 METRIC_NAME_MAP = dict(
@@ -516,15 +527,144 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
                 v(group, plot_type, model_version, base_output_dir)
 
 
+def create_legend_plot(base_output_dir: str, model: str, data: pd.DataFrame):
+    # Save only plot legend as separte figure to be appended in HTML file at the bottom
+    folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
+    Path(folder_path).mkdir(parents=True, exist_ok=True)
+    file_path_legend_plot = join(folder_path, f'plot_legend.png')
+
+    h = sns.barplot(
+        data=data,
+        x="method",
+        y="attribution",
+        hue="method",
+        hue_order=HUE_ORDER,
+        order=HUE_ORDER,
+        palette=sns.color_palette('pastel'),
+        # width=0.8
+    )
+
+    # Get the unique colors of the bars
+    colors = [p.get_facecolor() for p in h.patches]
+    plt.close()
+    # Create custom legend
+    legend_patches = [
+        plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor='black', linewidth=0.5)
+        for color in colors
+    ]
+
+    # Create a new figure for the legend
+    fig_legend = plt.figure(figsize=(5, 5))
+    ax_legend = fig_legend.add_subplot(111)
+    ax_legend.legend(
+        title='XAI Method',
+        handles=legend_patches,
+        labels=HUE_ORDER,
+        loc='center',
+        ncol=len(legend_patches) / 2,
+        frameon=True,
+    )
+
+    ax_legend.axis('off')  # Hide the axes
+    # Save the legend as a figure
+    fig_legend.savefig(file_path_legend_plot, bbox_inches='tight', dpi=300)
+    plt.close(fig_legend)
+
+    # GPT4-generated code to remove the white borders around legend image
+    # Makes border handling with the respect to the whole html file easier and
+    # Ensures a tighter layout
+    from PIL import Image
+
+    def trim_whitespace(image_path):
+        with Image.open(image_path) as img:
+            # Convert to a NumPy array for image processing
+            img_array = np.array(img)
+            # Find non-white pixels
+            non_white_pix = np.where(img_array < 255)
+            # Get the bounding box of non-white pixels
+            bbox = [
+                np.min(non_white_pix[1]),
+                np.min(non_white_pix[0]),
+                np.max(non_white_pix[1]),
+                np.max(non_white_pix[0]),
+            ]
+            # Crop the image according to the bounding box
+            trimmed_img = img.crop(bbox)
+            # Save the trimmed image
+            trimmed_img.save(file_path_legend_plot)
+
+    # Call the function to trim whitespace
+    trim_whitespace(file_path_legend_plot)
+
+    return file_path_legend_plot
+
+
+def create_single_word_plot(
+    data: pd.DataFrame,
+    model: str,
+    word_idx: int,
+    sentence: list,
+    base_output_dir: str,
+):
+    # Set the size of the figure (width, height)
+    plt.figure(figsize=(10, 10))
+
+    # Barplots for each word
+    g = sns.barplot(
+        data=data,
+        x="method",
+        y="attribution",
+        hue="method",
+        hue_order=HUE_ORDER,
+        order=HUE_ORDER,
+        width=0.8,
+        palette=sns.color_palette('pastel'),
+        legend=False,
+    )
+
+    # Set the border color and width
+    for bar in g.patches:
+        bar.set_edgecolor('black')  # Set the border color
+        bar.set_linewidth(2)  # Set the border width
+
+    g.set_ylabel("")
+    g.set_xlabel("")
+
+    sns.despine(left=True, bottom=True)
+    g.set_yticklabels([])
+    g.tick_params(left=False)
+
+    g.set_xticklabels([])
+    plt.yticks(np.arange(0, 1.1, 0.1))
+
+    folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
+    Path(folder_path).mkdir(parents=True, exist_ok=True)
+    file_path = join(
+        folder_path, f'{str(word_idx)}_attributions_word_{sentence[word_idx]}.png'
+    )
+
+    plt.tight_layout()
+    plt.savefig(file_path, dpi=300)
+    plt.close()
+
+    return file_path
+
+
 def create_xai_sentence_html_plots(
     data: pd.DataFrame, plot_type: str, base_output_dir: str
 ) -> None:
-    # Using islice for selecting a specific sentence
-    sentence_idx = 1  # 1179
+
+    data['attribution_method'] = data['attribution_method'].map(
+        lambda x: METHOD_NAME_MAP.get(x, x)
+    )
+
+    sentence_idx = 122  # 1179
     repetition_number = 0
     target = 0  # 0 female, 1 male
     model_version = SaveVersion.best.value
     dataset_type = DatasetKeys.gender_all.value
+
+    base_output_dir = join(base_output_dir, f'xai_sentence_plots_{sentence_idx}')
 
     df_explanations_sentence_different_models = data[
         (data["sentence_idx"] == sentence_idx)
@@ -535,16 +675,16 @@ def create_xai_sentence_html_plots(
     ]
 
     pre_trained_models = [
-        ('one_layer_attention_classification', "OLA"),
-        ('bert_randomly_init_embedding_classification', "Bert REC"),
-        ('bert_only_classification', "Bert C"),
-        ('bert_only_embedding_classification', "Bert EC"),
-        ('bert_all', "Bert all"),
+        'bert_only_classification',
+        'bert_randomly_init_embedding_classification',
+        'bert_only_embedding_classification',
+        'bert_all',
+        'one_layer_attention_classification',
     ]
 
     model_image_paths = []
     image_model_captions = []
-    for model, caption in tqdm(
+    for model in tqdm(
         pre_trained_models, desc="Generating images for different models."
     ):
 
@@ -562,128 +702,41 @@ def create_xai_sentence_html_plots(
 
         # Add caption
         model_caption = ["" for _ in range(len(sentences_w_ground_truths))]
-        model_caption[0] = f"{caption} "
+        model_caption[0] = MODEL_NAME_HTML_MAP[model]
         image_model_captions.append(model_caption)
 
-        word_idx = 0
         image_paths = []
-        for word in range(len(sentence)):
+        for word_idx in range(len(sentence)):
             attribution_scores_per_word = []
             xai_methods_per_word = []
 
             for method in range(len(attribution_scores_per_sentence)):
                 attribution_scores_per_word.append(
-                    attribution_scores_per_sentence.iloc[method][word]
+                    attribution_scores_per_sentence.iloc[method][word_idx]
                 )
                 xai_methods_per_word.append(xai_methods_per_sentence.iloc[method])
 
-            # Save only plot legend as separte figure to be appended in HTML file at the bottom
-            folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
-            Path(folder_path).mkdir(parents=True, exist_ok=True)
-            file_path_legend_plot = join(folder_path, f'plot_legend.png')
-
-            h = sns.barplot(
-                x=xai_methods_per_word,
-                y=attribution_scores_per_word,
-                hue=xai_methods_per_word,
-                # width=0.8
+            data = pd.DataFrame(
+                {
+                    'method': xai_methods_per_word,
+                    'attribution': attribution_scores_per_word,
+                }
             )
 
-            # GPT4-generated code to create legend of barplot and save it as a figure used in the final plot
-            # Previous approach: handles, labels = h.get_legend_handles_labels() with
-            # ax_legend.legend(handles, labels,...) stopped working
-
-            # Get the unique colors of the bars
-            colors = [p.get_facecolor() for p in h.patches]
-            # Create custom legend
-            legend_patches = [
-                plt.Rectangle((0, 0), 1, 1, facecolor=colors[i])
-                for i in range(len(xai_methods_per_word))
-            ]
-
-            # Create a new figure for the legend
-            fig_legend = plt.figure(figsize=(3, 3))
-            ax_legend = fig_legend.add_subplot(111)
-            ax_legend.legend(
-                handles=legend_patches,
-                labels=xai_methods_per_word,
-                loc='center',
-                ncol=len(legend_patches),
-                frameon=False,
-            )
-            ax_legend.axis('off')  # Hide the axes
-            # Save the legend as a figure
-            fig_legend.savefig(file_path_legend_plot, bbox_inches='tight', dpi=300)
-            plt.close(fig_legend)
-
-            # GPT4-generated code to remove the white borders around legend image
-            # Makes border handling with the respect to the whole html file easier and
-            # Ensures a tighter layout
-            from PIL import Image
-
-            def trim_whitespace(image_path):
-                with Image.open(image_path) as img:
-                    # Convert to a NumPy array for image processing
-                    img_array = np.array(img)
-                    # Find non-white pixels
-                    non_white_pix = np.where(img_array < 255)
-                    # Get the bounding box of non-white pixels
-                    bbox = [
-                        np.min(non_white_pix[1]),
-                        np.min(non_white_pix[0]),
-                        np.max(non_white_pix[1]),
-                        np.max(non_white_pix[0]),
-                    ]
-                    # Crop the image according to the bounding box
-                    trimmed_img = img.crop(bbox)
-                    # Save the trimmed image
-                    trimmed_img.save(file_path_legend_plot)
-
-            # Call the function to trim whitespace
-            trim_whitespace(file_path_legend_plot)
-
-            # Set the size of the figure (width, height)
-            plt.figure(figsize=(3, 2))
-
-            # Barplots for each word
-            g = sns.barplot(
-                x=xai_methods_per_word,
-                y=attribution_scores_per_word,
-                hue=xai_methods_per_word,
-                width=0.8,
+            file_path_legend_plot = create_legend_plot(
+                base_output_dir=base_output_dir, model=model, data=data
             )
 
-            sns.despine(left=True, bottom=True)
-            g.set_yticklabels([])
-            g.tick_params(left=False)
-
-            # GPT4-generated code
-            g.set_xticklabels([])
-            # for bar, label in zip(g.patches, xai_methods_per_word):
-            #     height = bar.get_height()
-            #     g.text(
-            #         bar.get_x()
-            #         + bar.get_width() / 2,  # X position is the center of the bar
-            #         height + 0.04,  # Y position is at the top of the bar
-            #         label,  # The text to display (name of XAI method)
-            #         ha='center',  # Center the text horizontally
-            #         va='bottom',  # Position the text above the bar
-            #         rotation=90,
-            #     )
-
-            plt.yticks(np.arange(0, 1.1, 0.1))
-            folder_path = join(base_output_dir, f"{model}_xai_attributions_per_word")
-            Path(folder_path).mkdir(parents=True, exist_ok=True)
-            file_path = join(
-                folder_path, f'{str(word_idx)}_attributions_word_{sentence[word]}.png'
+            file_path = create_single_word_plot(
+                data=data,
+                model=model,
+                word_idx=word_idx,
+                sentence=sentence,
+                base_output_dir=base_output_dir,
             )
+
             image_paths.append(file_path)
 
-            plt.tight_layout()
-            plt.savefig(file_path, dpi=300)
-            plt.close()
-
-            word_idx += 1
         model_image_paths.append(image_paths)
 
     # GPT4-generated code
@@ -693,7 +746,11 @@ def create_xai_sentence_html_plots(
     <head>
         <meta charset="UTF-8">
         <title>Concatenated Images</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dejavu-sans@1.0.0/css/dejavu-sans.min.css">
         <style>
+            body {
+                font-family: 'DejaVu Sans', sans-serif;
+            }
             .image-container{
                 display: flex;
                 flex-direction: row;
@@ -707,7 +764,7 @@ def create_xai_sentence_html_plots(
                 margin-top: 20px; /* Add some space above the vertical image row */
             }
             .image-box {
-                margin-right: -5px; /* Adjust spacing between image-text blocks */
+                margin-right: 0px; /* Adjust spacing between image-text blocks */
             }
             .image-box img {
                 max-width: 120px; /* Set a maximum width for each image */
@@ -721,21 +778,22 @@ def create_xai_sentence_html_plots(
             }
             .highlight {
                 background-color: lightgreen; /* Highlight color */
-                border-radius: 0px;
+                border-radius: 4px;
             }
             .legend-plot img {
-                max-width: 800px; /* Adjust max width as needed */
-                max-height: 800px; /* Adjust max height for vertical image */
+                max-width: 1250px; /* Adjust max width as needed */
                 object-fit: contain;
+                margin-top: 10px;
             }
             .image-with-caption {
                 display: flex;
                 align-items: center; /* Vertically center the flex items */
             }
             .text-container {
-                width: 50px; /* Fixed width for the text container */
-                text-align: right; /* Align text to the right */
-                margin-right: 5px; /* Consistent margin to the right of the text */
+                width: 100px; /* Fixed width for the text container */
+                transform: rotate(-90deg);
+                margin-right: -25px; /* Consistent margin to the right of the text */
+                margin-left: -25px; /* Consistent margin to the right of the text */
             }
         </style>
     </head>
@@ -750,8 +808,6 @@ def create_xai_sentence_html_plots(
     image_model_captions_zipped = [list(group) for group in image_model_captions_zipped]
 
     model_image_paths_zipped = [list(group) for group in zip(*model_image_paths)]
-
-    print(model_image_paths_zipped)
 
     for index, (model_name_caption, img_path, (text, highlight)) in enumerate(
         zip(
@@ -980,6 +1036,23 @@ def create_dataset_for_xai_plot(
     return output
 
 
+def cache_dec(save_path: str, recalc=False):
+    def dec_func(func):
+        def f(*args, **kwargs):
+            if os.path.exists(save_path) and not recalc:
+                return load_pickle(save_path)
+            else:
+                result = func(*args, **kwargs)
+                with open(save_path, "wb") as f:
+                    pickle.dump(result, f)
+                return result
+
+        return f
+
+    return dec_func
+
+
+@cache_dec(save_path="xai_records.pkl", recalc=False)
 def load_xai_records(config: dict) -> list:
     xai_dir = generate_xai_dir(config=config)
     artifacts_dir = generate_artifacts_dir(config=config)
