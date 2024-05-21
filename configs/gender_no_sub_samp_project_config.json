@@ -132,21 +132,21 @@
       "Kernel SHAP",
       "Uniform random",
       "Integrated Gradients",
-      "Correlation"
+      "Covariance"
     ]
   },
   "evaluation": {
     "output_dir": "evaluation_gender",
     "num_workers": 4,
     "evaluation_records": "evaluation_records.pkl",
-    "prediction_records": "predictions.pkl"
+    "prediction_records": "trained_on_predictions.pkl"
   },
   "visualization": {
     "output_dir": "visualization_gender",
     "absolute_dir_to_project": "/home/rick/research/xai-nlp-benchmark",
     "visualizations": {
       "data": [
-        "correlation_plot"
+        "covariance_plot"
       ],
       "model": [
         "model_performance"

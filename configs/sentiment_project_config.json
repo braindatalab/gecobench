@@ -136,14 +136,14 @@
       "Kernel SHAP",
       "Uniform random",
       "Integrated Gradients",
-      "Correlation"
+      "Covariance"
     ]
   },
   "evaluation": {
     "output_dir": "evaluation_sentiment",
     "num_workers": 4,
     "evaluation_records": "evaluation_records.pkl",
-    "prediction_records": "predictions.pkl"
+    "prediction_records": "trained_on_predictions.pkl"
   },
   "visualization": {
     "output_dir": "visualization_sentiment",
@@ -162,6 +162,9 @@
       ],
       "evaluation": [
         "mass_accuracy"
+      ],
+      "model": [
+        "model_performance"
       ]
     }
   }

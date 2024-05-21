@@ -139,7 +139,7 @@ dmypy.json
 artifacts/
 
 # generated data
-data/dataset_generation/data
+data/dataset_generation/data/corpus_data
 
 # logging
 wandb

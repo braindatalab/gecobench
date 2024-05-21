@@ -10,10 +10,16 @@ from loguru import logger
 from sklearn.metrics import auc, roc_curve
 from sklearn.metrics._ranking import _binary_clf_curve, average_precision_score
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 from transformers import BertTokenizer
 import torch
 
-from common import XAIEvaluationResult, ModelEvaluationResult, EvaluationResult
+from common import (
+    XAIEvaluationResult,
+    ModelEvaluationResult,
+    EvaluationResult,
+    SaveVersion,
+)
 from training.bert import create_bert_ids, create_tensor_dataset
 from xai.main import load_test_data
 from utils import (
@@ -144,15 +150,26 @@ def bundle_evaluation_results(xai_record: pd.Series, scores: dict) -> dict:
     return output
 
 
+def evalutate_row(idx_row: tuple[int, pd.Series]) -> dict:
+    _, row = idx_row
+
+    scores = calculate_scores(
+        attribution=np.abs(np.array(row['attribution'])),
+        ground_truth=np.array(row['ground_truth']),
+    )
+
+    result = bundle_evaluation_results(xai_record=row, scores=scores)
+    return result
+
+
 def evaluate_xai(data: pd.DataFrame) -> list[dict]:
-    results = list()
-    for k, row in tqdm(data.iterrows(), total=len(data)):
-        scores = calculate_scores(
-            attribution=np.abs(np.array(row['attribution'])),
-            ground_truth=np.array(row['ground_truth']),
-        )
-        result = bundle_evaluation_results(xai_record=row, scores=scores)
-        results += [result]
+    results = process_map(
+        evalutate_row,
+        data.iterrows(),
+        max_workers=8,
+        desc="Evaluate XAI results",
+        total=len(data),
+    )
 
     return results
 
@@ -279,6 +296,10 @@ def get_correctly_classified_samples(
     xai_data: pd.DataFrame, predication_data: pd.DataFrame
 ) -> pd.DataFrame:
 
+    predication_data = predication_data[
+        predication_data["model_version"] == SaveVersion.best.value
+    ]
+
     merge_columns = [
         'model_repetition_number',
         'model_version',
@@ -400,10 +421,12 @@ def evaluate_xai_performance(config: Dict) -> None:
     xai_data = create_xai_data(config=config)
     xai_data.to_pickle(join(artifacts_dir, evaluation_output_dir, 'xai_data.pkl'))
 
-    data_with_predictions = create_prediction_data(config=config)
-    data_with_predictions.to_pickle(
-        join(artifacts_dir, evaluation_output_dir, 'data_with_predictions.pkl')
+    data_with_predictions_path = join(
+        artifacts_dir, evaluation_output_dir, 'data_with_predictions.pkl'
     )
+
+    data_with_predictions = create_prediction_data(config=config)
+    data_with_predictions.to_pickle(data_with_predictions_path)
 
     evaluation_data = get_correctly_classified_samples(
         xai_data=xai_data, predication_data=data_with_predictions
