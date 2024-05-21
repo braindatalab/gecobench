@@ -315,7 +315,28 @@ def get_correctly_classified_samples(
     correctly_classified_mask = (
         data_for_evaluation['target'] == data_for_evaluation['prediction']
     )
-    return data_for_evaluation[correctly_classified_mask]
+
+    repetiton_numbers = data_for_evaluation['model_repetition_number'].unique()
+    model_versions = data_for_evaluation['model_version'].unique()
+    model_names = data_for_evaluation['model_name'].unique()
+    dataset_types = data_for_evaluation['dataset_type'].unique()
+    masks = list()
+    for r in repetiton_numbers:
+        for v in model_versions:
+            for m in model_names:
+                for d in dataset_types:
+                    mask = (
+                        (data_for_evaluation['model_repetition_number'] == r)
+                        & (data_for_evaluation['model_version'] == v)
+                        & (data_for_evaluation['model_name'] == m)
+                        & (data_for_evaluation['dataset_type'] == d)
+                    )
+                    correctly_classified = mask & correctly_classified_mask
+                    masks.append(correctly_classified)
+
+    correctly_classified_mask_intersection = np.logical_and(masks)
+
+    return data_for_evaluation[correctly_classified_mask_intersection]
 
 
 def create_prediction_data(config: dict) -> pd.DataFrame:
