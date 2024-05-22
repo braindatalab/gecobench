@@ -74,5 +74,6 @@ class ModelEvaluationResult:
 
 @dataclass
 class EvaluationResult:
-    xai_results: list[XAIEvaluationResult] = None
+    xai_results_correct: list[XAIEvaluationResult] = None
+    xai_results_all: list[XAIEvaluationResult] = None
     model_results: list[ModelEvaluationResult] = None
