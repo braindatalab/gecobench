@@ -18,8 +18,6 @@ from tqdm.contrib.concurrent import process_map
 from common import DatasetKeys, EvaluationResult, SaveVersion
 from utils import cache_dec
 
-rc('text', usetex=True)
-
 
 from utils import (
     generate_visualization_dir,
@@ -1617,6 +1615,7 @@ VISUALIZATIONS = dict(
 
 
 def main(config: dict) -> None:
+    rc('text', usetex=True)
     output_dir = generate_visualization_dir(config=config)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     visualize_results(base_output_dir=output_dir, config=config)

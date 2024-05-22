@@ -307,7 +307,7 @@ def main(config: Dict) -> None:
 
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
-    filename = config["evaluation"]["prediction_records"]
+    filename = config["evaluation"]["data_prediction_records"]
     prediction_records = load_pickle(
         join(artifacts_dir, evaluation_output_dir, filename)
     )

@@ -429,7 +429,7 @@ def evaluate_xai_performance(config: Dict) -> None:
     xai_data.to_pickle(join(artifacts_dir, evaluation_output_dir, 'xai_data.pkl'))
 
     data_with_predictions_path = join(
-        artifacts_dir, evaluation_output_dir, 'data_with_predictions.pkl'
+        artifacts_dir, evaluation_output_dir, config["evaluation"]["data_prediction_records"]
     )
 
     data_with_predictions = create_prediction_data(config=config)
