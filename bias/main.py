@@ -137,7 +137,9 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 binary_specificity_repetitions,
                 binary_f1_repetitions,
                 roc_auc_repetitions,
-            ) = ([] for i in range(5))
+                fnr_repetitions,
+                fpr_repetitions,
+            ) = ([] for i in range(7))
 
             model_variants_mapping = {
                 "bert_only_embedding_classification": "BERT-CEf",
@@ -176,7 +178,7 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 )
                 cm_repetitions.append(cm)
 
-                # Computation: accruacy, recall, specificity, f1
+                # Computation: accruacy, recall, specificity, f1, fpr, fnr
                 binary_acc_metric = BinaryAccuracy()
                 binary_acc_score = binary_acc_metric(
                     torch.tensor(predictions), torch.tensor(targets)
@@ -187,10 +189,14 @@ def bias_metrics_summary(prediction_records, bias_dir):
                     torch.tensor(predictions), torch.tensor(targets)
                 )
 
+                false_negative_rate_score = 1 - binary_recall_score
+
                 binary_specificity_metric = BinarySpecificity()
                 binary_specificity_score = binary_specificity_metric(
                     torch.tensor(predictions), torch.tensor(targets)
                 )
+
+                false_positive_rate_score = 1 - binary_specificity_score
 
                 binary_f1_metric = BinaryF1Score()
                 binary_f1_score = binary_f1_metric(
@@ -228,23 +234,34 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 binary_f1_repetitions.append(binary_f1_score)
                 binary_accruacy_repetitions.append(binary_acc_score)
                 roc_auc_repetitions.append(roc_auc)
+                fnr_repetitions.append(false_negative_rate_score)
+                fpr_repetitions.append(false_positive_rate_score)
 
             # Average accruacy, recall, specificity, f1, roc_auc
-            binary_acc_score_avg_repetitions = sum(binary_accruacy_repetitions) / len(
-                binary_accruacy_repetitions
-            )
-            binary_recall_score_avg_repetitions = sum(binary_recall_repetitions) / len(
-                binary_recall_repetitions
-            )
-            binary_specificity_score_avg_repetitions = sum(
+            binary_acc_score_avg_repetitions = np.mean(binary_accruacy_repetitions)
+            binary_acc_score_std_repetitions = np.std(binary_accruacy_repetitions)
+
+            binary_recall_score_avg_repetitions = np.mean(binary_recall_repetitions)
+            binary_recall_score_std_repetitions = np.std(binary_recall_repetitions)
+
+            binary_specificity_score_avg_repetitions = np.mean(
                 binary_specificity_repetitions
-            ) / len(binary_specificity_repetitions)
-            binary_f1_score_avg_repetitions = sum(binary_f1_repetitions) / len(
-                binary_f1_repetitions
             )
-            roc_auc_score_avg_repetitions = sum(roc_auc_repetitions) / len(
-                roc_auc_repetitions
+            binary_specificity_score_std_repetitions = np.std(
+                binary_specificity_repetitions
             )
+
+            binary_f1_score_avg_repetitions = np.mean(binary_f1_repetitions)
+            binary_f1_score_std_repetitions = np.std(binary_f1_repetitions)
+
+            roc_auc_score_avg_repetitions = np.mean(roc_auc_repetitions)
+            roc_auc_score_std_repetitions = np.std(roc_auc_repetitions)
+
+            fnr_score_avg_repetitions = np.mean(fnr_repetitions)
+            fnr_score_std_repetitions = np.std(fnr_repetitions)
+
+            fpr_score_avg_repetitions = np.mean(fpr_repetitions)
+            fpr_score_std_repetitions = np.std(fpr_repetitions)
 
             # Average tp, fp, tn, fn
             cm_repetitions_stacked = np.stack(cm_repetitions, axis=0)
@@ -262,25 +279,33 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 yticklabels=['male', 'female'],
             )
 
-            formatted_f1 = "{:.2f}".format(binary_f1_score_avg_repetitions * 100)
-            formatted_recall = "{:.2f}".format(
+            # Format strings
+            formatted_f1_avg = "{:.2f}".format(binary_f1_score_avg_repetitions * 100)
+            formatted_f1_std = "{:.2f}".format(binary_f1_score_std_repetitions)
+
+            formatted_recall_avg = "{:.2f}".format(
                 binary_recall_score_avg_repetitions * 100
             )
+            formatted_recall_std = "{:.2f}".format(binary_recall_score_std_repetitions)
 
-            false_negative_rate = 1 - binary_recall_score_avg_repetitions
-            formatted_false_negative_rate = "{:.2f}".format(false_negative_rate * 100)
+            formatted_fnr_avg = "{:.2f}".format(fnr_score_avg_repetitions * 100)
+            formatted_fnr_std = "{:.2f}".format(fnr_score_std_repetitions)
 
-            formatted_specificity = "{:.2f}".format(
+            formatted_specificity_avg = "{:.2f}".format(
                 binary_specificity_score_avg_repetitions * 100
             )
+            formatted_specificity_std = "{:.2f}".format(
+                binary_specificity_score_std_repetitions
+            )
 
-            false_positive_rate = 1 - binary_specificity_score_avg_repetitions
-            formatted_false_positive_rate = "{:.2f}".format(false_positive_rate * 100)
+            formatted_fpr_avg = "{:.2f}".format(fpr_score_avg_repetitions * 100)
+            formatted_fpr_std = "{:.2f}".format(fpr_score_std_repetitions)
 
-            formatted_acc = "{:.2f}".format(binary_acc_score_avg_repetitions * 100)
+            formatted_acc_avg = "{:.2f}".format(binary_acc_score_avg_repetitions * 100)
+            formatted_acc_std = "{:.2f}".format(binary_acc_score_avg_repetitions)
 
             axs1[i].set_title(
-                f"{model_variant_explicit_name} \n accruacy: {formatted_acc} \n specificity: {formatted_specificity} \n recall: {formatted_recall} \n f1: {formatted_f1}"
+                f"{model_variant_explicit_name} \n accruacy: {formatted_acc_avg} \n specificity: {formatted_specificity_avg} \n recall: {formatted_recall_avg} \n f1: {formatted_f1_avg}"
             )
 
             # Plot: ROC curve
@@ -296,9 +321,13 @@ def bias_metrics_summary(prediction_records, bias_dir):
                 axs2[i].legend(loc='upper left')
 
             print(f"Dataset: {dataset}")
-            print(
-                f"Model: {model_variant_explicit_name} \n Accruacy: {formatted_acc} \n True Positive Rate (Recall): {formatted_recall} \n False Negative Rate (Miss rate): {formatted_false_negative_rate} \n True Negative Rate (Specificity): {formatted_specificity} \n False Positive Rate (Probability of False Alarm): {formatted_false_positive_rate} \n F1: {formatted_f1}"
-            )
+            print(f"Model: {model_variant_explicit_name}")
+            print(f"Accruacy: Average: {formatted_acc_avg}, Std: {formatted_acc_std}")
+            print(f"TPR: Average: {formatted_recall_avg}, Std: {formatted_recall_std}")  # recall
+            print(f"FNR: Average {formatted_fnr_avg}, Std: {formatted_fnr_std}")  # miss rate: 1 - TPR
+            print(f"TNR: Average: {formatted_specificity_avg}, Std: {formatted_specificity_std}")  # specificity
+            print(f"FPR: Average: {formatted_fpr_avg}, Std: {formatted_fpr_std}")  # probability of false alarm: 1 - TNR
+            print(f"F1: Average: {formatted_f1_avg}, Std: {formatted_f1_std}")
 
         savedir = f"{bias_dir}/confusion_matrix_{dataset}.png"
         fig1.tight_layout()
