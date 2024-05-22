@@ -266,9 +266,17 @@ def bias_metrics_summary(prediction_records, bias_dir):
             formatted_recall = "{:.2f}".format(
                 binary_recall_score_avg_repetitions * 100
             )
+
+            false_negative_rate = 1 - binary_recall_score_avg_repetitions
+            formatted_false_negative_rate = "{:.2f}".format(false_negative_rate * 100)
+
             formatted_specificity = "{:.2f}".format(
                 binary_specificity_score_avg_repetitions * 100
             )
+
+            false_positive_rate = 1 - binary_specificity_score_avg_repetitions
+            formatted_false_positive_rate = "{:.2f}".format(false_positive_rate * 100)
+
             formatted_acc = "{:.2f}".format(binary_acc_score_avg_repetitions * 100)
 
             axs1[i].set_title(
@@ -286,6 +294,11 @@ def bias_metrics_summary(prediction_records, bias_dir):
             axs2[i].plot([0, 1], [0, 1], linestyle='--', color='grey')
             if i == 0:
                 axs2[i].legend(loc='upper left')
+
+            print(f"Dataset: {dataset}")
+            print(
+                f"Model: {model_variant_explicit_name} \n Accruacy: {formatted_acc} \n True Positive Rate (Recall): {formatted_recall} \n False Negative Rate (Miss rate): {formatted_false_negative_rate} \n True Negative Rate (Specificity): {formatted_specificity} \n False Positive Rate (Probability of False Alarm): {formatted_false_positive_rate} \n F1: {formatted_f1}"
+            )
 
         savedir = f"{bias_dir}/confusion_matrix_{dataset}.png"
         fig1.tight_layout()
