@@ -22,6 +22,7 @@ from common import (
 )
 from training.bert import create_bert_ids, create_tensor_dataset
 from xai.main import load_test_data
+from evaluation.difference_testing import prepare_difference_data
 from utils import (
     filter_eval_datasets,
     filter_train_datasets,
@@ -136,12 +137,14 @@ def calculate_scores(attribution: np.ndarray, ground_truth: np.ndarray) -> Dict:
     return result
 
 
-def evaluate_row(idx_row: tuple[int, pd.Series], only_correctly_classified: bool) -> dict:
+def evaluate_row(
+    idx_row: tuple[int, pd.Series], only_correctly_classified: bool
+) -> dict:
     _, xai_record = idx_row
 
     scores = calculate_scores(
-        attribution=np.abs(np.array(row['attribution'])),
-        ground_truth=np.array(row['ground_truth']),
+        attribution=np.abs(np.array(xai_record['attribution'])),
+        ground_truth=np.array(xai_record['ground_truth']),
     )
 
     output = asdict(
@@ -161,11 +164,7 @@ def evaluate_row(idx_row: tuple[int, pd.Series], only_correctly_classified: bool
 def evaluate_xai(data: pd.DataFrame, only_correctly_classified: bool) -> list[dict]:
     results = []
 
-    for idx_row in tqdm(
-        data.iterrows(), 
-        desc="Evaluate XAI results",
-        total=len(data)
-    ):
+    for idx_row in tqdm(data.iterrows(), desc="Evaluate XAI results", total=len(data)):
         results += [evaluate_row(idx_row, only_correctly_classified)]
 
     return results
@@ -417,13 +416,15 @@ def evaluate_model_performance(config: Dict) -> None:
 def evaluate_xai_performance(config: Dict) -> None:
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
-    os.makedirs(join(artifacts_dir, evaluation_output_dir), exist_ok=True)
+    output_dir = join(artifacts_dir, evaluation_output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
     xai_data = create_xai_data(config=config)
-    xai_data.to_pickle(join(artifacts_dir, evaluation_output_dir, 'xai_data.pkl'))
+    xai_data.to_pickle(join(output_dir, 'xai_data.pkl'))
 
     data_with_predictions_path = join(
-        artifacts_dir, evaluation_output_dir, config["evaluation"]["data_prediction_records"]
+        output_dir,
+        config["evaluation"]["data_prediction_records"],
     )
 
     data_with_predictions = create_prediction_data(config=config)
@@ -432,13 +433,34 @@ def evaluate_xai_performance(config: Dict) -> None:
     ]
     data_with_predictions.to_pickle(data_with_predictions_path)
 
-    evaluation_data_all, evaluation_data_correct = merge_xai_results_with_prediction_data(
-        xai_data=xai_data, predication_data=data_with_predictions
+    evaluation_data_all, evaluation_data_correct = (
+        merge_xai_results_with_prediction_data(
+            xai_data=xai_data, predication_data=data_with_predictions
+        )
     )
 
+    # Calculate gender difference in prediction & attributions
+    difference_config = config["evaluation"]["gender_difference"]
+    if difference_config["correctly_classified_only"]:
+        prepare_difference_data(
+            df=evaluation_data_correct,
+            idxs=difference_config["prediction_idx"],
+            output_dir=output_dir,
+        )
+    else:
+        prepare_difference_data(
+            df=evaluation_data_all,
+            idxs=difference_config["prediction_idx"],
+            output_dir=output_dir,
+        )
+
     logger.info("Calculate evaluation scores.")
-    xai_evaluation_results = evaluate_xai(data=evaluation_data_correct, only_correctly_classified=True)
-    xai_evaluation_results_all = evaluate_xai(data=evaluation_data_all, only_correctly_classified=False)
+    xai_evaluation_results = evaluate_xai(
+        data=evaluation_data_correct, only_correctly_classified=True
+    )
+    xai_evaluation_results_all = evaluate_xai(
+        data=evaluation_data_all, only_correctly_classified=False
+    )
 
     return xai_evaluation_results, xai_evaluation_results_all
 
@@ -447,7 +469,9 @@ def main(config: Dict) -> None:
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
 
-    xai_evaluation_results, xai_evaluation_results_all = evaluate_xai_performance(config=config)
+    xai_evaluation_results, xai_evaluation_results_all = evaluate_xai_performance(
+        config=config
+    )
     model_evaluation_results = evaluate_model_performance(config=config)
 
     evaluation_results = EvaluationResult(

@@ -140,7 +140,14 @@
     "num_workers": 4,
     "evaluation_records": "evaluation_records.pkl",
     "prediction_records": "trained_on_predictions.pkl",
-    "data_prediction_records": "data_with_predictions.pkl"
+    "data_prediction_records": "data_with_predictions.pkl",
+    "gender_difference": {
+      "prediction_idx": {
+        "female": 0,
+        "male": 1
+      },
+      "correctly_classified_only": true
+    }
   },
   "visualization": {
     "output_dir": "visualization_gender",

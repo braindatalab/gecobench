@@ -226,9 +226,27 @@ def determine_model_type(s: str) -> str:
     return result
 
 
-def cache_dec(save_path: str, recalc=False):
+def cache_dec(save_path: str, recalc: bool = False):
     def dec_func(func):
         def f(*args, **kwargs):
+            if os.path.exists(save_path) and not recalc:
+                return load_pickle(save_path)
+            else:
+                result = func(*args, **kwargs)
+                with open(save_path, "wb") as f:
+                    pickle.dump(result, f)
+                return result
+
+        return f
+
+    return dec_func
+
+
+def cache_dec_key(key: callable, recalc: bool = False):
+    def dec_func(func):
+        def f(*args, **kwargs):
+            save_path = key(*args, **kwargs)
+
             if os.path.exists(save_path) and not recalc:
                 return load_pickle(save_path)
             else:
