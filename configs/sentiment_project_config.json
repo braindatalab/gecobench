@@ -143,7 +143,8 @@
     "output_dir": "evaluation_sentiment",
     "num_workers": 4,
     "evaluation_records": "evaluation_records.pkl",
-    "prediction_records": "trained_on_predictions.pkl"
+    "prediction_records": "trained_on_predictions.pkl",
+    "data_prediction_records": "data_with_predictions.pkl"
   },
   "visualization": {
     "output_dir": "visualization_sentiment",
@@ -167,5 +168,8 @@
         "model_performance"
       ]
     }
+  },
+  "bias": {
+    "output_dir": "bias"
   }
 }
