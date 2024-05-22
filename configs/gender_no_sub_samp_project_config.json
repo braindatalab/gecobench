@@ -166,5 +166,8 @@
         "mass_accuracy"
       ]
     }
+  },
+  "bias": {
+    "output_dir": "bias"
   }
 }
