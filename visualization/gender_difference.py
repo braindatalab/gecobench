@@ -9,6 +9,7 @@ import numpy as np
 from matplotlib.colors import ListedColormap
 import matplotlib.cm as cm
 import matplotlib
+from utils import list_intersection
 
 from visualization.common import (
     MODEL_NAME_MAP,
@@ -428,7 +429,7 @@ def plot_word_attribution_difference_point(output_dir: str, df: pd.DataFrame, ke
         hue="XAI Method",
         row="dataset",
         kind="point",
-        hue_order=HUE_ORDER,
+        hue_order=list_intersection(HUE_ORDER, df["XAI Method"].unique()),
         order=MODEL_ORDER,
         row_order=ROW_ORDER,
         palette=sns.color_palette(palette='pastel'),
@@ -484,6 +485,12 @@ def create_gender_difference_plots(base_output_dir: str, config: dict):
         if method not in config["xai"]["methods"]:
             attribution_diffs_df = attribution_diffs_df[
                 attribution_diffs_df["attribution_method"] != method
+            ]
+            attribution_diffs_gt_df = attribution_diffs_gt_df[
+                attribution_diffs_gt_df["attribution_method"] != method
+            ]
+            attribution_diffs_not_gt_df = attribution_diffs_not_gt_df[
+                attribution_diffs_not_gt_df["attribution_method"] != method
             ]
 
     # Generate difference tables & plots

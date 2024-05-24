@@ -243,6 +243,7 @@ def plot_model_performance(
         hue='Data Split',
         col='Dataset',
         kind='bar',
+        order=MODEL_ORDER,
         palette=sns.color_palette(palette='pastel'),
         fill=True,
         linewidth=0.0,
