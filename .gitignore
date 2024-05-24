@@ -154,3 +154,4 @@ logs
 # MacOS
 .DS_store
 data/.DS_Store
+temp_results

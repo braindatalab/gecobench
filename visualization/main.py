@@ -16,8 +16,20 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from common import DatasetKeys, EvaluationResult, SaveVersion
-from utils import cache_dec
+from utils import list_intersection
 
+from visualization.gender_difference import create_gender_difference_plots
+from visualization.common import (
+    MODEL_NAME_MAP,
+    DATASET_NAME_MAP,
+    METHOD_NAME_MAP,
+    METRIC_NAME_MAP,
+    MODEL_NAME_HTML_MAP,
+    MODEL_ORDER,
+    HUE_ORDER,
+    ROW_ORDER,
+    GENDER,
+)
 
 from utils import (
     generate_visualization_dir,
@@ -31,61 +43,6 @@ from utils import (
     generate_artifacts_dir,
 )
 
-MODEL_NAME_MAP = dict(
-    bert_only_classification='\\textit{BERT}-C',
-    bert_randomly_init_embedding_classification='\\textit{BERT}-CE',
-    bert_only_embedding_classification='\\textit{BERT}-CEf',
-    bert_all='\\textit{BERT}-CEfAf',
-    one_layer_attention_classification='\\textit{OLA}-CEA',
-    bert_only_embedding='\\textit{BERT}-Ef',
-)
-
-MODEL_NAME_HTML_MAP = dict(
-    bert_only_classification='<p><i>BERT</i>-C</p>',
-    bert_randomly_init_embedding_classification='<p><i>BERT</i>-CE</p>',
-    bert_only_embedding_classification='<p><i>BERT</i>-CEf</p>',
-    bert_all='<p><i>BERT</i>-CEfAf</p>',
-    one_layer_attention_classification='<p><i>OLA</i>-CEA</p>',
-    bert_only_embedding='<p><i>BERT</i>-Ef</p>',
-)
-
-METRIC_NAME_MAP = dict(
-    roc_auc='ROC AUC',
-    precision_recall_auc='Precision-Recall AUC',
-    avg_precision='Precision',
-    precision_specificity='Precision-Specificity',
-    top_k_precision='Top-K Precision',
-    mass_accuracy='Mass Accuracy (MA)',
-)
-
-METHOD_NAME_MAP = dict(Covariance="Pattern Variant")
-
-MODEL_ORDER = [
-    MODEL_NAME_MAP["bert_only_classification"],
-    MODEL_NAME_MAP["bert_only_embedding_classification"],
-    MODEL_NAME_MAP["bert_randomly_init_embedding_classification"],
-    MODEL_NAME_MAP["bert_all"],
-    MODEL_NAME_MAP["one_layer_attention_classification"],
-]
-
-
-HUE_ORDER = [
-    'Uniform random',
-    'Saliency',
-    'Kernel SHAP',
-    'Guided Backprop',
-    'DeepLift',
-    'InputXGradient',
-    'LIME',
-    'Gradient SHAP',
-    'Integrated Gradients',
-    'Pattern Variant',
-]
-
-DATASET_NAME_MAP = dict(gender_subj='$\mathcal{D}_{S}$', gender_all='$\mathcal{D}_{A}$')
-ROW_ORDER = [DATASET_NAME_MAP['gender_all'], DATASET_NAME_MAP['gender_subj']]
-
-GENDER = {0.0: 'female', 1.0: 'male'}
 
 MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES = dict(
     accumulated="most_common_xai_attributions",
@@ -114,27 +71,26 @@ def plot_evaluation_results(
     data: pd.DataFrame,
     metric: str,
     model_version: str,
+    result_type: str,
     base_output_dir: str,
 ) -> None:
     def _plot_postprocessing(g):
-        print(g)
-        g.set_titles(row_template="")
-        print("Shape", g.axes.shape)
+        g.set_titles(row_template="Dataset: {row_name}", size=12)
         for k in range(g.axes.shape[0]):
             for j in range(g.axes.shape[1]):
                 g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
 
                 if 0 == k and 'top_k_precision' == metric:
                     g.axes[k, j].set_ylabel(
-                        f'Average {METRIC_NAME_MAP[metric]} for {ROW_ORDER[k]}',
-                        fontsize=13,
+                        f'Average {METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
                     )
                 else:
                     g.axes[k, j].set_ylabel(
-                        f'{METRIC_NAME_MAP[metric]} for {ROW_ORDER[k]}',
-                        fontsize=13,
+                        f'{METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
                     )
-                g.axes[k, j].set_xlabel('', fontsize=12)
+                g.axes[k, j].set_xlabel('')
                 g.axes[k, j].set_ylim(0, 1)
                 g.axes[k, j].set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
 
@@ -174,7 +130,7 @@ def plot_evaluation_results(
                 x='Model',
                 y=METRIC_NAME_MAP[metric],
                 order=MODEL_ORDER,
-                hue_order=HUE_ORDER,
+                hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
                 row_order=ROW_ORDER,
                 hue='XAI Method',
                 row='Dataset',
@@ -185,7 +141,6 @@ def plot_evaluation_results(
                 fliersize=0,
                 estimator='median',
                 aspect=9.5 / height,
-                margin_titles=True,
                 legend_out=True,
             )
 
@@ -198,8 +153,19 @@ def plot_evaluation_results(
             )
 
             _plot_postprocessing(g=g)
-            file_path = join(base_output_dir, f'{metric}_{s}_{model_version}.png')
+            file_path = join(
+                base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
+            )
             plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            # Disable legend
+            g._legend.remove()
+            file_path = join(
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
             plt.close()
 
     else:
@@ -211,7 +177,7 @@ def plot_evaluation_results(
                 x='Model',
                 y=METRIC_NAME_MAP[metric],
                 order=MODEL_ORDER,
-                hue_order=HUE_ORDER,
+                hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
                 hue='XAI Method',
                 col='Dataset',
                 kind='bar',
@@ -220,8 +186,8 @@ def plot_evaluation_results(
                 estimator='mean',
                 # errorbar='sd',
                 # err_kws={'linewidth': 2.0},
-                margin_titles=True,
                 aspect=2.0,
+                legend_out=True,
             )
 
             sns.move_legend(
@@ -229,11 +195,23 @@ def plot_evaluation_results(
                 "lower center",
                 bbox_to_anchor=(0.5, -0.2),
                 ncol=5,
+                frameon=True,
             )
 
             _plot_postprocessing(g=g)
-            file_path = join(base_output_dir, f'{metric}_{s}_{model_version}.png')
+            file_path = join(
+                base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
+            )
             plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            # Disable legend
+            g._legend.remove()
+            file_path = join(
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
             plt.close()
 
 
@@ -245,6 +223,9 @@ def plot_model_performance(
 ) -> None:
     training_history['mapped_model_name'] = training_history['model_name'].map(
         lambda x: MODEL_NAME_MAP[x]
+    )
+    training_history['dataset_type'] = training_history['dataset_type'].map(
+        lambda x: DATASET_NAME_MAP[x]
     )
     training_history = training_history.rename(
         columns={
@@ -258,50 +239,39 @@ def plot_model_performance(
     g = sns.catplot(
         data=training_history,
         x='Model',
-        # x='attribution_method',
         y='Accuracy',
         hue='Data Split',
-        # hue='dataset_type',
-        # split=True,
-        # row='num_gaussians',
         col='Dataset',
-        # col='mapped_model_name',
         kind='bar',
         palette=sns.color_palette(palette='pastel'),
         fill=True,
         linewidth=0.0,
         height=2.5,
-        # inner_kws=dict(box_width=2, whis_width=0.2, color='0.4', marker='o'),
-        # inner='stick',
         estimator='mean',
-        # errorbar=('pi', 95) if 'top_k_precision' != metric else 'sd',
         errorbar='sd',
-        # showfliers=False,
-        # medianprops={'color': 'white', 'linewidth': 1.0},
-        aspect=2.0,
+        aspect=2,
         margin_titles=True,
-        # line_kws={'linewidth': 1.5},
     )
+    g.set_titles(col_template="Dataset: {col_name}", size=10)
     for k in range(g.axes.shape[0]):
         for j in range(g.axes.shape[1]):
             g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
-            # g.axes[k, j].title.set_size(6)
-            # g.axes[k, j].set_xticklabels('')
-            # g.axes[k, j].set_xlabel('')
-
             g.axes[k, j].set_ylim(0, 1)
-            # g.axes[k, j].set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
             g.axes[k, j].set_yticks(np.arange(start=0.1, step=0.1, stop=1.1))
-            # for label in (
-            #     g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
-            # ):
-            #     label.set_fontsize(4)
+            g.axes[k, j].set_xlabel('')
+            g.axes[k, j].set_ylabel('Accuracy', fontsize=10)
+
+            for label in (
+                g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+            ):
+                label.set_fontsize(10)
 
     sns.move_legend(
         g,
         "lower center",
-        bbox_to_anchor=(0.5, -0.2),
+        bbox_to_anchor=(0.47, -0.15),
         ncol=3,
+        frameon=True,
     )
 
     file_path = join(base_output_dir, f'{plot_type}_{model_version}.png')
@@ -316,9 +286,10 @@ def plot_most_common_xai_attributions(
     base_output_dir: str,
 ) -> None:
     data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
 
-    rows = np.unique(data['mapped_model_name'].values)
-    columns = np.unique(data['dataset_type'].values)
+    rows = MODEL_ORDER
+    columns = ROW_ORDER
     attribution_methods = np.unique(data['attribution_method'].values)
     ranks = np.unique(data['rank'].values)
 
@@ -368,6 +339,9 @@ def plot_most_common_xai_attributions(
                         y='rank',
                         order=ranks,
                         hue='attribution_method',
+                        hue_order=list_intersection(
+                            HUE_ORDER, ggdf['attribution_method'].unique()
+                        ),
                         orient='y',
                         ax=axs[k, j],
                         width=0.8,
@@ -444,13 +418,27 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
 
     plot_types = config['visualization']['visualizations']['evaluation']
     for plot_type in plot_types:
-        for model_version, xai_group in pd.DataFrame(
-            evaluation_results.xai_results
-        ).groupby("model_version"):
-            logger.info(f'Type of plot: {plot_type}')
-            v = xai_visualization_methods.get(plot_type, None)
-            if v is not None:
-                v(xai_group, plot_type, model_version, base_output_dir)
+        for result_df, result_type in [
+            (evaluation_results.xai_results_all, "filter_all"),
+            (evaluation_results.xai_results_correct, "filter_correct"),
+        ]:
+            result_df = pd.DataFrame(result_df)
+            if len(result_df) == 0:
+                # E.g. for sentiment dataset we have no ground truth labels and therefore
+                # the evaluation results are empty for the correct filter
+                continue
+
+            # Filter out methods not listed in config
+            methods = result_df['attribution_method'].unique()
+            for method in methods:
+                if method not in config["xai"]["methods"]:
+                    result_df = result_df[result_df['attribution_method'] != method]
+
+            for model_version, xai_group in result_df.groupby("model_version"):
+                logger.info(f'Type of plot: {plot_type}')
+                v = xai_visualization_methods.get(plot_type, None)
+                if v is not None:
+                    v(xai_group, plot_type, model_version, result_type, base_output_dir)
 
 
 def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
@@ -535,8 +523,8 @@ def create_legend_plot(base_output_dir: str, model: str, data: pd.DataFrame):
         x="method",
         y="attribution",
         hue="method",
-        hue_order=HUE_ORDER,
-        order=HUE_ORDER,
+        hue_order=list_intersection(HUE_ORDER, data['method'].unique()),
+        order=list_intersection(HUE_ORDER, data['method'].unique()),
         palette=sns.color_palette('pastel'),
         # width=0.8
     )
@@ -556,7 +544,7 @@ def create_legend_plot(base_output_dir: str, model: str, data: pd.DataFrame):
     ax_legend.legend(
         title='XAI Method',
         handles=legend_patches,
-        labels=HUE_ORDER,
+        labels=list_intersection(HUE_ORDER, data['method'].unique()),
         loc='center',
         ncol=len(legend_patches) / 2,
         frameon=True,
@@ -612,8 +600,8 @@ def create_single_word_plot(
         x="method",
         y="attribution",
         hue="method",
-        hue_order=HUE_ORDER,
-        order=HUE_ORDER,
+        hue_order=list_intersection(HUE_ORDER, data['method'].unique()),
+        order=list_intersection(HUE_ORDER, data['method'].unique()),
         width=0.8,
         palette=sns.color_palette('pastel'),
         legend=False,
@@ -1033,8 +1021,7 @@ def create_dataset_for_xai_plot(
     return output
 
 
-# @cache_dec(save_path="xai_records.pkl", recalc=False)
-def load_xai_records(config: dict) -> list:
+def load_xai_records(config: dict) -> pd.DataFrame:
     xai_dir = generate_xai_dir(config=config)
     artifacts_dir = generate_artifacts_dir(config=config)
     file_path = join(artifacts_dir, xai_dir, config['xai']['xai_records'])
@@ -1046,22 +1033,19 @@ def load_xai_records(config: dict) -> list:
             xai_records.model_version = xai_records.model_version.value
             data_list += [asdict(xai_records)]
 
-    return data_list
+    df = pd.DataFrame(data_list)
 
+    methods = df['attribution_method'].unique()
+    for method in methods:
+        if method not in config["xai"]["methods"]:
+            df = df[df['attribution_method'] != method]
 
-def get_correctly_classified_records(records: list) -> list:
-    result = list()
-    # TODO: Where is the correct_classified_intersection field coming from?
-    for r in records:
-        if 0 == r['correct_classified_intersection']:
-            continue
-        result.append(deepcopy(r))
-    return result
+    return df
 
 
 def create_xai_plots(base_output_dir: str, config: dict) -> None:
     xai_records = load_xai_records(config=config)
-    # filtered_xai_records = get_correctly_classified_records(records=xai_records)
+
     visualization_methods = dict(
         most_common_xai_attributions=plot_most_common_xai_attributions,
         most_common_xai_attributions_tf_idf=plot_most_common_xai_attributions,
@@ -1125,7 +1109,6 @@ def plot_correlation_between_words_and_labels(
         ncols=len(dataset_types),
         sharex=True,
         sharey=True,
-        # layout='constrained',
         gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
         figsize=(4, 2),
     )
@@ -1170,13 +1153,7 @@ def plot_correlation_between_words_and_labels(
 
             start = 0 if len(topk_words) == len(g.containers) else len(topk_words)
             for container, word in zip(g.containers[start:], topk_words):
-                g.bar_label(container, labels=[word], fontsize=3)
-            axs[k].legend(
-                loc='lower right',
-                ncols=1,
-                # fontsize='xx-small',
-                prop={'size': 2},
-            )
+                g.bar_label(container, labels=[word], fontsize=4)
 
             for label in axs[k].get_xticklabels() + axs[k].get_yticklabels():
                 label.set_fontsize(4)
@@ -1197,7 +1174,7 @@ def plot_correlation_between_words_and_labels(
             axs[k].spines['left'].set_linewidth(0.5)
             axs[k].grid(linewidth=0.1)
             axs[k].set_title(
-                f'Dataset = {DATASET_NAME_MAP[c]}',
+                f'Dataset: {DATASET_NAME_MAP[c]}',
                 fontsize=4,
             )
 
@@ -1546,7 +1523,7 @@ def plot_sentence_wise_attribution_diff(
             y="rank",
             order=ranks,
             hue="method",
-            hue_order=list(mean_attr_method.index),
+            hue_order=list_intersection(HUE_ORDER, df['method'].unique()),
             orient="y",
             data=df,
             ax=ax,
@@ -1611,6 +1588,7 @@ VISUALIZATIONS = dict(
     evaluation=create_evaluation_plots,
     model=create_model_performance_plots,
     prediction=create_prediction_plots,
+    gender_difference=create_gender_difference_plots,
 )
 
 

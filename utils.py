@@ -226,6 +226,13 @@ def determine_model_type(s: str) -> str:
     return result
 
 
+def list_intersection(lst1, lst2):
+    """
+    List intersection between two lists while keeping the order of the first list.
+    """
+    return [value for value in lst1 if value in lst2]
+
+
 def cache_dec(save_path: str, recalc: bool = False):
     def dec_func(func):
         def f(*args, **kwargs):
