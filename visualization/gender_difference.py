@@ -154,11 +154,14 @@ def apply_attribution_test(
 
 def get_cutoff_cmap(alpha: float = 0.05, cmap_name: str = "magma"):
     vird = matplotlib.colormaps[cmap_name]
+    color_range = 2028
+    first_section = int(np.floor((alpha) * color_range))
+    second_section = color_range - first_section
     new_colors = vird(
         np.concatenate(
             [
-                np.linspace(0, 0.1, int(np.ceil(alpha * (256)))),
-                np.linspace(0.6, 0.7, int(np.ceil((1 - alpha) * 256))),
+                np.linspace(0, 0.1, first_section),
+                np.linspace(0.6, 0.7, second_section),
             ]
         )
     )
@@ -166,7 +169,6 @@ def get_cutoff_cmap(alpha: float = 0.05, cmap_name: str = "magma"):
 
 
 def plot_prediction_heatmap(output_dir: str, df: pd.DataFrame, test: str = "ttest"):
-    cmap = get_cutoff_cmap()
     gender_all = df[
         (df["model_version"] == "best") & (df["dataset_type"] == "gender_all")
     ].pivot(index="model_name", columns="model_repetition_number", values="p_value")
@@ -175,7 +177,7 @@ def plot_prediction_heatmap(output_dir: str, df: pd.DataFrame, test: str = "ttes
         (df["model_version"] == "best") & (df["dataset_type"] == "gender_subj")
     ].pivot(index="model_name", columns="model_repetition_number", values="p_value")
 
-    max_value = max(gender_all.values.max(), gender_subj.values.max())
+    cmap = get_cutoff_cmap()
 
     fig, axs = plt.subplots(
         1, 2, figsize=(12, 5), sharey=True, gridspec_kw={'width_ratios': [1, 1.2]}
@@ -185,7 +187,8 @@ def plot_prediction_heatmap(output_dir: str, df: pd.DataFrame, test: str = "ttes
         annot=True,
         fmt=".3f",
         ax=axs[0],
-        vmax=max_value,
+        vmin=0,
+        vmax=1.0,
         cbar=False,
         cmap=cmap,
     )
@@ -193,18 +196,21 @@ def plot_prediction_heatmap(output_dir: str, df: pd.DataFrame, test: str = "ttes
     axs[0].set_ylabel("")
     axs[0].set_xlabel("")
 
-    sns.heatmap(
+    g = sns.heatmap(
         gender_subj,
         annot=True,
         fmt=".3f",
         ax=axs[1],
-        vmax=max_value,
+        vmin=0,
+        vmax=1.0,
         cbar=True,
         cmap=cmap,
     )
     axs[1].set_title("$Dataset: D_S$")
     axs[1].set_ylabel("")
     axs[1].set_xlabel("")
+    g.collections[0].colorbar.set_label("p-value")
+    g.collections[0].colorbar.set_ticks([0, 0.05, 1])
 
     save_path = os.path.join(output_dir, "hypo_tests", test, f"prediction_diff.png")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -216,7 +222,13 @@ def plot_prediction_heatmap(output_dir: str, df: pd.DataFrame, test: str = "ttes
 def plot_attribution_heatmap_row(
     df: pd.DataFrame, axs: list[plt.Axes], max_value: float = 1
 ) -> None:
-    cmap = get_cutoff_cmap()
+
+    def truncate_df(df: pd.DataFrame, decimals: int = 2) -> pd.DataFrame:
+        return df.applymap(
+            lambda x: (
+                np.trunc(x * 10**decimals) / 10 ** decimals if not pd.isnull(x) else x
+            )
+        )
 
     df["attribution_method"] = df["attribution_method"].apply(
         lambda x: METHOD_NAME_MAP.get(x, x)
@@ -233,6 +245,7 @@ def plot_attribution_heatmap_row(
 
     # Sort columns by HUE_ORDER
     gender_all = gender_all.reindex(columns=HUE_ORDER)
+    gender_all = truncate_df(gender_all)
 
     gender_subj = df[df["dataset_type"] == "gender_subj"].pivot(
         index="model_name", columns="attribution_method", values="p_value"
@@ -245,13 +258,17 @@ def plot_attribution_heatmap_row(
 
     # Sort columns by HUE_ORDER
     gender_subj = gender_subj.reindex(columns=HUE_ORDER)
+    gender_subj = truncate_df(gender_subj)
+
+    cmap = get_cutoff_cmap()
 
     sns.heatmap(
         gender_all,
         annot=True,
         fmt=".2f",
         ax=axs[0],
-        vmax=max_value,
+        vmin=0,
+        vmax=1,
         cbar=False,
         cmap=cmap,
     )
@@ -259,18 +276,21 @@ def plot_attribution_heatmap_row(
     axs[0].set_ylabel("")
     axs[0].set_xlabel("")
 
-    sns.heatmap(
+    g = sns.heatmap(
         gender_subj,
         annot=True,
         fmt=".2f",
         ax=axs[1],
-        vmax=max_value,
+        vmin=0,
+        vmax=1,
         cbar=True,
         cmap=cmap,
     )
     axs[1].set_title("Dataset: $D_S$")
     axs[1].set_ylabel("")
     axs[1].set_xlabel("")
+    g.collections[0].colorbar.set_label("p-value")
+    g.collections[0].colorbar.set_ticks([0, 0.05, 1])
 
 
 def plot_attribution_heatmap(
@@ -320,7 +340,6 @@ def plot_attribution_heatmap_with_rep(
             results_df["model_repetition_number"] == model_repetition
         ]
         plot_attribution_heatmap_row(cur_results_df, axs[i], max_value=max_value)
-        axs[i][0].set_title(f"Repetition {model_repetition}")
 
     fig.tight_layout()
 
