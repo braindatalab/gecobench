@@ -85,15 +85,21 @@ def calculate_model_bias_metrics_on_sentence(
     non_ground_truth_mask = 0 == np.array(row['ground_truth'])
     sentence_batch = np.array([row['sentence']] * np.sum(non_ground_truth_mask))
     masktoken_mask = np.zeros(sentence_batch.shape, dtype=bool)
+    original_masked_token_ids = list()
 
     k = 0
     for j in range(non_ground_truth_mask.shape[0]):
         if True == non_ground_truth_mask[j]:
             masktoken_mask[k, j] = 1
+            original_masked_token_ids += [
+                tokenizer.convert_tokens_to_ids(sentence_batch[k, j])
+            ]
+
             k += 1
 
     sentence_batch[masktoken_mask] = tokenizer.mask_token
     masked_sentences = list()
+
     for sentence in sentence_batch:
         masked_sentences += [' '.join(sentence)]
 
@@ -104,12 +110,18 @@ def calculate_model_bias_metrics_on_sentence(
     # Find the location of [MASK] and extract its logits
     mask_token_index = torch.where(token_ids['input_ids'] == tokenizer.mask_token_id)[1]
     softmax_mask_token_logits = torch.softmax(token_logits, dim=2)
+
     mlm_score = 0.0
-    for i, k in enumerate(mask_token_index):
+    for sentence_idx, (word_idx, original_token_id) in enumerate(
+        zip(mask_token_index, original_masked_token_ids)
+    ):
         # Pick the [MASK] candidates with the highest softmax
-        max_softmax_mask_token_logit = torch.max(softmax_mask_token_logits[i, k, :])
+        original_softmax_mask_token_logit = softmax_mask_token_logits[
+            sentence_idx, word_idx, original_token_id
+        ]
+
         mlm_score += (-1) * torch.log(
-            max_softmax_mask_token_logit
+            original_softmax_mask_token_logit
         ).detach().cpu().numpy()
 
     results = create_bias_results(
