@@ -68,7 +68,7 @@ def create_bias_results(
     return results
 
 
-def apply_xai_methods_on_sentence(
+def calculate_model_bias_metrics_on_sentence(
     model: Any,
     row: pd.Series,
     dataset_type: str,
@@ -120,7 +120,7 @@ def apply_xai_methods_on_sentence(
     return results
 
 
-def apply_xai_methods(
+def calculate_model_bias_metrics(
     model: Any,
     dataset: pd.DataFrame,
     dataset_type: str,
@@ -128,11 +128,10 @@ def apply_xai_methods(
     model_params: dict,
     config: dict,
 ) -> list[XAIResult]:
-    results = list()
     num_samples = dataset.shape[0]
 
     results = Parallel(n_jobs=1)(
-        delayed(apply_xai_methods_on_sentence)(
+        delayed(calculate_model_bias_metrics_on_sentence)(
             model,
             row,
             dataset_type,
@@ -170,7 +169,7 @@ def loop_over_training_records(
             dataset = data[dataset_name]
             model = load_model(path=join(artifacts_dir, model_path)).to(DEVICE)
 
-            result = apply_xai_methods(
+            result = calculate_model_bias_metrics(
                 model=model,
                 dataset=dataset,
                 config=config,
