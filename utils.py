@@ -176,10 +176,7 @@ def generate_evaluation_dir(config: Dict) -> str:
 
 
 def generate_bias_dir(config: Dict) -> str:
-    return join(
-        generate_artifacts_dir(config),
-        config['bias']['output_dir'],
-    )
+    return config['bias']['output_dir']
 
 
 def generate_visualization_dir(config: Dict) -> str:
