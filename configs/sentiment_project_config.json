@@ -173,6 +173,10 @@
       ],
       "model": [
         "model_performance"
+      ],
+      "gender_difference": [
+        "test_heatmaps",
+        "stats"
       ]
     }
   },

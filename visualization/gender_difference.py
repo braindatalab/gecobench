@@ -491,61 +491,101 @@ def plot_word_attribution_difference_point(output_dir: str, df: pd.DataFrame, ke
     plt.close()
 
 
-def create_gender_difference_plots(base_output_dir: str, config: dict):
-    logger.info("Generating gender difference plots")
-
-    results_path = os.path.join(
-        generate_artifacts_dir(config),
-        generate_evaluation_dir(config),
-        "gender_differences.pkl",
-    )
-
-    (
-        pred_diffs_df,
-        attribution_diffs_df,
-        attribution_diffs_gt_df,
-        attribution_diffs_not_gt_df,
-    ) = load_differences(results_path, MODEL_NAME_MAP=MODEL_NAME_MAP)
-
-    # Exclude methods not defined in config
-    for method in attribution_diffs_df["attribution_method"].unique():
-        if method not in config["xai"]["methods"]:
-            attribution_diffs_df = attribution_diffs_df[
-                attribution_diffs_df["attribution_method"] != method
-            ]
-            attribution_diffs_gt_df = attribution_diffs_gt_df[
-                attribution_diffs_gt_df["attribution_method"] != method
-            ]
-            attribution_diffs_not_gt_df = attribution_diffs_not_gt_df[
-                attribution_diffs_not_gt_df["attribution_method"] != method
-            ]
-
-    # Generate difference tables & plots
-    generate_stats_table_pred(base_output_dir, pred_diffs_df)
-
-    for key, df in [
-        ("all", attribution_diffs_df),
-        ("gt", attribution_diffs_gt_df),
-        ("not_gt", attribution_diffs_not_gt_df),
-    ]:
-        df_with_rep = generate_stats_table_attribution_with_rep(
-            base_output_dir, df, key
+def plot_prediction_difference(
+    base_output_dir: str, pred_diffs_df: pd.DataFrame, **kwargs
+):
+    # We have one row for every attribution method, but the prediction difference is the same for all
+    # so we can just use the first one.
+    df = pred_diffs_df[
+        (
+            pred_diffs_df["attribution_method"]
+            == pred_diffs_df["attribution_method"].unique()[0]
         )
+        & (pred_diffs_df["model_version"] == "best")
+    ]
+    df["dataset_type"] = df["dataset_type"].map(lambda x: DATASET_NAME_MAP.get(x, x))
 
-        df_with_rep["method"] = df_with_rep["method"].apply(
-            lambda x: METHOD_NAME_MAP.get(x, x)
-        )
-        df_with_rep.rename(
+    df_pos = df[df["pred_diff"] > 0]
+    df_neg = df[df["pred_diff"] <= 0]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    def make_errorbar(plot_negative):
+        def plot_errorbar(x):
+            # Get the first index of the group to get the model and dataset
+            idx = x.index[0]
+            entry = df.loc[idx]
+
+            cur_abs_df = df[
+                (df["model_name"] == entry["model_name"])
+                & (df["dataset_type"] == entry["dataset_type"])
+            ]
+            cur_abs_df = cur_abs_df[cur_abs_df["pred_diff"] != 0]
+
+            cur_abs_diff = np.mean(np.abs(cur_abs_df["pred_diff"]))
+
+            if plot_negative:
+                return (0, cur_abs_diff)
+            else:
+                return (-cur_abs_diff, 0)
+
+        return plot_errorbar
+
+    for idx, (cur_df, colors) in enumerate(
+        [
+            (df_pos, sns.color_palette("pastel")),
+            (df_neg, sns.color_palette()),
+        ]
+    ):
+
+        x_label = "Model"
+        y_label = "P(female) - P(male)"
+        hue_label = "Dataset"
+        cur_df = cur_df.rename(
             columns={
-                "method": "XAI Method",
-                "model": "Model",
-                "mean": "Average Attribution Difference",
-            },
-            inplace=True,
+                "model_name": x_label,
+                "pred_diff": y_label,
+                "dataset_type": hue_label,
+            }
         )
 
-        plot_word_attribution_difference_point(base_output_dir, df_with_rep, key)
+        g = sns.barplot(
+            data=cur_df,
+            x=x_label,
+            y=y_label,
+            hue=hue_label,
+            ax=ax,
+            palette=colors,
+            legend=idx == 0,
+            errorbar=make_errorbar(idx == 1),
+        )
+        g.set_xlabel("")
+        g.set_ylabel(y_label, fontsize=12)
+        for label in g.get_xticklabels() + g.get_yticklabels():
+            label.set_fontsize(12)
 
+        if idx == 0:
+            leg = g.legend(title=hue_label)
+            # Set title font size
+            leg.set_title(title=hue_label, prop={'size': 12})
+            for t in leg.texts:
+                t.set_fontsize(12)
+
+    plt.savefig(
+        os.path.join(base_output_dir, "bias_prediction_diff.png"),
+        bbox_inches='tight',
+        dpi=300,
+    )
+    plt.close()
+
+
+def plot_test_heatmaps(
+    base_output_dir: str,
+    pred_diffs_df: pd.DataFrame,
+    attribution_diffs_df: pd.DataFrame,
+    attribution_diffs_gt_df: pd.DataFrame,
+    attribution_diffs_not_gt_df: pd.DataFrame,
+):
     # Generate hypothesis test plots
     for test in ["ttest", "wilcoxon"]:
         if len(pred_diffs_df) > 0:
@@ -579,5 +619,89 @@ def create_gender_difference_plots(base_output_dir: str, config: dict):
             (results_not_gt_rep, "not_gt"),
         ]:
             plot_attribution_heatmap_with_rep(base_output_dir, results, test, key)
+
+
+def plot_means_stats(
+    base_output_dir: str,
+    pred_diffs_df: pd.DataFrame,
+    attribution_diffs_df: pd.DataFrame,
+    attribution_diffs_gt_df: pd.DataFrame,
+    attribution_diffs_not_gt_df: pd.DataFrame,
+):
+    # Generate difference tables & plots
+    generate_stats_table_pred(base_output_dir, pred_diffs_df)
+
+    for key, df in [
+        ("all", attribution_diffs_df),
+        ("gt", attribution_diffs_gt_df),
+        ("not_gt", attribution_diffs_not_gt_df),
+    ]:
+        df_with_rep = generate_stats_table_attribution_with_rep(
+            base_output_dir, df, key
+        )
+
+        df_with_rep["method"] = df_with_rep["method"].apply(
+            lambda x: METHOD_NAME_MAP.get(x, x)
+        )
+        df_with_rep.rename(
+            columns={
+                "method": "XAI Method",
+                "model": "Model",
+                "mean": "Average Attribution Difference",
+            },
+            inplace=True,
+        )
+
+        plot_word_attribution_difference_point(base_output_dir, df_with_rep, key)
+
+
+def create_gender_difference_plots(base_output_dir: str, config: dict):
+    logger.info("Generating gender difference plots")
+
+    results_path = os.path.join(
+        generate_artifacts_dir(config),
+        generate_evaluation_dir(config),
+        "gender_differences.pkl",
+    )
+
+    (
+        pred_diffs_df,
+        attribution_diffs_df,
+        attribution_diffs_gt_df,
+        attribution_diffs_not_gt_df,
+    ) = load_differences(results_path, MODEL_NAME_MAP=MODEL_NAME_MAP)
+
+    # Exclude methods not defined in config
+    for method in attribution_diffs_df["attribution_method"].unique():
+        if method not in config["xai"]["methods"]:
+            attribution_diffs_df = attribution_diffs_df[
+                attribution_diffs_df["attribution_method"] != method
+            ]
+            attribution_diffs_gt_df = attribution_diffs_gt_df[
+                attribution_diffs_gt_df["attribution_method"] != method
+            ]
+            attribution_diffs_not_gt_df = attribution_diffs_not_gt_df[
+                attribution_diffs_not_gt_df["attribution_method"] != method
+            ]
+
+    visualization_methods = dict(
+        test_heatmaps=plot_test_heatmaps,
+        stats=plot_means_stats,
+        prediction_difference=plot_prediction_difference,
+    )
+
+    plot_types = config['visualization']['visualizations']['gender_difference']
+    for plot_type in plot_types:
+        logger.info(f'Type of plot: {plot_type}')
+        v = visualization_methods.get(plot_type, None)
+        if v is None:
+            continue
+        v(
+            base_output_dir=base_output_dir,
+            pred_diffs_df=pred_diffs_df,
+            attribution_diffs_df=attribution_diffs_df,
+            attribution_diffs_gt_df=attribution_diffs_gt_df,
+            attribution_diffs_not_gt_df=attribution_diffs_not_gt_df,
+        )
 
     logger.info("Finished generating gender difference plots")
