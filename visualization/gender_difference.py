@@ -173,9 +173,17 @@ def plot_prediction_heatmap(output_dir: str, df: pd.DataFrame, test: str = "ttes
         (df["model_version"] == "best") & (df["dataset_type"] == "gender_all")
     ].pivot(index="model_name", columns="model_repetition_number", values="p_value")
 
+    gender_all.sort_index(
+        key=lambda x: [MODEL_ORDER.index(model) for model in x], inplace=True
+    )
+
     gender_subj = df[
         (df["model_version"] == "best") & (df["dataset_type"] == "gender_subj")
     ].pivot(index="model_name", columns="model_repetition_number", values="p_value")
+
+    gender_subj.sort_index(
+        key=lambda x: [MODEL_ORDER.index(model) for model in x], inplace=True
+    )
 
     cmap = get_cutoff_cmap()
 

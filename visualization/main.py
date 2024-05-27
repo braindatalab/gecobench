@@ -1219,6 +1219,8 @@ def model_ds_axs(
     Helper function that creates a grid of subplots for each model and dataset type.
     and groups the data accordingly.
     """
+    data["model_name"] = data["model_name"].map(MODEL_NAME_MAP)
+    data["dataset_type"] = data["dataset_type"].map(DATASET_NAME_MAP)
     pad = 5
     _, axs = plt.subplots(
         nrows=len(data["model_name"].unique()),
@@ -1228,15 +1230,18 @@ def model_ds_axs(
     )
 
     plots = []
-    for model_idx, (model_name, group) in enumerate(data.groupby(by="model_name")):
-        for ds_idx, (dataset_type, group2) in enumerate(
-            group.groupby(by="dataset_type")
-        ):
+    for model_idx, model_name in enumerate(MODEL_ORDER):
+        for ds_idx, dataset_type in enumerate(ROW_ORDER):
+            group = data[
+                (data["model_name"] == model_name)
+                & (data["dataset_type"] == dataset_type)
+            ]
+
             ax = axs[model_idx][ds_idx]
 
             # Set title and labels
             if model_idx == 0:
-                ax.set_title(f"{dataset_type}", fontsize=font_size)
+                ax.set_title(f"Dataset: {dataset_type}", fontsize=font_size)
 
             if ds_idx == 0:
                 ax.annotate(
@@ -1251,7 +1256,7 @@ def model_ds_axs(
                     fontsize=font_size,
                 )
 
-            plots.append((ax, model_name, dataset_type, group2))
+            plots.append((ax, model_name, dataset_type, group))
 
     return plots
 
@@ -1316,7 +1321,9 @@ def plot_prediction_positive(
     male and female sentences.
     """
 
-    for ax, _, _, grouped in model_ds_axs(data, figsize=(15, 10)):
+    for ax, _, _, grouped in model_ds_axs(
+        data, figsize=(15, 10), sharex=True, sharey=True
+    ):
         # Prepare data for plot
         female_positiv_probs = [
             pred[1] for pred in grouped[grouped["target"] == 0]["pred_probabilities"]
@@ -1369,7 +1376,7 @@ def plot_prediction_diff(
     ]
     for ds_idx, (dataset_type, group) in enumerate(data.groupby(by="dataset_type")):
         ax = axs[ds_idx]
-        ax.set_title(f"{dataset_type}")
+        ax.set_title(f"Dataset: {DATASET_NAME_MAP[dataset_type]}")
 
         plot_data = []
         for model_name, group_model in group.groupby(by="model_name"):
@@ -1420,13 +1427,18 @@ def plot_prediction_diff(
                 }
             )
 
+        plot_data = pd.DataFrame(plot_data)
+        plot_data['model'] = plot_data['model'].map(MODEL_NAME_MAP)
+
         sns.barplot(
             x="count",
             y="section",
             order=sections,
             hue="model",
+            hue_order=list_intersection(MODEL_ORDER, plot_data['model'].unique()),
+            palette=sns.color_palette("pastel"),
             orient="y",
-            data=pd.DataFrame(plot_data),
+            data=plot_data,
             ax=ax,
             legend=ds_idx == 0,
         )
@@ -1436,7 +1448,9 @@ def plot_prediction_diff(
 
         if ds_idx == 0:
             # Move legend outside of plot
-            ax.legend(loc='lower center', bbox_to_anchor=(1, -0.5))
+            ax.legend(
+                loc='lower center', bbox_to_anchor=(0.75, -0.5), title="Model", ncol=5
+            )
 
     file_path = join(base_output_dir, f'{plot_type}_{model_version}.png')
     logger.info(file_path)
