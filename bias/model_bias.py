@@ -1,23 +1,19 @@
-import os.path
+from itertools import chain
 from itertools import chain
 from os.path import join
 from typing import Dict, Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
-import torch.nn.functional as F
-from captum.attr import TokenReferenceBase
 from joblib import Parallel, delayed
 from loguru import logger
-from torch import Tensor
 from tqdm import tqdm
-from transformers import BertTokenizer, AutoModelForMaskedLM
+from transformers import AutoModelForMaskedLM
 
-from common import XAIResult, validate_dataset_key
+from common import validate_dataset_key
 from training.bert import (
     create_bert_ids,
-    get_bert_ids,
     get_bert_tokenizer,
 )
 from utils import (
@@ -26,7 +22,6 @@ from utils import (
     load_jsonl_as_df,
     load_pickle,
     dump_as_pickle,
-    generate_xai_dir,
     append_date,
     load_model,
     generate_data_dir,
@@ -34,11 +29,7 @@ from utils import (
     BERT_MODEL_TYPE,
     ONE_LAYER_ATTENTION_MODEL_TYPE,
     determine_model_type,
-)
-from xai.methods import (
-    get_captum_attributions,
-    calculate_covariance_between_words_target,
-    get_covariance_between_words_target,
+    generate_bias_dir,
 )
 
 DEVICE = 'cpu'
@@ -77,7 +68,7 @@ def calculate_model_bias_metrics_on_sentence(
     config: dict,
     num_samples: int,
     index: int,
-) -> list[XAIResult]:
+) -> list[dict]:
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
     tokenizer = get_tokenizer[model_type](config)
@@ -127,7 +118,7 @@ def calculate_model_bias_metrics(
     trained_on_dataset_name: str,
     model_params: dict,
     config: dict,
-) -> list[XAIResult]:
+) -> list[dict]:
     num_samples = dataset.shape[0]
 
     results = Parallel(n_jobs=1)(
@@ -166,7 +157,7 @@ def loop_over_training_records(
             logger.info(
                 f'Processing {model_params["model_name"]} trained on {trained_on_dataset_name} with dataset {dataset_name}.'
             )
-            dataset = data[dataset_name]
+            dataset = data[dataset_name][:2]
             model = load_model(path=join(artifacts_dir, model_path)).to(DEVICE)
 
             result = calculate_model_bias_metrics(
@@ -178,14 +169,14 @@ def loop_over_training_records(
                 model_params=model_params,
             )
 
-            xai_output_dir = generate_xai_dir(config=config)
-            filename = f'{append_date(s=config["xai"]["intermediate_raw_xai_result_prefix"])}.pkl'
+            bias_output_dir = generate_bias_dir(config=config)
+            filename = f'{append_date(s="model_bias")}.pkl'
             dump_as_pickle(
                 data=result,
-                output_dir=join(artifacts_dir, xai_output_dir),
+                output_dir=join(artifacts_dir, bias_output_dir),
                 filename=filename,
             )
-            output += [join(xai_output_dir, filename)]
+            output += [join(bias_output_dir, filename)]
 
     return output
 
@@ -221,19 +212,18 @@ def main(config: Dict) -> None:
     )
     training_records = load_pickle(file_path=training_records_path)
     test_data = load_test_data(config=config)
-
     logger.info(f'Generate explanations.')
     intermediate_results_paths = loop_over_training_records(
         training_records=training_records, data=test_data, config=config
     )
 
     logger.info('Dump path records.')
-    # output_dir = join(
-    #     generate_artifacts_dir(config=config), generate_xai_dir(config=config)
-    # )
-    # dump_as_pickle(
-    #     data=results, output_dir=output_dir, filename=config['xai']['xai_records']
-    # )
+    output_dir = join(
+        generate_artifacts_dir(config=config), generate_bias_dir(config=config)
+    )
+    dump_as_pickle(
+        data=intermediate_results_paths, output_dir=output_dir, filename='bias_records.pkl'
+    )
 
 
 if __name__ == '__main__':
