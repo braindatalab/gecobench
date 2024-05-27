@@ -10,6 +10,8 @@ from joblib import Parallel, delayed
 from loguru import logger
 from tqdm import tqdm
 from transformers import AutoModelForMaskedLM
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from common import validate_dataset_key
 from training.bert import (
@@ -30,6 +32,13 @@ from utils import (
     ONE_LAYER_ATTENTION_MODEL_TYPE,
     determine_model_type,
     generate_bias_dir,
+)
+from visualization.common import (
+    MODEL_NAME_MAP,
+    DATASET_NAME_MAP,
+    METRIC_NAME_MAP,
+    MODEL_ORDER,
+    ROW_ORDER,
 )
 
 DEVICE = 'cpu'
@@ -135,7 +144,7 @@ def calculate_model_bias_metrics(
         for k, (_, row) in enumerate(dataset.iterrows())
     )
 
-    return list(chain.from_iterable(results))
+    return results
 
 
 def loop_over_training_records(
@@ -157,7 +166,7 @@ def loop_over_training_records(
             logger.info(
                 f'Processing {model_params["model_name"]} trained on {trained_on_dataset_name} with dataset {dataset_name}.'
             )
-            dataset = data[dataset_name][:2]
+            dataset = pd.concat([data[dataset_name][:2], data[dataset_name][-2:]], axis=0)
             model = load_model(path=join(artifacts_dir, model_path)).to(DEVICE)
 
             result = calculate_model_bias_metrics(
@@ -205,8 +214,9 @@ create_token_ids = {
 
 
 def main(config: Dict) -> None:
+    artifacts_dir = generate_artifacts_dir(config=config)
     training_records_path = join(
-        generate_artifacts_dir(config=config),
+        artifacts_dir,
         generate_training_dir(config=config),
         config['training']['training_records'],
     )
@@ -218,12 +228,51 @@ def main(config: Dict) -> None:
     )
 
     logger.info('Dump path records.')
-    output_dir = join(
-        generate_artifacts_dir(config=config), generate_bias_dir(config=config)
-    )
+    output_dir = join(artifacts_dir, generate_bias_dir(config=config))
     dump_as_pickle(
-        data=intermediate_results_paths, output_dir=output_dir, filename='bias_records.pkl'
+        data=intermediate_results_paths,
+        output_dir=output_dir,
+        filename='bias_records.pkl',
     )
+
+    data_paths = load_pickle(file_path=join(output_dir, 'bias_records.pkl'))
+    list_of_dicts = list()
+    for p in data_paths:
+        d = load_pickle(file_path=join(artifacts_dir, p))
+        list_of_dicts += d
+
+    data = pd.DataFrame(list_of_dicts)
+
+    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+
+    data = data.rename(
+        columns={
+            "mapped_model_name": "Model",
+            "dataset_type": "Dataset",
+        }
+    )
+
+    g = sns.catplot(
+        data=data,
+        x='Model',
+        y='mlm_score',
+        order=MODEL_ORDER,
+        # hue_order='target',
+        # row_order=ROW_ORDER,
+        hue='target',
+        row='Dataset',
+        kind='box',
+        palette=sns.color_palette(palette='pastel'),
+        fill=True,
+        # height=height,
+        fliersize=0,
+        estimator='median',
+        # aspect=9.5 / height,
+        legend_out=True,
+    )
+
+    plt.show()
 
 
 if __name__ == '__main__':
