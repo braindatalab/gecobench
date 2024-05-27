@@ -172,6 +172,11 @@
         "precision_specificity",
         "top_k_precision",
         "mass_accuracy"
+      ],
+      "gender_difference": [
+        "test_heatmaps",
+        "stats",
+        "prediction_difference"
       ]
     }
   },
