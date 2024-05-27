@@ -6,6 +6,7 @@ from xai.main import main as xai_main
 from evaluation.main import main as evaluation_main
 from visualization.main import main as visualization_main
 from bias.main import main as bias_main
+from bias.model_bias import main as model_bias_main
 from training.sweep import main as sweep_main
 from utils import load_json_file
 
@@ -42,6 +43,7 @@ Modes = {
     'evaluation': evaluation_main,
     'visualization': visualization_main,
     'bias': bias_main,
+    'model_bias': model_bias_main,
     'sweep': sweep_main,
 }
 
