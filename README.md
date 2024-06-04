@@ -25,6 +25,39 @@ The benchmark pipeline consists of the following steps:
 
 ![Pipeline](./misc/pipeline.png)
 
+## Dataset Format
+
+**GECO** consists of two gender-controlled datasets: `gender_all` and `gender_subj`. Both datasets contain 805 sentences in both male and female version, resulting in 1610 sentences in total per dataset. In the `gender_all` dataset, every word referring to a protagonist is replaced with the male or female version. In the `gender_subj` dataset, only the subject of the sentence is changed. Both datasets are split into a training and test set.
+
+The training set contains 1288 male and 1288 female sentences, totaling 2576 sentences. The test set contains 322 male and 322 female sentences resulting in 644 test sentences.
+
+Folder structure of the dataset:
+
+```
+├── data_config.json
+├── gender_all
+│   ├── test.jsonl
+│   └── train.jsonl
+└── gender_subj
+    ├── test.jsonl
+    └── train.jsonl
+```
+
+Format:
+
+The format of the dataset is a jsonl file with the following fields:
+
+```json
+{
+  "sentence": [ "An", "old", "man", "answers", "the", "advertisement", ",", "he", ...],
+  "ground_truth": [ 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, ...],
+  "target": 1,
+  "sentence_idx": 0
+}
+```
+
+The sentence is tokenized into a list of strings. The ground truth is a list of floats, where 1.0 indicates that the word is part of the ground truth explanation and 0.0 otherwise. The target indicates whether the sentence is in the female (0) or male (1) form. The sentence_idx is the index of the raw unaltered sentence in the dataset and can be used to retrieve the both the male and female version of a sentence.
+
 ## Getting Started
 
 All artifacts are available on [OSF](https://osf.io/74j9s/?view_only=8f80e68d2bba42258da325fa47b9010f), including the **GECO** dataset, the trained models, the generated explanations, evaluation results and visualizations. With the artifacts, you can start from any step of the pipeline, by downloading the artifacts and unpacking them in the main directory of the project.
