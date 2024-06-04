@@ -106,10 +106,10 @@ The script assumes you have added lazy access to hydra in your ssh config, as de
 https://git.tu-berlin.de/ml-group/hydra/documentation
 
 ```
-HYDRA_SSH_USER=hjalmar
-HYDRA_DATA_DIR=/home/space/datasets/xai_nlp # The path where to place the data on the cluster
-HYDRA_PROJECT_DIR=/home/space/uniml/hjalmar/xai-nlp-benchmark # The path to the code on the cluster
-KNOWN_HOSTS=/home/hjall/.ssh/known_hosts
+HYDRA_SSH_USER= # Name of the user on the cluster
+HYDRA_DATA_DIR=# The path where to place the data on the cluster
+HYDRA_PROJECT_DIR= # The path to the code on the cluster
+KNOWN_HOSTS= # Path to the known_hosts file
 ```
 
 #### Step 2: Move the code to the cluster
