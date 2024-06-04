@@ -171,7 +171,8 @@
         "avg_precision",
         "precision_specificity",
         "top_k_precision",
-        "mass_accuracy"
+        "mass_accuracy",
+        "mass_accuracy_method_grouped"
       ],
       "gender_difference": [
         "test_heatmaps",

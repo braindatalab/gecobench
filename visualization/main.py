@@ -215,6 +215,109 @@ def plot_evaluation_results(
             plt.close()
 
 
+def plot_evaluation_results_grouped_by_xai_method(
+    data: pd.DataFrame,
+    metric: str,
+    model_version: str,
+    result_type: str,
+    base_output_dir: str,
+) -> None:
+    def _plot_postprocessing(g):
+        g.set_titles(row_template="Dataset: {row_name}", size=12)
+        for k in range(g.axes.shape[0]):
+            for j in range(g.axes.shape[1]):
+                g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
+
+                if 0 == k and 'top_k_precision' == metric:
+                    g.axes[k, j].set_ylabel(
+                        f'Average {METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
+                    )
+                else:
+                    g.axes[k, j].set_ylabel(
+                        f'{METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
+                    )
+                g.axes[k, j].set_xlabel('')
+                g.axes[k, j].set_ylim(0, 1)
+                g.axes[k, j].set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
+                # Rotate x-axis labels
+                g.axes[k, j].tick_params(axis='x', rotation=45)
+
+                for label in (
+                    g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+                ):
+                    label.set_fontsize(12)
+
+        # Set legend font size
+        g._legend.set_title('XAI Method', prop={'size': 12})
+        for t in g._legend.texts:
+            t.set_fontsize(12)
+
+    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+    data['attribution_method'] = data['attribution_method'].map(
+        lambda x: METHOD_NAME_MAP.get(x, x)
+    )
+
+    data = data.rename(
+        columns={
+            "mapped_model_name": "Model",
+            "dataset_type": "Dataset",
+            "attribution_method": "XAI Method",
+            **METRIC_NAME_MAP,
+        }
+    )
+
+    average_data = compute_average_score_per_repetition(data=data)
+    datasets = [('', data), ('averaged', average_data)]
+
+    height = 2.5
+    for s, d in datasets:
+        g = sns.catplot(
+            data=d,
+            x='XAI Method',
+            y=METRIC_NAME_MAP[metric],
+            order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
+            hue_order=MODEL_ORDER,
+            row_order=ROW_ORDER,
+            hue='Model',
+            row='Dataset',
+            kind='box',
+            palette=sns.color_palette(palette='pastel'),
+            fill=True,
+            height=height,
+            fliersize=0,
+            estimator='median',
+            aspect=9.5 / height,
+            legend_out=True,
+        )
+
+        sns.move_legend(
+            g,
+            "lower center",
+            bbox_to_anchor=(0.41, -0.25),
+            ncol=5,
+            frameon=True,
+        )
+
+        _plot_postprocessing(g=g)
+        file_path = join(
+            base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
+        )
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+        # Disable legend
+        g._legend.remove()
+        file_path = join(
+            base_output_dir,
+            f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
+        )
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+        plt.close()
+
+
 def plot_model_performance(
     training_history: pd.DataFrame,
     plot_type: str,
@@ -415,6 +518,7 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
         precision_specificity=plot_evaluation_results,
         top_k_precision=plot_evaluation_results,
         mass_accuracy=plot_evaluation_results,
+        mass_accuracy_method_grouped=plot_evaluation_results_grouped_by_xai_method,
     )
 
     plot_types = config['visualization']['visualizations']['evaluation']

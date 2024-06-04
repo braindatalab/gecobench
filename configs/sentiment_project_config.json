@@ -169,7 +169,8 @@
         "sentence_wise_attribution_diff"
       ],
       "evaluation": [
-        "mass_accuracy"
+        "mass_accuracy",
+        "mass_accuracy_method_grouped"
       ],
       "model": [
         "model_performance"
