@@ -132,15 +132,14 @@ After setting up the experiment folder, we can run any step of the pipeline by r
 python run_experiments.py --mode=MODE --config=artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/gender_project_config.json
 ```
 
-### On hydra
+### On Hydra
 
 To run the code on the cluster we have to do three steps:
 
 #### Step 1: Setup environment
 
 Copy the `.env.example` file to `.env` and fill in the environment variables.
-The script assumes you have added lazy access to hydra in your ssh config, as described in the hydra documentation.
-https://git.tu-berlin.de/ml-group/hydra/documentation
+The script assumes you have added lazy access to hydra in your ssh config, as described in the [hydra documentation](https://git.tu-berlin.de/ml-group/hydra/documentation).
 
 ```
 HYDRA_SSH_USER= # Name of the user on the cluster
