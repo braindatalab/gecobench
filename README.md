@@ -11,7 +11,7 @@ Large pre-trained language models have become popular for many applications and 
 
 ## Project Structure
 
-![Project Structure](./misc/overview.png)
+![Project Structure](./misc/overview_full_v2_border.png)
 
 The project is structured in the following way:
 
