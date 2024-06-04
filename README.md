@@ -29,6 +29,14 @@ The benchmark pipeline consists of the following steps:
 
 All artifacts are available on [OSF](https://osf.io/74j9s/?view_only=8f80e68d2bba42258da325fa47b9010f), including the **GECO** dataset, the trained models, the generated explanations, evaluation results and visualizations. With the artifacts, you can start from any step of the pipeline, by downloading the artifacts and unpacking them in the main directory of the project.
 
+### Installation
+
+We use [poetry](https://python-poetry.org/) to manage the dependencies. To install the dependencies run the following command:
+
+```bash
+poetry install
+```
+
 ### Building the datasets
 
 The dataset generation consists of two steps:
