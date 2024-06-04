@@ -1,10 +1,36 @@
-# nlp-benchmark
+# GECOBench: A Gender-Controlled Text Dataset and Benchmark for Quantifying Biases in Explanations
 
-NLP Benchmark for XAI methods
+This repository contains the code for the paper "GECOBench: A Gender-Controlled Text Dataset and Benchmark for Quantifying Biases in Explanations" submitted to NeurIPS 2024 (Datasets and Benchmarks track).
+
+**Abstract**
+Large pre-trained language models have become popular for many applications and form an important backbone of many downstream tasks in natural language processing (NLP). Applying 'explainable artificial intelligence' (XAI) techniques to enrich such models' outputs is considered crucial for assuring their quality and shedding light on their inner workings. However, large language models are trained on a plethora of data containing a variety of biases, such as gender biases, affecting model weights and, potentially, behavior. Currently, it is unclear to what extent such biases also impact model explanations in unfavorable ways. We create a gender-controlled text dataset, GECO, in which otherwise identical sentences appear in male and female forms. This gives rise to ground-truth `world explanations' for gender classification tasks, enabling the objective evaluation of the correctness of XAI methods. We provide GECOBench, a rigorous quantitative evaluation framework benchmarking popular XAI methods, applying them to pre-trained language models fine-tuned to different degrees. This allows us to investigate how pre-training induces undesirable bias in model explanations and to what extent fine-tuning can mitigate such explanation bias. We show a clear dependency between explanation performance and the number of fine-tuned layers, where XAI methods are observed to particularly benefit from fine-tuning or complete retraining of embedding layers. Remarkably, this relationship holds for models achieving similar classification performance on the same task. With that, we highlight the utility of the proposed gender-controlled dataset and novel benchmarking approach for research and development of novel XAI methods.
+
+## Project Structure
+
+![Project Structure](./misc/overview.png)
+
+The project is structured in the following way:
+
+- `configs/`: Contains the configuration files for the dataset and the project.
+- `data/`: Contains the code to generate the **GECO** dataset.
+- `training/`: Contains the code to train the different bert models according to the training schemes defined in the config.
+- `xai/`: Contains the code to generate the explanations for the different models and explanation methods.
+- `evaluation/`: Contains the code to evaluate the explanations and compare them to the ground truth explanations from **GECO**.
+- `visualization/`: Contains the code to visualize the evaluation results.
+
+The project can be run locally or on a slurm cluster. The `scripts/` directory contains the scripts to setup the environment and run the code on the cluster.
+
+The benchmark pipeline consists of the following steps:
+
+![Pipeline](./misc/pipeline.png)
+
+## Getting Started
+
+All artifacts are available on [OSF](https://osf.io/74j9s/?view_only=8f80e68d2bba42258da325fa47b9010f), including the **GECO** dataset, the trained models, the generated explanations, evaluation results and visualizations. With the artifacts, you can start from any step of the pipeline, by downloading the artifacts and unpacking them in the main directory of the project.
 
 # Building the datasets
 
-Currently we have four datasets: `gender_all`, `gender_subj`, `sentiment_twitter` and `sentiment_imdb`.
+Currently we have three datasets: `gender_all`, `gender_subj`, and `sentiment_imdb`.
 The config in `config/data_config.json` specifies the datasets and the parameters for the data generation.
 The script expects the raw pickle files to be in `data/raw`.
 
