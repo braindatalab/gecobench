@@ -29,7 +29,16 @@ The benchmark pipeline consists of the following steps:
 
 All artifacts are available on [OSF](https://osf.io/74j9s/?view_only=8f80e68d2bba42258da325fa47b9010f), including the **GECO** dataset, the trained models, the generated explanations, evaluation results and visualizations. With the artifacts, you can start from any step of the pipeline, by downloading the artifacts and unpacking them in the main directory of the project.
 
-# Building the datasets
+### Building the datasets
+
+The dataset generation consists of two steps:
+
+1. Scraping, labeling and preprocessing the data for the GECO dataset.
+2. Generating the final datasets as .jsonl files for GECO and Sentiment datasets.
+
+For Step 1. please refer to the `data/dataset_generation/README.md` for more information.
+
+After finishing Step 1. or downloading the artifacts from OSF, you can generate the datasets.
 
 Currently we have three datasets: `gender_all`, `gender_subj`, and `sentiment_imdb`.
 The config in `config/data_config.json` specifies the datasets and the parameters for the data generation.
@@ -48,7 +57,7 @@ To upload the data to the cluster we can use the `copy_data_to_cluster.sh` scrip
 ./scripts/hydra/copy_data_to_cluster.sh nlp-benchmark_2024-02-15-10-14-37
 ```
 
-Lastly, the project config has to be updated to point to the correct data directory in `configs/gender_project_config.json`:
+Lastly, the project config has to be updated to point to the correct data directory in `configs/gender_no_sub_samp_project_config.json` and `configs/sentiment_config.json`:
 
 ```json
 {
@@ -60,30 +69,31 @@ Lastly, the project config has to be updated to point to the correct data direct
 }
 ```
 
-# Running experiments locally
+### Running experiments locally
 
-1. Setup a experiment run
-   This creates a timestamped folder for the artifacts and copies the config files to the folder.
+Either download the artifacts from OSF or generate a new timestamped experiment run, by running the following command:
 
 ```bash
 python setup_experiment.py
 ```
 
+This will create a timestamped folder in the `artifacts` directory with the necessary config files for the project.
+
 The output gives you the instructions to run the different steps of the experiment.
 
-2. Run model experiment
+#### Run model experiment
 
-Set the mode to `training`, `xai`, `evaluation` or `visualization` and the config to the project config. The modes depend on each other and have to be run in the order `training`, `xai`, `evaluation` and `visualization`.
+After setting up the experiment folder, we can run any step of the pipeline by running the command below. Set the mode to `training`, `xai`, `evaluation` or `visualization` and the config to the project config in the artifacts directory. The modes depend on each other and have to be run in the order `training`, `xai`, `evaluation` and `visualization`.
 
 ```bash
 python run_experiments.py --mode=MODE --config=artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/gender_project_config.json
 ```
 
-# On hydra
+### On hydra
 
 To run the code on the cluster we have to do three steps:
 
-## Step 1: Setup environment
+#### Step 1: Setup environment
 
 Copy the `.env.example` file to `.env` and fill in the environment variables.
 The script assumes you have added lazy access to hydra in your ssh config, as described in the hydra documentation.
@@ -96,7 +106,7 @@ HYDRA_PROJECT_DIR=/home/space/uniml/hjalmar/xai-nlp-benchmark # The path to the 
 KNOWN_HOSTS=/home/hjall/.ssh/known_hosts
 ```
 
-## Step 2: Move the code to the cluster
+#### Step 2: Move the code to the cluster
 
 Either clone the remote repository (recommended) or use the `upload_code_to_cluster.py` script.
 
@@ -104,7 +114,7 @@ Either clone the remote repository (recommended) or use the `upload_code_to_clus
 python ./scripts/hydra/upload_code_to_cluster.py hydra
 ```
 
-## Step 4. Setup the project
+#### Step 4. Setup the project
 
 Ssh into the cluster and navigate to the code directory.
 As mentioned above, this creates a timestamped folder for the artifacts and copies the config files to the folder.
@@ -115,7 +125,7 @@ python3 setup_experiment.py
 
 By default it will create the artifacts folder in the code directory.
 
-## Step 5. Build and run the container
+#### Step 5. Build and run the container
 
 To run the code we need to first build the container. This step only needs to be repeated if the dependencies change.
 
@@ -135,12 +145,12 @@ The machine the code is run on and the timeslot can be configured in `./scripts/
 Further details can be found in the hydra documentation: https://git.tu-berlin.de/ml-group/hydra/documentation
 The logger outputs of the container can be found in the code directory under logs.
 
-## Step 4. View and cancel jobs
+#### Step 4. View and cancel jobs
 
-To view your current jobs: run e.g. `squeue --user=hjalmar`
+To view your current jobs: run e.g. `squeue --user=USERNAME`
 To cancel a job run `scancel job_id` with the job id you get from the command above.
 
-## Step 5. Retrieve results
+#### Step 5. Retrieve results
 
 To copy the results from the cluster to your local machine you can use the `get_results_from_cluster.sh` script.
 
@@ -148,9 +158,9 @@ To copy the results from the cluster to your local machine you can use the `get_
 ./scripts/hydra/get_results_from_cluster.sh xai-nlp-benchmark-2024...
 ```
 
-# Viewing the html plots
+## Visualization
 
-To view the html plots start a local server in the root directory of the project:
+All visualizations are saved in the `artifacts` directory as images. The only exception are the html plots. To view the html plots start a local server in the root directory of the project:
 
 ```bash
 python -m http.server 9000
