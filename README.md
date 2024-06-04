@@ -30,7 +30,7 @@ The benchmark pipeline consists of the following steps:
 
 ## Dataset Format
 
-**GECO** consists of two gender-controlled datasets: `gender_all` and `gender_subj`. Both datasets contain 805 sentences in both male and female version, resulting in 1610 sentences in total per dataset. In the `gender_all` dataset, every word referring to a protagonist is replaced with the male or female version. In the `gender_subj` dataset, only the subject of the sentence is changed. Both datasets are split into a training and test set.
+**GECO** consists of two gender-controlled datasets: `gender_all` and `gender_subj`. In the `gender_all` dataset, every word referring to a protagonist is replaced with the male or female version. In the `gender_subj` dataset, only the subject of the sentence is changed. Both datasets are split into a training and test set.
 
 The training set contains 1288 male and 1288 female sentences, totaling 2576 sentences. The test set contains 322 male and 322 female sentences resulting in 644 test sentences.
 
