@@ -47,7 +47,7 @@ Format:
 
 The format of the dataset is a jsonl file with the following fields:
 
-```json
+```js
 // Example entry labelled according to the gender_all scheme
 {
   "sentence": ["Paul", "loves", "his", "dog"],
