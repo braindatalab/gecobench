@@ -69,11 +69,9 @@ Lastly, the project config has to be updated to point to the correct data direct
 
 ```json
 {
-  ...
   "data" {
     "data_dir": "/path/to/nlp-benchmark_2024-02-15-10-14-37"
   },
-  ...
 }
 ```
 
