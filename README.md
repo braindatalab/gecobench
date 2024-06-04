@@ -89,7 +89,7 @@ The output gives you the instructions to run the different steps of the experime
 
 #### Run model experiment
 
-After setting up the experiment folder, we can run any step of the pipeline by running the command below. Set the mode to `training`, `xai`, `evaluation` or `visualization` and the config to the project config in the artifacts directory. The modes depend on each other and have to be run in the order `training`, `xai`, `evaluation` and `visualization`.
+After setting up the experiment folder, we can run any step of the pipeline by running the command below. Set the mode to `training`, `xai`, `evaluation` or `visualization` and the config to the project config in the artifacts directory. The modes depend on each other and have to be run in the order `training`, `xai`, `evaluation` and `visualization`. Additionally, we provide a bias analysis script to analyze the bias in the dataset and models by setting the mode to `bias` or `model_bias`.
 
 ```bash
 python run_experiments.py --mode=MODE --config=artifacts/xai-nlp-benchmark-2024-02-15-16-45-19/configs/gender_project_config.json
