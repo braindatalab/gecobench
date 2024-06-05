@@ -3,7 +3,7 @@
 ## 1. Intro
 
 The objective of this dataset is the creation of a ground truth for NLP models. To do so the dataset is composed by a set of manipulated phrases where each one has either a female and a male subject or a all female/male universe (every subject/object of the phrase are female or male).
-To chose the original phrases, they should be of similar length to avoid biases that may be created by the length (I ended up not considering this). The phrases should also be in the 3rd person of the singular. The original phrases were obtained from entries of Wikipedia related to the top 100 books of the day 17/3/2022 of the Gutemberg project. I collected the entire Wikipedia page of these books but only considered phrases related to the plot of the story.
+To chose the original phrases, they should be of similar length to avoid biases that may be created by the length (we ended up not considering this). The phrases should also be in the 3rd person of the singular. The original phrases were obtained from entries of Wikipedia related to the top 100 books of the day 17/3/2022 of the Gutemberg project. We collected the entire Wikipedia page of these books but only considered phrases related to the plot of the story.
 
 ## 2. Getting the URLs
 
@@ -14,12 +14,12 @@ These pages were obtained using the package Selenium.
 
 ## 3. Getting the Wikipedia entries
 
-- the url used for the Wikipedia pages was a google search with the ‘https://www.google.com/search?q="en.wikipedia.org"+’ to which I added the name of the book+author separated by + (replaces the white spaces with +)
+- the url used for the Wikipedia pages was a google search with the ‘https://www.google.com/search?q="en.wikipedia.org"+’ to which We added the name of the book+author separated by + (replaces the white spaces with +)
   - ex: https://www.google.com/search?q="en.wikipedia.org"+Thus+Spake+Zarathustra+A+Book+for+All+and+None+by+Friedrich+Wilhelm+Nietzsche'
   - these urls were saved in a list
-- using these urls And selenium I collect all paragraphs of the Wikipedia pages (<p> on html). These pragraphs are then appended to a list.
+- using these urls And selenium we collect all paragraphs of the Wikipedia pages (<p> on html). These pragraphs are then appended to a list.
 
-Note: to access these urls firstly we need to get to google (and accept the cookies and sometimes it asks if I’m a robot, and I need to manually complete the reCAPTCHA)
+Note: to access these urls firstly we need to get to google (and accept the cookies and sometimes it asks if I’m a robot, and We need to manually complete the reCAPTCHA)
 
 We also deleted the wikipedia references that appear on the middle of the texts, before saving them into a pickle file -> raw_texts.pkl.
 
