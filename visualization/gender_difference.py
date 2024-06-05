@@ -228,7 +228,7 @@ def plot_prediction_heatmap(output_dir: str, df: pd.DataFrame, test: str = "ttes
 
 
 def plot_attribution_heatmap_row(
-    df: pd.DataFrame, axs: list[plt.Axes], max_value: float = 1
+    df: pd.DataFrame, axs: list[plt.Axes], max_value: float = 1, y_label: str = ""
 ) -> None:
 
     def truncate_df(df: pd.DataFrame, decimals: int = 2) -> pd.DataFrame:
@@ -280,8 +280,8 @@ def plot_attribution_heatmap_row(
         cbar=False,
         cmap=cmap,
     )
-    axs[0].set_title("Dataset: $D_A$")
-    axs[0].set_ylabel("")
+    axs[0].set_title("Dataset: $D_A$", fontsize=16)
+    axs[0].set_ylabel(y_label, fontsize=14)
     axs[0].set_xlabel("")
 
     g = sns.heatmap(
@@ -294,11 +294,23 @@ def plot_attribution_heatmap_row(
         cbar=True,
         cmap=cmap,
     )
-    axs[1].set_title("Dataset: $D_S$")
+    axs[1].set_title("Dataset: $D_S$", fontsize=16)
     axs[1].set_ylabel("")
     axs[1].set_xlabel("")
-    g.collections[0].colorbar.set_label("p-value")
+    g.collections[0].colorbar.set_label("p-value", fontsize=16)
     g.collections[0].colorbar.set_ticks([0, 0.05, 1])
+    g.collections[0].colorbar.ax.tick_params(labelsize=14)
+
+    for ax in axs:
+        # Set font size of tick labels
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontsize(14)
+
+        # Rotate y labels
+        labels = [x.get_text() for x in ax.get_yticklabels()]
+        if len(labels) > 0:
+            print(labels)
+            ax.set_yticklabels(labels, rotation=0, fontsize=14)
 
 
 def plot_attribution_heatmap(
@@ -347,7 +359,12 @@ def plot_attribution_heatmap_with_rep(
         cur_results_df = results_df[
             results_df["model_repetition_number"] == model_repetition
         ]
-        plot_attribution_heatmap_row(cur_results_df, axs[i], max_value=max_value)
+        plot_attribution_heatmap_row(
+            cur_results_df,
+            axs[i],
+            max_value=max_value,
+            y_label=f"Rep: {model_repetition}",
+        )
 
     fig.tight_layout()
 
