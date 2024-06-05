@@ -66,6 +66,7 @@ The sentence is tokenized into a list of strings. The ground truth is a list of 
 
 ![MassAccruacy](./misc/mass_accuracy__filter_correct_best_no_legend.png)
 Mass Accuracy for different post-hoc XAI methods applied on the five training schemes, with the null performance baseline for random explanations *Uniform Random* for correctly classified sentences. Within the results for the *BERT* models, fine-tuning or retraining the embedding layer leads to consistent changes in explanation performance; though model performance is equivalent for all models. Applying XAI methods to the *OLA* model is leading to overall higher explanation performance, with InputXGradient on par with the Pattern Variant baseline.
+
 ![OneSentencePlot](./misc/sentence_plot_2.png)
 Explanations by popular XAI methods for one sample sentence, broken down into input tokens as given to the respective model, with the ground truth manipulations highlighted in green. The majority of importance by many methods is correctly attributed to the word 'she', however all tokenized words show non-zero attribution for multiple methods, including the period character '.'. 
 
