@@ -215,6 +215,23 @@ def plot_evaluation_results(
             plt.close()
 
 
+def plot_mass_accuracy_reversed(
+    data: pd.DataFrame,
+    metric: str,
+    model_version: str,
+    result_type: str,
+    base_output_dir: str,
+):
+    data["mass_accuracy_reversed"] = 1 - data["mass_accuracy"]
+    plot_evaluation_results(
+        data=data,
+        metric="mass_accuracy_reversed",
+        model_version=model_version,
+        result_type=result_type,
+        base_output_dir=base_output_dir,
+    )
+
+
 def plot_evaluation_results_grouped_by_xai_method(
     data: pd.DataFrame,
     metric: str,
@@ -519,6 +536,7 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
         top_k_precision=plot_evaluation_results,
         mass_accuracy=plot_evaluation_results,
         mass_accuracy_method_grouped=plot_evaluation_results_grouped_by_xai_method,
+        mass_accuracy_reversed=plot_mass_accuracy_reversed,
     )
 
     plot_types = config['visualization']['visualizations']['evaluation']

@@ -24,6 +24,7 @@ METRIC_NAME_MAP = dict(
     top_k_precision='Top-K Precision',
     mass_accuracy='Mass Accuracy (MA)',
     mass_accuracy_method_grouped="Mass Accuracy (MA)",
+    mass_accuracy_reversed="1 - Mass Accuracy (MA)",
 )
 
 METHOD_NAME_MAP = dict(Covariance="Pattern Variant")
