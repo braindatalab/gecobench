@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentence Labeler</title>
+    <script src="https://unpkg.com/react@17.0.2/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17.0.2/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6.26.0/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="text/babel">
+      const LabelInput = ({
+        isTagTool,
+        isTag,
+        value,
+        onChange,
+        backgroundColor,
+      }) => {
+        const [localValue, setLocalValue] = React.useState(value);
+
+        React.useEffect(() => {
+          setLocalValue(value);
+        }, [value]);
+
+        const handleInputChange = (e) => {
+          const newValue = e.target.value;
+          setLocalValue(newValue);
+          onChange(newValue);
+        };
+
+        if (isTag) {
+          return (
+            <p
+              className={`w-full px-2 py-1 ${
+                !isTagTool ? "hover:line-through hover:opacity-50" : ""
+              }`}
+              style={{
+                backgroundColor,
+                cursor: isTagTool ? "default" : "pointer",
+                transition: "opacity 0.3s ease",
+              }}
+            >
+              {localValue}
+            </p>
+          );
+        }
+
+        return (
+          <input
+            value={localValue}
+            onChange={handleInputChange}
+            className={`w-full px-2 py-1 ${
+              isTag ? "" : "border-b border-gray-300"
+            } focus:outline-none focus:border-blue-500`}
+            style={{
+              backgroundColor,
+              cursor: isTagTool && !isTag ? "pointer" : "default",
+            }}
+          />
+        );
+      };
+
+      const FileUploader = ({ onFileUpload }) => {
+        const handleFileUpload = (event) => {
+          const file = event.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            onFileUpload(JSON.parse(e.target.result));
+          };
+          reader.readAsText(file);
+        };
+
+        return (
+          <div className="flex items-center justify-center h-screen">
+            <label className="w-64 flex flex-col items-center px-4 py-6 bg-white text-blue-500 rounded-lg shadow-lg tracking-wide uppercase border border-blue-500 cursor-pointer hover:bg-blue-500 hover:text-white">
+              <svg
+                className="w-8 h-8"
+                fill="currentColor"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+              >
+                <path d="M16.88 9.1A4 4 0 0 1 16 17H5a5 5 0 0 1-1-9.9V7a3 3 0 0 1 4.52-2.59A4.98 4.98 0 0 1 17 8c0 .38-.04.74-.12 1.1zM11 11h3l-4-4-4 4h3v3h2v-3z" />
+              </svg>
+              <span className="mt-2 text-base leading-normal">
+                Select a file
+              </span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+            </label>
+          </div>
+        );
+      };
+
+      const SentenceNavigation = ({
+        currentSentenceId,
+        onPrevious,
+        onNext,
+        onIdChange,
+      }) => {
+        return (
+          <div className="flex items-center space-x-4">
+            <input
+              type="text"
+              value={currentSentenceId}
+              onChange={onIdChange}
+              className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={onPrevious}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              onClick={onNext}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        );
+      };
+
+      const ToolSelector = ({
+        selectedTool,
+        onToolSelect,
+        tags,
+        replacementTools,
+      }) => {
+        return (
+          <div className="mb-4 flex space-x-2">
+            <button
+              onClick={() => onToolSelect("text")}
+              className={`px-4 py-2 rounded-md ${
+                selectedTool === "text"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
+            >
+              Text
+            </button>
+            {Object.entries(tags).map(([tagId, tag]) => (
+              <button
+                key={tagId}
+                onClick={() => onToolSelect(tagId)}
+                className={`px-4 py-2 rounded-md ${
+                  selectedTool === tagId
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+                style={{
+                  backgroundColor:
+                    selectedTool === tagId ? tag.color : undefined,
+                }}
+              >
+                {tag.tag}
+              </button>
+            ))}
+            {replacementTools.map((tool, index) => (
+              <button
+                key={`replacement_${index}`}
+                onClick={() => onToolSelect(`replacement_${tool}`)}
+                className={`px-4 py-2 rounded-md ${
+                  selectedTool === `replacement_${tool}`
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                {tool}
+              </button>
+            ))}
+          </div>
+        );
+      };
+
+      const ReplacementToolAdder = ({ onAddTool }) => {
+        const [newReplacementTool, setNewReplacementTool] = React.useState("");
+
+        const addReplacementTool = () => {
+          if (newReplacementTool.trim() !== "") {
+            onAddTool(newReplacementTool.trim());
+            setNewReplacementTool("");
+          }
+        };
+
+        return (
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={newReplacementTool}
+              onChange={(e) => setNewReplacementTool(e.target.value)}
+              placeholder="New replacement tool"
+              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={addReplacementTool}
+              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        );
+      };
+
+      const SentenceTable = ({
+        currentSentence,
+        versions,
+        onCellClick,
+        onInputChange,
+        onRemoveColumn,
+        selectedTool,
+        tags,
+      }) => {
+        const getInputValue = (version, gender, wordIndex) => {
+          const labelling = version.gender[gender].labelling;
+          const label = labelling[wordIndex];
+
+          if (label && label.tag !== undefined) {
+            const tagObj = tags[label.tag];
+            return tagObj ? tagObj.tag : "";
+          } else {
+            return label ? label.replacement || "" : "";
+          }
+        };
+
+        const checkIsTag = (version, gender, wordIndex) => {
+          const labelling = version.gender[gender].labelling;
+          const label = labelling[wordIndex];
+
+          return label && label.tag !== undefined;
+        };
+
+        const getInputColor = (version, gender, wordIndex) => {
+          const labelling = version.gender[gender].labelling;
+          const label = labelling[wordIndex];
+          console.log(label);
+          if (label && label.tag !== undefined) {
+            const tagObj = tags[label.tag];
+            return tagObj ? tagObj.color : "transparent";
+          }
+          return "transparent";
+        };
+
+        const getOriginalWordColor = (wordIndex) => {
+          for (const versionKey in versions) {
+            const version = versions[versionKey];
+            for (const genderKey in version.gender) {
+              const gender = version.gender[genderKey];
+              if (gender.labelling[wordIndex]) {
+                return "bg-gray-200"; // Light gray background for changed words
+              }
+            }
+          }
+          return ""; // No background color for unchanged words
+        };
+
+        return (
+          <div className="overflow-x-auto w-full">
+            <table className="w-full table-auto">
+              <tbody>
+                <tr className="bg-gray-100">
+                  <td className="px-4 py-2 font-semibold w-44">
+                    Original {currentSentence.id}
+                  </td>
+                  {currentSentence.sentence.map((word, index) => (
+                    <td
+                      key={index}
+                      className={`px-4 py-2 border min-w-[100px] max-w-[200px] break-words ${getOriginalWordColor(
+                        index
+                      )} cursor-pointer`}
+                      onClick={() => onRemoveColumn(index)}
+                    >
+                      {word}
+                    </td>
+                  ))}
+                </tr>
+                {Object.entries(versions).map(([versionKey, version]) =>
+                  Object.entries(version.gender).map(([genderKey, gender]) => (
+                    <tr
+                      key={`${versionKey}-${genderKey}`}
+                      className="hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-2 font-semibold w-32">{`${versionKey} ${genderKey}`}</td>
+                      {currentSentence.sentence.map((word, wordIndex) => (
+                        <td
+                          key={wordIndex}
+                          className="px-4 py-2 border min-w-[100px] max-w-[200px]"
+                          onClick={() =>
+                            onCellClick(versionKey, genderKey, wordIndex)
+                          }
+                        >
+                          <LabelInput
+                            isTagTool={selectedTool !== "text"}
+                            isTag={checkIsTag(version, genderKey, wordIndex)}
+                            value={getInputValue(version, genderKey, wordIndex)}
+                            onChange={(value) => {
+                              onInputChange(
+                                versionKey,
+                                genderKey,
+                                wordIndex,
+                                value
+                              );
+                            }}
+                            backgroundColor={getInputColor(
+                              version,
+                              genderKey,
+                              wordIndex
+                            )}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        );
+      };
+
+      const KeyboardShortcuts = () => {
+        return (
+          <div className="container mx-auto px-4 py-2 mt-4">
+            <div className="bg-white shadow-md rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h2>
+              <p>
+                Press 'n' to skip to the next sentence (when no input is
+                focused)
+              </p>
+            </div>
+          </div>
+        );
+      };
+
+      function App() {
+        const [data, setData] = React.useState(null);
+        const [currentSentenceId, setCurrentSentenceId] = React.useState(null);
+        const [selectedTool, setSelectedTool] = React.useState("text");
+        const [replacementTools, setReplacementTools] = React.useState([]);
+        const [isDeleteMode, setIsDeleteMode] = React.useState(false);
+
+        const handleFileUpload = (uploadedData) => {
+          setData(uploadedData);
+        };
+
+        React.useEffect(() => {
+          if (data && data.sentences) {
+            const firstSentenceId = Object.keys(data.sentences)[0];
+            if (currentSentenceId === null) {
+              setCurrentSentenceId(firstSentenceId);
+            }
+          }
+        }, [data, currentSentenceId]);
+
+        const handleNextSentence = () => {
+          if (data && data.sentences) {
+            const sentenceIds = Object.keys(data.sentences);
+            const currentIndex = sentenceIds.indexOf(currentSentenceId);
+            if (currentIndex < sentenceIds.length - 1) {
+              setCurrentSentenceId(sentenceIds[currentIndex + 1]);
+            }
+          }
+        };
+
+        const handlePreviousSentence = () => {
+          if (data && data.sentences) {
+            const sentenceIds = Object.keys(data.sentences);
+            const currentIndex = sentenceIds.indexOf(currentSentenceId);
+            if (currentIndex > 0) {
+              setCurrentSentenceId(sentenceIds[currentIndex - 1]);
+            }
+          }
+        };
+
+        const handleCellClick = (versionKey, genderKey, wordIndex) => {
+          setData((prevData) => {
+            const newData = JSON.parse(JSON.stringify(prevData));
+            const currentSentence = newData.sentences[currentSentenceId];
+            const labelling =
+              currentSentence.versions[versionKey].gender[genderKey].labelling;
+
+            if (selectedTool === "text") {
+              if (
+                labelling[wordIndex] &&
+                labelling[wordIndex].tag !== undefined
+              ) {
+                delete labelling[wordIndex];
+                labelling[wordIndex] = { replacement: "" };
+              }
+            } else if (selectedTool.startsWith("replacement_")) {
+              const replacementValue = selectedTool.split("_")[1];
+              labelling[wordIndex] = { replacement: replacementValue };
+            } else {
+              labelling[wordIndex] = { tag: parseInt(selectedTool) };
+            }
+
+            return newData;
+          });
+        };
+
+        const handleInputChange = (versionKey, genderKey, wordIndex, value) => {
+          setData((prevData) => {
+            const newData = JSON.parse(JSON.stringify(prevData));
+            const currentSentence = newData.sentences[currentSentenceId];
+            const labelling =
+              currentSentence.versions[versionKey].gender[genderKey].labelling;
+
+            if (value === "") {
+              delete labelling[wordIndex];
+            } else {
+              labelling[wordIndex] = { replacement: value };
+            }
+
+            return newData;
+          });
+        };
+
+        const downloadJSON = () => {
+          const jsonString = JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonString], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "labeled_sentences.json";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+
+        const addReplacementTool = (newTool) => {
+          setReplacementTools([...replacementTools, newTool]);
+        };
+
+        const removeColumn = (wordIndex) => {
+          if (!isDeleteMode) return;
+
+          setData((prevData) => {
+            const newData = JSON.parse(JSON.stringify(prevData));
+            const currentSentence = newData.sentences[currentSentenceId];
+
+            // Update tags
+            const newTags = {};
+            for (const tagId in currentSentence.tags) {
+              const tag = currentSentence.tags[tagId];
+              if (tag.pos !== wordIndex) {
+                newTags[tagId] =
+                  tag.pos > wordIndex ? { ...tag, pos: tag.pos - 1 } : tag;
+              }
+            }
+            currentSentence.tags = newTags;
+
+            // Remove the word from the sentence
+            currentSentence.sentence.splice(wordIndex, 1);
+
+            // Update versions and labellings
+            for (const versionKey in currentSentence.versions) {
+              const version = currentSentence.versions[versionKey];
+              for (const genderKey in version.gender) {
+                const gender = version.gender[genderKey];
+                const newLabelling = {};
+                for (const labelPos in gender.labelling) {
+                  const pos = parseInt(labelPos);
+                  if (pos !== wordIndex) {
+                    newLabelling[pos > wordIndex ? pos - 1 : pos] =
+                      gender.labelling[pos];
+                  }
+                }
+                gender.labelling = newLabelling;
+              }
+            }
+
+            return newData;
+          });
+        };
+
+        React.useEffect(() => {
+          const handleKeyPress = (event) => {
+            if (
+              event.key === "n" &&
+              document.activeElement.tagName !== "INPUT"
+            ) {
+              event.preventDefault();
+              handleNextSentence();
+            }
+          };
+
+          document.addEventListener("keydown", handleKeyPress);
+
+          return () => {
+            document.removeEventListener("keydown", handleKeyPress);
+          };
+        }, [data, currentSentenceId]);
+
+        if (!data || !currentSentenceId) {
+          return <FileUploader onFileUpload={handleFileUpload} />;
+        }
+
+        const currentSentence = data.sentences[currentSentenceId];
+
+        return (
+          <div>
+            <div className="mx-auto px-4 py-8">
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <SentenceNavigation
+                    currentSentenceId={currentSentenceId}
+                    onPrevious={handlePreviousSentence}
+                    onNext={handleNextSentence}
+                    onIdChange={(e) => {
+                      if (data.sentences[e.target.value]) {
+                        setCurrentSentenceId(e.target.value);
+                      }
+                    }}
+                  />
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setIsDeleteMode(!isDeleteMode)}
+                      className={`px-4 py-2 ${
+                        isDeleteMode
+                          ? "bg-red-500 hover:bg-red-600"
+                          : "bg-gray-500 hover:bg-gray-600"
+                      } text-white rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50`}
+                    >
+                      {isDeleteMode ? "Exit Delete Mode" : "Enter Delete Mode"}
+                    </button>
+                    <button
+                      onClick={downloadJSON}
+                      className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
+                    >
+                      Download JSON
+                    </button>
+                  </div>
+                </div>
+                <SentenceTable
+                  currentSentence={currentSentence}
+                  versions={currentSentence.versions}
+                  onCellClick={handleCellClick}
+                  onInputChange={handleInputChange}
+                  onRemoveColumn={removeColumn}
+                  selectedTool={selectedTool}
+                  tags={data.tags}
+                />
+              </div>
+            </div>
+
+            <div className="container mx-auto px-4 py-2">
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <h2 className="text-lg font-semibold mb-4">Tools</h2>
+                <ToolSelector
+                  selectedTool={selectedTool}
+                  onToolSelect={setSelectedTool}
+                  tags={data.tags}
+                  replacementTools={replacementTools}
+                />
+                <ReplacementToolAdder onAddTool={addReplacementTool} />
+              </div>
+            </div>
+
+            <KeyboardShortcuts />
+          </div>
+        );
+      }
+
+      ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+  </body>
+</html>
