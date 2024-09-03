@@ -1,42 +1,28 @@
 {
-    "dataset_name": "nlp-benchmark",
-    "output_dir": "artifacts/data",
-    "seed": 42,
-    "datasets": {
-        "gender_all": {
-            "num_labels": 2,
-            "raw_data": {
-                "train": "data/raw/training_df_all.pkl",
-                "test_female": "data/raw/df_validation_female_all.pkl",
-                "test_male": "data/raw/df_validation_male_all.pkl",
-                "ground_truth_test": "data/raw/gt_all_val.pkl",
-                "ground_truth_train": "data/raw/gt_all_train.pkl"
-            },
-            "output_filenames": {
-                "train": "train.jsonl",
-                "test": "test.jsonl"
-            }
-        },
-        "gender_subj": {
-            "num_labels": 2,
-            "raw_data": {
-                "train": "data/raw/training_df_subj.pkl",
-                "test_female": "data/raw/df_validation_female_subj.pkl",
-                "test_male": "data/raw/df_validation_male_subj.pkl",
-                "ground_truth_test": "data/raw/gt_subj_val.pkl",
-                "ground_truth_train": "data/raw/gt_subj_train.pkl"
-            },
-            "output_filenames": {
-                "train": "train.jsonl",
-                "test": "test.jsonl"
-            }
-        },
-        "sentiment_imdb": {
-            "num_labels": 2,
-            "output_filenames": {
-                "train": "train.jsonl",
-                "test": "test.jsonl"
-            }
-        }
+  "dataset_name": "nlp-benchmark",
+  "output_dir": "./artifacts/data",
+  "seed": 42,
+  "datasets": {
+    "gender_all": {
+      "num_labels": 2,
+      "output_filenames": {
+        "train": "train.jsonl",
+        "test": "test.jsonl"
+      }
+    },
+    "gender_subj": {
+      "num_labels": 2,
+      "output_filenames": {
+        "train": "train.jsonl",
+        "test": "test.jsonl"
+      }
+    },
+    "sentiment_imdb": {
+      "num_labels": 2,
+      "output_filenames": {
+        "train": "train.jsonl",
+        "test": "test.jsonl"
+      }
     }
+  }
 }
