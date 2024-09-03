@@ -3,22 +3,29 @@
   "output_dir": "./artifacts/data",
   "seed": 42,
   "datasets": {
-    "gender_all": {
+    "binary_gender_all": {
       "num_labels": 2,
       "output_filenames": {
         "train": "train.jsonl",
         "test": "test.jsonl"
       }
     },
-    "gender_subj": {
+    "binary_gender_subj": {
       "num_labels": 2,
       "output_filenames": {
         "train": "train.jsonl",
         "test": "test.jsonl"
       }
     },
-    "sentiment_imdb": {
-      "num_labels": 2,
+    "non_binary_gender_all": {
+      "num_labels":3,
+      "output_filenames": {
+        "train": "train.jsonl",
+        "test": "test.jsonl"
+      }
+    },
+    "non_binary_gender_subj": {
+      "num_labels": 3 ,
       "output_filenames": {
         "train": "train.jsonl",
         "test": "test.jsonl"
