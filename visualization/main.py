@@ -770,7 +770,7 @@ def create_xai_sentence_html_plots(
     repetition_number = 0
     target = 0  # 0 female, 1 male
     model_version = SaveVersion.best.value
-    dataset_type = DatasetKeys.gender_all.value
+    dataset_type = DatasetKeys.binary_gender_all.value
 
     base_output_dir = join(base_output_dir, f'xai_sentence_plots_{sentence_idx}')
 
@@ -1311,10 +1311,10 @@ def plot_correlation_between_words_and_labels(
 
 def create_data_plots(base_output_dir: str, config: dict) -> None:
     filename_all = join(
-        generate_data_dir(config), DatasetKeys.gender_all.value, "test.jsonl"
+        generate_data_dir(config), DatasetKeys.binary_gender_all.value, "test.jsonl"
     )
     filename_subj = join(
-        generate_data_dir(config), DatasetKeys.gender_subj.value, "test.jsonl"
+        generate_data_dir(config), DatasetKeys.binary_gender_subj.value, "test.jsonl"
     )
 
     dataset_all = load_jsonl_as_df(filename_all)
