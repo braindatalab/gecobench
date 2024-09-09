@@ -30,15 +30,15 @@ def prepare_difference_data(
         male = group[group['target'] == 1].iloc[0]
 
         pred_diff = (
-            female["pred_probabilities"][idxs["female"]]
-            - male["pred_probabilities"][idxs["male"]]
+            female["pred_probs"][idxs["female"]]
+            - male["pred_probs"][idxs["male"]]
         )
         pred_diffs.append(
             {
                 **info,
                 "pred_diff": pred_diff,
-                "pred_female": female["pred_probabilities"][idxs["female"]],
-                "pred_male": male["pred_probabilities"][idxs["male"]],
+                "pred_female": female["pred_probs"][idxs["female"]],
+                "pred_male": male["pred_probs"][idxs["male"]],
             }
         )
 
