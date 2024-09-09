@@ -289,10 +289,15 @@ def load_xai_results(config: dict) -> list:
 
 def determine_correctly_classified(data: pd.DataFrame) -> pd.DataFrame:
     correctly_classified = list()
-    for (d_type, s_id), df in data.groupby(['dataset_type', 'sentence_idx']):
-        predictions = df['pred_probabilities'].map(lambda x: np.argmax(x))
-        if 1 == np.prod(df['target'] == predictions):
-            correctly_classified += [(d_type, s_id)]
+
+    binary_data = data[~data['dataset_type'].str.contains('non_binary')]
+    non_binary_data = data[data['dataset_type'].str.contains('non_binary')]
+
+    for d in [binary_data, non_binary_data]:
+        for (d_type, s_id), df in d.groupby(['dataset_type', 'sentence_idx']):
+            # predictions = df['pred_probabilities'].map(lambda x: np.argmax(x))
+            if 1 == np.prod(df['target'] == df['prediction']):
+                correctly_classified += [(d_type, s_id)]
 
     correctly_classified_mask = data.apply(
         lambda x: (x['dataset_type'], x['sentence_idx']) in correctly_classified, axis=1
@@ -438,6 +443,11 @@ def evaluate_xai_performance(config: Dict) -> None:
     evaluation_data_all = merge_xai_results_with_prediction_data(
         xai_data=xai_data, predication_data=data_with_predictions
     )
+    
+    evaluation_data_all = evaluation_data_all[
+        evaluation_data_all["model_version"] == SaveVersion.best.value
+    ]
+    
     evaluation_data_correct = determine_correctly_classified(data=evaluation_data_all)
 
     # Calculate gender difference in prediction & attributions
