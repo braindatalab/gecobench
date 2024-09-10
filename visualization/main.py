@@ -584,20 +584,20 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
             model_info = record[1]
 
             training_history = load_pickle(file_path=join(artifacts_dir, history_path))
-            data_dict['dataset_type'] += [record[0].split('_')[-1]]
+            data_dict['dataset_type'] += [record[0]]
             data_dict['model_name'] += [record[1]['model_name']]
             data_dict['model_version'] += [model_info["save_version"].value]
             data_dict['accuracy'] += [training_history['train_acc'][-1]]
             data_dict['data_split'] += ['training']
 
-            data_dict['dataset_type'] += [record[0].split('_')[-1]]
+            data_dict['dataset_type'] += [record[0]]
             data_dict['model_name'] += [record[1]['model_name']]
             data_dict['model_version'] += [model_info["save_version"].value]
             data_dict['accuracy'] += [training_history['val_acc'][-1]]
             data_dict['data_split'] += ['validation']
 
         for entry in eval_results.model_results:
-            data_dict['dataset_type'] += [entry.dataset_type.split("_")[-1]]
+            data_dict['dataset_type'] += [entry.dataset_type]
             data_dict['model_name'] += [entry.model_name]
             data_dict['model_version'] += [entry.model_version]
             data_dict['accuracy'] += [entry.accuracy]

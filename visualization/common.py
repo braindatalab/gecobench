@@ -52,12 +52,19 @@ HUE_ORDER = [
 ]
 
 DATASET_NAME_MAP = dict(
-    gender_subj='$\mathcal{D}_{S}$',
-    gender_all='$\mathcal{D}_{A}$',
+    binary_gender_subj='$\mathcal{D}_{S}^{b}$',
+    binary_gender_all='$\mathcal{D}_{A}^{b}$',
+    non_binary_gender_subj='$\mathcal{D}_{S}^{nb}$',
+    non_binary_gender_all='$\mathcal{D}_{A}^{nb}$',
     subj='$\mathcal{D}_{S}$',
     all='$\mathcal{D}_{A}$',
     imdb='IMDB',
 )
-ROW_ORDER = [DATASET_NAME_MAP['gender_all'], DATASET_NAME_MAP['gender_subj']]
+ROW_ORDER = [
+    DATASET_NAME_MAP['binary_gender_all'],
+    DATASET_NAME_MAP['binary_gender_subj'],
+    DATASET_NAME_MAP['non_binary_gender_all'],
+    DATASET_NAME_MAP['non_binary_gender_subj'],
+]
 
 GENDER = {0.0: 'female', 1.0: 'male'}
