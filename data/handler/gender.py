@@ -24,22 +24,14 @@ def prepare_gender_data(
     os.makedirs(dataset_output_dir, exist_ok=True)
 
     for filename in dataset_config["output_filenames"].values():
-        if 'non_binary' in dataset_key:
-            shutil.copyfile(
-                join(dataset_input_dir, filename), join(dataset_output_dir, filename)
-            )
-        else:
-            input_file_path = join(dataset_input_dir, filename)
-            output_file_path = join(dataset_output_dir, filename)
-
-            data = pd.read_json(input_file_path, lines=True)
-            filtered_data = data[data['target'].isin([1, 0])]
-            filtered_data.to_json(output_file_path, orient='records', lines=True)
+        shutil.copyfile(
+            join(dataset_input_dir, filename), join(dataset_output_dir, filename)
+        )
 
 
 def prepare_binary_gender_all_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
-        folder_name="all",
+        folder_name="binary_gender_all",
         config=config,
         data_output_dir=data_output_dir,
         dataset_key=DatasetKeys.binary_gender_all.value,
@@ -48,7 +40,7 @@ def prepare_binary_gender_all_data(config: Dict, data_output_dir: str):
 
 def prepare_binary_gender_subj_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
-        folder_name="subj",
+        folder_name="binary_gender_subj",
         config=config,
         data_output_dir=data_output_dir,
         dataset_key=DatasetKeys.binary_gender_subj.value,
@@ -57,7 +49,7 @@ def prepare_binary_gender_subj_data(config: Dict, data_output_dir: str):
 
 def prepare_non_binary_gender_all_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
-        folder_name="all",
+        folder_name="non_binary_gender_all",
         config=config,
         data_output_dir=data_output_dir,
         dataset_key=DatasetKeys.non_binary_gender_all.value,
@@ -66,7 +58,7 @@ def prepare_non_binary_gender_all_data(config: Dict, data_output_dir: str):
 
 def prepare_non_binary_gender_subj_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
-        folder_name="subj",
+        folder_name="non_binary_gender_subj",
         config=config,
         data_output_dir=data_output_dir,
         dataset_key=DatasetKeys.non_binary_gender_subj.value,
