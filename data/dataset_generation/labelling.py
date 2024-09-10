@@ -204,7 +204,7 @@ class Sentence(pydantic.BaseModel):
                         or is_verb(next_word)
                         or is_verb(next_next_word)
                         or pos == 0
-                    ):
+                    ) and not is_verb(prev_word):
                         type = "SUBJ_PRONOUN"  # He, She, They
                     elif is_verb(prev_word) or is_preposition(prev_word):
                         type = "OBJECT_PRONOUN"  # Him, Her, Them
