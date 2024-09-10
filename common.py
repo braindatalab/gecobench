@@ -19,8 +19,10 @@ class SaveVersion(Enum):
 
 
 class DatasetKeys(Enum):
-    gender_all = "gender_all"
-    gender_subj = "gender_subj"
+    binary_gender_all = "binary_gender_all"
+    binary_gender_subj = "binary_gender_subj"
+    non_binary_gender_all = "non_binary_gender_all"
+    non_binary_gender_subj = "non_binary_gender_subj"
     sentiment_twitter = "sentiment_twitter"
     sentiment_imdb = "sentiment_imdb"
 

@@ -584,20 +584,20 @@ def create_model_performance_plots(base_output_dir: str, config: dict) -> None:
             model_info = record[1]
 
             training_history = load_pickle(file_path=join(artifacts_dir, history_path))
-            data_dict['dataset_type'] += [record[0].split('_')[-1]]
+            data_dict['dataset_type'] += [record[0]]
             data_dict['model_name'] += [record[1]['model_name']]
             data_dict['model_version'] += [model_info["save_version"].value]
             data_dict['accuracy'] += [training_history['train_acc'][-1]]
             data_dict['data_split'] += ['training']
 
-            data_dict['dataset_type'] += [record[0].split('_')[-1]]
+            data_dict['dataset_type'] += [record[0]]
             data_dict['model_name'] += [record[1]['model_name']]
             data_dict['model_version'] += [model_info["save_version"].value]
             data_dict['accuracy'] += [training_history['val_acc'][-1]]
             data_dict['data_split'] += ['validation']
 
         for entry in eval_results.model_results:
-            data_dict['dataset_type'] += [entry.dataset_type.split("_")[-1]]
+            data_dict['dataset_type'] += [entry.dataset_type]
             data_dict['model_name'] += [entry.model_name]
             data_dict['model_version'] += [entry.model_version]
             data_dict['accuracy'] += [entry.accuracy]
@@ -770,7 +770,7 @@ def create_xai_sentence_html_plots(
     repetition_number = 0
     target = 0  # 0 female, 1 male
     model_version = SaveVersion.best.value
-    dataset_type = DatasetKeys.gender_all.value
+    dataset_type = DatasetKeys.binary_gender_all.value
 
     base_output_dir = join(base_output_dir, f'xai_sentence_plots_{sentence_idx}')
 
@@ -1311,10 +1311,10 @@ def plot_correlation_between_words_and_labels(
 
 def create_data_plots(base_output_dir: str, config: dict) -> None:
     filename_all = join(
-        generate_data_dir(config), DatasetKeys.gender_all.value, "test.jsonl"
+        generate_data_dir(config), DatasetKeys.binary_gender_all.value, "test.jsonl"
     )
     filename_subj = join(
-        generate_data_dir(config), DatasetKeys.gender_subj.value, "test.jsonl"
+        generate_data_dir(config), DatasetKeys.binary_gender_subj.value, "test.jsonl"
     )
 
     dataset_all = load_jsonl_as_df(filename_all)

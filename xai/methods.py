@@ -337,7 +337,8 @@ def get_lime_attributions(
 
     x = data.flatten().detach()
     text = tokenizer.decode(x[1:-1])
-    explainer = LimeTextExplainer(class_names=['0', '1'], char_level=False)
+    class_names = [str(k) for k in np.unique(target)]
+    explainer = LimeTextExplainer(class_names=class_names, char_level=False)
     lime_explanation = explainer.explain_instance(
         text,
         new_forward_function,

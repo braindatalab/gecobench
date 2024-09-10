@@ -210,6 +210,7 @@ def create_dataset_with_predictions(
         'prediction': list(),
         'dataset_type': list(),
         'logits': list(),
+        'pred_probs': list(),
     }
     artifacts_dir = generate_artifacts_dir(config=config)
     tensor_data = create_bert_tensor_data(data=data, config=config)
@@ -264,6 +265,9 @@ def create_dataset_with_predictions(
                         prediction.detach().cpu().numpy().tolist()
                     )
                     data_dict['logits'] += logits.detach().cpu().numpy().tolist()
+                    data_dict['pred_probs'] += (
+                        torch.softmax(logits, dim=1).detach().cpu().numpy().tolist()
+                    )
                     data_dict['dataset_type'] += n * [dataset_name]
 
     return pd.DataFrame(data_dict)
@@ -287,6 +291,25 @@ def load_xai_results(config: dict) -> list:
     return output
 
 
+def determine_correctly_classified(data: pd.DataFrame) -> pd.DataFrame:
+    correctly_classified = list()
+
+    binary_data = data[~data['dataset_type'].str.contains('non_binary')]
+    non_binary_data = data[data['dataset_type'].str.contains('non_binary')]
+
+    for d in [binary_data, non_binary_data]:
+        for (d_type, s_id), df in d.groupby(['dataset_type', 'sentence_idx']):
+            # predictions = df['pred_probabilities'].map(lambda x: np.argmax(x))
+            if 1 == np.prod(df['target'] == df['prediction']):
+                correctly_classified += [(d_type, s_id)]
+
+    correctly_classified_mask = data.apply(
+        lambda x: (x['dataset_type'], x['sentence_idx']) in correctly_classified, axis=1
+    )
+
+    return data[correctly_classified_mask]
+
+
 def merge_xai_results_with_prediction_data(
     xai_data: pd.DataFrame, predication_data: pd.DataFrame
 ) -> pd.DataFrame:
@@ -303,19 +326,7 @@ def merge_xai_results_with_prediction_data(
         xai_data, predication_data, how='outer', on=merge_columns
     )
 
-    correctly_classified = list()
-    for (d_type, s_id), df in data_for_evaluation.groupby(
-        ['dataset_type', 'sentence_idx']
-    ):
-        predictions = df['pred_probabilities'].map(lambda x: np.argmax(x))
-        if 1 == np.prod(df['target'] == predictions):
-            correctly_classified += [(d_type, s_id)]
-
-    correctly_classified_mask = data_for_evaluation.apply(
-        lambda x: (x['dataset_type'], x['sentence_idx']) in correctly_classified, axis=1
-    )
-
-    return data_for_evaluation, data_for_evaluation[correctly_classified_mask]
+    return data_for_evaluation
 
 
 def create_prediction_data(config: dict) -> pd.DataFrame:
@@ -422,34 +433,35 @@ def evaluate_xai_performance(config: Dict) -> None:
     xai_data = create_xai_data(config=config)
     xai_data.to_pickle(join(output_dir, 'xai_data.pkl'))
 
-    data_with_predictions_path = join(
-        output_dir,
-        config["evaluation"]["data_prediction_records"],
-    )
-
     data_with_predictions = create_prediction_data(config=config)
-    data_with_predictions = data_with_predictions[
-        data_with_predictions["model_version"] == SaveVersion.best.value
-    ]
-    data_with_predictions.to_pickle(data_with_predictions_path)
-
-    evaluation_data_all, evaluation_data_correct = (
-        merge_xai_results_with_prediction_data(
-            xai_data=xai_data, predication_data=data_with_predictions
-        )
+    data_with_predictions.to_pickle(
+        join(output_dir, config["evaluation"]["data_prediction_records"])
     )
+
+    evaluation_data_all = merge_xai_results_with_prediction_data(
+        xai_data=xai_data, predication_data=data_with_predictions
+    )
+
+    evaluation_data_all = evaluation_data_all[
+        evaluation_data_all["model_version"] == SaveVersion.best.value
+    ]
+
+    evaluation_data_correct = determine_correctly_classified(data=evaluation_data_all)
 
     # Calculate gender difference in prediction & attributions
     difference_config = config["evaluation"]["gender_difference"]
+    binary_data = evaluation_data_correct[
+        ~evaluation_data_correct['dataset_type'].str.contains('non_binary')
+    ]
     if difference_config["correctly_classified_only"]:
         prepare_difference_data(
-            df=evaluation_data_correct,
+            df=binary_data,
             idxs=difference_config["prediction_idx"],
             output_dir=output_dir,
         )
     else:
         prepare_difference_data(
-            df=evaluation_data_all,
+            df=binary_data,
             idxs=difference_config["prediction_idx"],
             output_dir=output_dir,
         )

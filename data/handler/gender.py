@@ -29,19 +29,37 @@ def prepare_gender_data(
         )
 
 
-def prepare_gender_all_data(config: Dict, data_output_dir: str):
+def prepare_binary_gender_all_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
-        folder_name="all",
+        folder_name="binary_gender_all",
         config=config,
         data_output_dir=data_output_dir,
-        dataset_key=DatasetKeys.gender_all.value,
+        dataset_key=DatasetKeys.binary_gender_all.value,
     )
 
 
-def prepare_gender_subj_data(config: Dict, data_output_dir: str):
+def prepare_binary_gender_subj_data(config: Dict, data_output_dir: str):
     prepare_gender_data(
-        folder_name="subj",
+        folder_name="binary_gender_subj",
         config=config,
         data_output_dir=data_output_dir,
-        dataset_key=DatasetKeys.gender_subj.value,
+        dataset_key=DatasetKeys.binary_gender_subj.value,
+    )
+
+
+def prepare_non_binary_gender_all_data(config: Dict, data_output_dir: str):
+    prepare_gender_data(
+        folder_name="non_binary_gender_all",
+        config=config,
+        data_output_dir=data_output_dir,
+        dataset_key=DatasetKeys.non_binary_gender_all.value,
+    )
+
+
+def prepare_non_binary_gender_subj_data(config: Dict, data_output_dir: str):
+    prepare_gender_data(
+        folder_name="non_binary_gender_subj",
+        config=config,
+        data_output_dir=data_output_dir,
+        dataset_key=DatasetKeys.non_binary_gender_subj.value,
     )

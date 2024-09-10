@@ -10,14 +10,22 @@
     }
   },
   "data": {
-    "data_scenario": "nlp-benchmark_2024-04-07-21-43-57",
+    "data_scenario": "nlp-benchmark_2024-09-03-16-21-21",
     "data_dir": "./artifacts/data",
     "tags": {
-      "gender_all": [
+      "binary_gender_all": [
         "train",
         "eval"
       ],
-      "gender_subj": [
+      "binary_gender_subj": [
+        "train",
+        "eval"
+      ],
+      "non_binary_gender_all": [
+        "train",
+        "eval"
+      ],
+      "non_binary_gender_subj": [
         "train",
         "eval"
       ]

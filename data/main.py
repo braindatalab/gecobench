@@ -6,13 +6,20 @@ from typing import Dict
 from common import NAME_OF_DATA_CONFIG, NAME_OF_PROJECT_CONFIG, DatasetKeys
 from utils import dump_as_json_file, today_formatted
 
-from .handler.gender import prepare_gender_all_data, prepare_gender_subj_data
+from .handler.gender import (
+    prepare_binary_gender_all_data,
+    prepare_binary_gender_subj_data,
+    prepare_non_binary_gender_all_data,
+    prepare_non_binary_gender_subj_data,
+)
 from .handler.sentiment_twitter import prepare_twitter_sentiment_data
 from .handler.sentiment_imdb import prepare_imdb_sentiment_data
 
 HANDLERS = {
-    DatasetKeys.gender_all.value: prepare_gender_all_data,
-    DatasetKeys.gender_subj.value: prepare_gender_subj_data,
+    DatasetKeys.non_binary_gender_all.value: prepare_non_binary_gender_all_data,
+    DatasetKeys.non_binary_gender_subj.value: prepare_non_binary_gender_subj_data,
+    DatasetKeys.binary_gender_all.value: prepare_binary_gender_all_data,
+    DatasetKeys.binary_gender_subj.value: prepare_binary_gender_subj_data,
     DatasetKeys.sentiment_twitter.value: prepare_twitter_sentiment_data,
     DatasetKeys.sentiment_imdb.value: prepare_imdb_sentiment_data,
 }
