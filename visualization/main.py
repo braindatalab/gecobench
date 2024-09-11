@@ -13,6 +13,7 @@ import seaborn as sns
 from loguru import logger
 from pandas.core.groupby.generic import DataFrameGroupBy
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from common import DatasetKeys, EvaluationResult, SaveVersion
@@ -65,6 +66,265 @@ def compute_average_score_per_repetition(data: pd.DataFrame) -> pd.DataFrame:
                     results += [first_row.combine_first(average_scores)]
 
     return pd.concat(results, axis=1).T
+
+def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
+    data: pd.DataFrame,
+    metric: str,
+    model_version: str,
+    result_type: str,
+    base_output_dir: str,
+) -> None:
+    def _plot_postprocessing(g):
+        g.set_titles(row_template="Dataset: {row_name}", size=12)
+        for k in range(g.axes.shape[0]):
+            for j in range(g.axes.shape[1]):
+                g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
+
+                if 0 == k and 'top_k_precision' == metric:
+                    g.axes[k, j].set_ylabel(
+                        f'Average {METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
+                    )
+                else:
+                    g.axes[k, j].set_ylabel(
+                        f'{METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
+                    )
+                g.axes[k, j].set_xlabel('')
+                g.axes[k, j].set_ylim(0, 1)
+                # g.axes[k, j].set_yticks([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
+                # g.axes[k, j].set_yticks([-0.5, 0.0, 1.0, 2.0])
+                g.axes[k, j].set_yticks([0.0, 0.5, 1.0, 1.5, 2.0])
+
+                for label in (
+                    g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+                ):
+                    label.set_fontsize(12)
+
+        # Set legend font size
+        g._legend.set_title('XAI Method', prop={'size': 12})
+        for t in g._legend.texts:
+            t.set_fontsize(12)
+
+    XAI_METHOD_MAP = {
+        'Uniform random': 'Uniform\nrandom',
+        'Saliency': 'Saliency',
+        'Kernel SHAP': 'Kernel\nSHAP',
+        'Guided Backprop': 'Guided\nBackprop',
+        'DeepLift': 'DeepLift',
+        'InputXGradient': 'InputXGradient',
+        'LIME': 'LIME',
+        'Gradient SHAP': 'Gradient\nSHAP',
+        'Integrated Gradients': 'Integrated\nGradients',
+        'Pattern Variant': 'Pattern\nVariant',
+    }
+
+    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+    data['attribution_method'] = data['attribution_method'].map(
+        lambda x: METHOD_NAME_MAP.get(x, x)
+    )
+    data['attribution_method'] = data['attribution_method'].map(
+        lambda x: XAI_METHOD_MAP[x.strip()]
+    )
+
+    data = data.rename(
+        columns={
+            "mapped_model_name": "Model",
+            "dataset_type": "Dataset",
+            "attribution_method": "XAI Method",
+            **METRIC_NAME_MAP,
+        }
+    )
+
+    # data[f'{metric}_new'] = data['Mass Accuracy (MA)'] / data['mass_accuracy_zero_shot']
+    # data[f'{metric}_new'] = np.log(data[f'{metric}_new'] + 1e-6)
+
+
+    # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
+    #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
+    # )
+
+    # data = data['Pattern\nVariant' != data['XAI Method']]
+
+    average_data = compute_average_score_per_repetition(data=data)
+    datasets = [('', data), ('averaged', average_data)]
+
+    _HUE_ORDER = [
+        'Uniform\nrandom',
+        'Saliency',
+        'Kernel\nSHAP',
+        'Guided\nBackprop',
+        'DeepLift',
+        'InputXGradient',
+        'LIME',
+        'Gradient\nSHAP',
+        'Integrated\nGradients',
+        'Pattern\nVariant'
+    ]
+
+    height = 2.5
+    for s, d in datasets:
+        g = sns.catplot(
+            data=d,
+            x='XAI Method',
+            y=METRIC_NAME_MAP[metric],
+            # y=f'{metric}_new',
+            order=list_intersection(_HUE_ORDER, d['XAI Method'].unique()),
+            hue_order=MODEL_ORDER,
+            row_order=ROW_ORDER,
+            hue='Model',
+            row='Dataset',
+            kind='point',
+            palette=sns.color_palette(palette='pastel'),
+            height=height,
+            estimator='median',
+            errorbar=None, #("pi", 50),
+            aspect=9.5 / height,
+            legend_out=True,
+            linestyles='--',
+            linewidth=1.0,
+            markersize=10.0,
+            markeredgecolor='black',
+            markeredgewidth=0.5
+        )
+
+        sns.move_legend(
+            g,
+            "lower center",
+            bbox_to_anchor=(0.41, -0.13),
+            ncol=5,
+            frameon=True,
+        )
+
+        _plot_postprocessing(g=g)
+        file_path = join(
+            base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
+        )
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+        # Disable legend
+        g._legend.remove()
+        file_path = join(
+            base_output_dir,
+            f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
+        )
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+        plt.close()
+
+
+
+def plot_evaluation_results_for_relative_mass_accuracy(
+    data: pd.DataFrame,
+    metric: str,
+    model_version: str,
+    result_type: str,
+    base_output_dir: str,
+) -> None:
+    def _plot_postprocessing(g):
+        g.set_titles(row_template="Dataset: {row_name}", size=12)
+        for k in range(g.axes.shape[0]):
+            for j in range(g.axes.shape[1]):
+                g.axes[k, j].grid(alpha=0.8, linewidth=0.5)
+
+                if 0 == k and 'top_k_precision' == metric:
+                    g.axes[k, j].set_ylabel(
+                        f'Average {METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
+                    )
+                else:
+                    g.axes[k, j].set_ylabel(
+                        f'{METRIC_NAME_MAP[metric]}',
+                        fontsize=12,
+                    )
+                g.axes[k, j].set_xlabel('')
+                g.axes[k, j].set_ylim(0, 1)
+                # g.axes[k, j].set_yticks([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
+                g.axes[k, j].set_yticks([-0.5, 0.0, 1.0, 2.0])
+
+                for label in (
+                    g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
+                ):
+                    label.set_fontsize(12)
+
+        # Set legend font size
+        g._legend.set_title('XAI Method', prop={'size': 12})
+        for t in g._legend.texts:
+            t.set_fontsize(12)
+
+    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+    data['attribution_method'] = data['attribution_method'].map(
+        lambda x: METHOD_NAME_MAP.get(x, x)
+    )
+
+    data = data.rename(
+        columns={
+            "mapped_model_name": "Model",
+            "dataset_type": "Dataset",
+            "attribution_method": "XAI Method",
+            **METRIC_NAME_MAP,
+        }
+    )
+
+    # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
+    #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
+    # )
+
+    data = data['Pattern Variant' != data['XAI Method']]
+
+    average_data = compute_average_score_per_repetition(data=data)
+    datasets = [('', data), ('averaged', average_data)]
+
+    height = 2.5
+    for s, d in datasets:
+        g = sns.catplot(
+            data=d,
+            x='Model',
+            y=METRIC_NAME_MAP[metric],
+            order=MODEL_ORDER,
+            hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
+            row_order=ROW_ORDER,
+            hue='XAI Method',
+            row='Dataset',
+            kind='point',
+            palette=sns.color_palette(palette='pastel'),
+            height=height,
+            estimator='median',
+            errorbar=None, #("pi", 50),
+            aspect=9.5 / height,
+            legend_out=True,
+            linestyles='--',
+            linewidth=1.0,
+            markersize=10.0,
+            markeredgecolor='black',
+            markeredgewidth=0.5
+        )
+
+        sns.move_legend(
+            g,
+            "lower center",
+            bbox_to_anchor=(0.41, -0.13),
+            ncol=5,
+            frameon=True,
+        )
+
+        _plot_postprocessing(g=g)
+        file_path = join(
+            base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
+        )
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+        # Disable legend
+        g._legend.remove()
+        file_path = join(
+            base_output_dir,
+            f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
+        )
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+        plt.close()
 
 
 def plot_evaluation_results(
@@ -537,6 +797,8 @@ def create_evaluation_plots(base_output_dir: str, config: dict) -> None:
         mass_accuracy=plot_evaluation_results,
         mass_accuracy_method_grouped=plot_evaluation_results_grouped_by_xai_method,
         mass_accuracy_reversed=plot_mass_accuracy_reversed,
+        mass_accuracy_relative=plot_evaluation_results_for_relative_mass_accuracy,
+        mass_accuracy_relative_grouped=plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method,
     )
 
     plot_types = config['visualization']['visualizations']['evaluation']

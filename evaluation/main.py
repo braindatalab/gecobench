@@ -101,40 +101,45 @@ def top_k_precision_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
     return float(len(intersection)) / float(len(true_ground_truth_indices))
 
 
-def mass_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+def mass_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     a = np.sum(y_pred[1 == y_true])
     b = np.sum(y_pred)
     return np.divide(a, b, where=(0 != b))
 
 
-def compute_precision_based_scores(y_true: np.ndarray, y_score: np.ndarray) -> Dict:
+def relative_mass_accuracy(ma1: float, ma2: float, epsilon=1e-6) -> float:
+    output = np.log((ma1 / ma2 if ma2 > 0 else 1/epsilon) + epsilon)
+    return output
+
+
+def calculate_scores(
+    attribution: np.ndarray, attribution_zero_shot: np.ndarray, ground_truth: np.ndarray
+) -> Dict:
+    roc_auc = roc_auc_scores(y_true=ground_truth, y_score=attribution)
     precision, recall, thresholds, specificity = precision_curves(
-        y_true=y_true, probas_pred=y_score
+        y_true=ground_truth, probas_pred=attribution
     )
     auc_value = auc(x=recall, y=precision)
-    avg_precision = average_precision_score(y_true=y_true, y_score=y_score)
+    avg_precision = average_precision_score(y_true=ground_truth, y_score=attribution)
     precision_specificity = precision_specificity_score(
         precision=precision, specificity=specificity, threshold=0.5
     )
-    top_k_precision = top_k_precision_score(y_true=y_true, y_score=y_score)
+    top_k_precision = top_k_precision_score(y_true=ground_truth, y_score=attribution)
+
+    ma = mass_accuracy(y_true=ground_truth, y_pred=attribution)
+    ma_zero_shot = mass_accuracy(y_true=ground_truth, y_pred=attribution_zero_shot)
+    relative_ma_to_ma_zero_shot = relative_mass_accuracy(ma1=ma, ma2=ma_zero_shot)
+
     return dict(
+        roc_auc=roc_auc,
         precision_recall_auc=auc_value,
         avg_precision=avg_precision,
         precision_specificity=precision_specificity,
         top_k_precision=top_k_precision,
+        mass_accuracy=ma,
+        mass_accuracy_zero_shot=ma_zero_shot,
+        mass_accuracy_relative=relative_ma_to_ma_zero_shot,
     )
-
-
-def calculate_scores(attribution: np.ndarray, ground_truth: np.ndarray) -> Dict:
-    result = dict(
-        roc_auc=roc_auc_scores(y_true=ground_truth, y_score=attribution),
-        mass_accuracy=mass_accuracy(y_true=ground_truth, y_pred=attribution),
-    )
-    precision_based_scores = compute_precision_based_scores(
-        y_true=ground_truth, y_score=attribution
-    )
-    result.update(precision_based_scores)
-    return result
 
 
 def evaluate_row(
@@ -144,6 +149,7 @@ def evaluate_row(
 
     scores = calculate_scores(
         attribution=np.abs(np.array(xai_record['attribution'])),
+        attribution_zero_shot=np.abs(np.array(xai_record['attribution_zero_shot'])),
         ground_truth=np.array(xai_record['ground_truth']),
     )
 
@@ -329,6 +335,34 @@ def merge_xai_results_with_prediction_data(
     return data_for_evaluation
 
 
+def merge_with_zero_shot_model_results(
+    data: pd.DataFrame, zero_shot_model_data: pd.DataFrame
+) -> pd.DataFrame:
+    merge_columns = [
+        'model_repetition_number',
+        'model_version',
+        'attribution_method',
+        'sentence',
+        'target',
+        'dataset_type',
+    ]
+    output = pd.merge(data, zero_shot_model_data, how='inner', on=merge_columns)
+
+    output.rename(
+        columns={
+            'model_name_x': 'model_name',
+            'attribution_x': 'attribution',
+            'ground_truth_x': 'ground_truth',
+            'sentence_idx_x': 'sentence_idx',
+            'prediction_x': 'prediction',
+            'attribution_y': 'attribution_zero_shot',
+        },
+        inplace=True,
+    )
+
+    return output
+
+
 def create_prediction_data(config: dict) -> pd.DataFrame:
     artifacts_dir = generate_artifacts_dir(config=config)
     training_records_path = join(
@@ -440,6 +474,15 @@ def evaluate_xai_performance(config: Dict) -> None:
 
     evaluation_data_all = merge_xai_results_with_prediction_data(
         xai_data=xai_data, predication_data=data_with_predictions
+    )
+
+    zero_shot_model_results = evaluation_data_all[
+        evaluation_data_all['model_name'] == 'bert_zero_shot'
+    ]
+
+    evaluation_data_all = merge_with_zero_shot_model_results(
+        data=evaluation_data_all,
+        zero_shot_model_data=zero_shot_model_results,
     )
 
     evaluation_data_all = evaluation_data_all[
