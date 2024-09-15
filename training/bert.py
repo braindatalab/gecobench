@@ -1,7 +1,7 @@
 from copy import deepcopy
 from os.path import join
 from pathlib import Path
-from typing import Tuple, Dict, List, Any
+from typing import Tuple, Dict, List, Any, Callable
 
 import torch
 from loguru import logger
@@ -280,11 +280,12 @@ def dump_history(history: Dict, config: dict, history_name: str) -> str:
 
 
 def create_bert_ids(
-    data: List, tokenizer: BertTokenizer, type: str = "", config: dict = None
+    data: List, tokenizer: BertTokenizer, type: str = "", config: dict = None,
+        sentence_context: Callable = None
 ) -> List:
     should_cache = type != "" and config is not None
 
-    if should_cache:
+    if should_cache and sentence_context is None:
         cache_key = f"bert_ids_{type}"
         cache_entry = load_from_cache(cache_key, config)
         if cache_entry is not None:
@@ -295,13 +296,14 @@ def create_bert_ids(
     for k, sentence in tqdm(
         enumerate(data), total=len(data), desc=f'Creating BERT IDs {type}'
     ):
+        sentence = sentence if sentence_context is None else sentence_context(sentence)
         cur = create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
 
         if len(cur) <= MAX_TOKEN_LENGTH:
             bert_ids.append(cur)
             valid_idxs.append(k)
 
-    if should_cache:
+    if should_cache and sentence_context is None:
         save_to_cache(cache_key, (bert_ids, valid_idxs), config)
 
     return bert_ids, valid_idxs
