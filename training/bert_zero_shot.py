@@ -261,16 +261,14 @@ def train_bert_zero_shot(
 
     logger.info(f'Begin zero shot training BERT model')
     for k in range(config['training']['num_training_repetitions']):
-        output += [
-            train_model(
-                config=config,
-                dataset_name=dataset_name,
-                training_params=params,
-                train_loader=train_loader,
-                val_loader=val_loader,
-                tokenizer=bert_tokenizer,
-                idx=k,
-            )
-        ]
+        output += train_model(
+            config=config,
+            dataset_name=dataset_name,
+            training_params=params,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            tokenizer=bert_tokenizer,
+            idx=k,
+        )
 
     return output
