@@ -120,6 +120,11 @@
         "model_name": "bert_all",
         "model_performance": "bert_all_history",
         "layers_to_train": []
+      },
+      "bert_zero_shot": {
+        "batch_size": 32,
+        "model_name": "bert_zero_shot",
+        "model_performance": "bert_zero_shot_history"
       }
     }
   },
