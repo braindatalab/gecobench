@@ -164,10 +164,10 @@ def train_model(
         model=model, data_loder=val_loader, tokenizer=tokenizer
     )
 
-    training_history['train_loss'] = training_params['epochs'] * [-1]
-    training_history['train_acc'] = training_params['epochs'] * [train_acc]
-    training_history['val_loss'] += training_params['epochs'] * [-1]
-    training_history['val_acc'] += training_params['epochs'] * [val_acc]
+    training_history['train_loss'] = [-1]
+    training_history['train_acc'] = [train_acc]
+    training_history['val_loss'] = [-1]
+    training_history['val_acc'] = [val_acc]
 
     logger.info(
         f"AVG Training Loss:{training_history['train_loss'][-1]:.2f}, "
