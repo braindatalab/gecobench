@@ -208,6 +208,8 @@ def train_model(
     )
     records += [(dataset_name, output_params_last, model_path_last, history_path_last)]
 
+    return records
+
 
 def determine_gender_type(dataset_name: str) -> str:
     output = 'binary'
