@@ -70,7 +70,7 @@ def format_logits(
         n = input_embeddings.shape[0]
     mask = torch.zeros(
         size=(n, get_num_labels(dataset_name=dataset_name)),
-    )
+    ).to(DEVICE)
     mask[:, target] = 1.0
     return mask * logits.unsqueeze(1)
 

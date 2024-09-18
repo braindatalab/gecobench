@@ -7,7 +7,7 @@ from torch.nn import Module
 from transformers import BertTokenizer
 
 LABEL_MAP = {'female': 0, 'male': 1, 'neutral': 2}
-
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def determine_gender_type(dataset_name: str) -> str:
     output = 'binary'
@@ -90,7 +90,7 @@ def zero_shot_prediction(
     ).logits
     mask_token_ids = input_ids == tokenizer.mask_token_id
 
-    predicted_logits = torch.zeros(output.shape[0])
+    predicted_logits = torch.zeros(output.shape[0]).to(DEVICE)
     for k in range(mask_token_ids.shape[0]):
         if not mask_token_ids[k].any():
             predicted_logits[k] *= output[k].sum()
