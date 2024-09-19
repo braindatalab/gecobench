@@ -9,6 +9,7 @@ from transformers import BertTokenizer
 LABEL_MAP = {'female': 0, 'male': 1, 'neutral': 2}
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+
 def determine_gender_type(dataset_name: str) -> str:
     output = 'binary'
     if 'non_binary' in dataset_name:
@@ -68,18 +69,50 @@ def predict_first_token_coinciding_with_labels(
     return prediction, ids_and_tokens_map[prediction]
 
 
+def predict_masked_tokens(
+    logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer
+) -> Tuple[Tensor, list[str], Tensor]:
+    predicted_tokens = list()
+    predicted_token_ids = list()
+    predicted_logits = list()
+    output_mask_tokens = logits[mask_token_ids]
+    _, topk_predicted_tokens_ids = output_mask_tokens.topk(5, axis=-1)
+    for j in range(topk_predicted_tokens_ids.shape[0]):
+        prediction, predicted_id = predict_first_token_coinciding_with_labels(
+            topk_predicted_tokens_ids=topk_predicted_tokens_ids[j],
+            tokenizer=tokenizer,
+        )
+        predicted_tokens += [prediction]
+        predicted_token_ids += [predicted_id]
+        predicted_logits += [output_mask_tokens[j, predicted_id]]
+
+    return (
+        torch.tensor(predicted_token_ids).to(DEVICE),
+        predicted_tokens,
+        torch.tensor(predicted_logits).to(DEVICE),
+    )
+
+
+def predict_max_logit_tokens(
+    logits: Tensor, input_ids: Tensor, tokenizer: BertTokenizer
+) -> Tuple[Tensor, list[str], Tensor]:
+    predicted_logits = logits.max(dim=-1)[0].max(dim=-1)[0]
+    predicted_token_ids = logits.argmax(dim=-1).argmax(dim=-1)
+    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_token_ids.tolist())
+    return predicted_token_ids, predicted_tokens, predicted_logits
+
+
 def zero_shot_prediction(
     model: Module,
     tokenizer: BertTokenizer,
     input_ids: Tensor = None,
     attention_mask: Tensor = None,
     input_embeddings: Tensor = None,
-) -> Tuple[list[str], list[int], Tensor]:
-    predicted_tokens = list()
-    predicted_token_ids = list()
-
-    if (input_ids is not None and input_embeddings is not None) and (
-        input_ids.shape[0] != input_embeddings.shape[0]
+) -> Tuple[list[str], Tensor, Tensor]:
+    if (
+        input_ids is not None
+        and input_embeddings is not None
+        and input_ids.shape[0] != input_embeddings.shape[0]
     ):
         input_ids = input_ids.repeat(input_embeddings.shape[0], 1)
 
@@ -88,22 +121,26 @@ def zero_shot_prediction(
         inputs_embeds=input_embeddings,
         attention_mask=attention_mask,
     ).logits
-    mask_token_ids = input_ids == tokenizer.mask_token_id
 
-    predicted_logits = torch.zeros(output.shape[0]).to(DEVICE)
-    for k in range(mask_token_ids.shape[0]):
-        if not mask_token_ids[k].any():
-            predicted_logits[k] *= output[k].sum()
-        else:
-            _, topk_predicted_tokens_ids = output[k, mask_token_ids[k]].topk(5, axis=-1)
-            for j in range(topk_predicted_tokens_ids.shape[0]):
-                prediction, predicted_id = predict_first_token_coinciding_with_labels(
-                    topk_predicted_tokens_ids=topk_predicted_tokens_ids[j],
-                    tokenizer=tokenizer,
-                )
-                predicted_tokens += [prediction]
-                predicted_token_ids += [predicted_id]
-                predicted_logits[k] = output[k, mask_token_ids[k], predicted_id]
+    predicted_token_ids, predicted_tokens, predicted_logits = predict_max_logit_tokens(
+        logits=output, input_ids=input_ids, tokenizer=tokenizer
+    )
+
+    mask_token_ids = input_ids == tokenizer.mask_token_id
+    if mask_token_ids.any(dim=-1).any(dim=-1):
+        predicted_mask_ids, predicted_mask_tokens, predicted_mask_logits = (
+            predict_masked_tokens(
+                logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
+            )
+        )
+        predicted_logits[mask_token_ids.any(dim=-1)] = predicted_mask_logits
+        predicted_token_ids[mask_token_ids.any(dim=-1)] = predicted_mask_ids
+
+        counter = 0
+        for k, has_mask_token in enumerate(mask_token_ids.any(dim=-1)):
+            if has_mask_token:
+                predicted_tokens[k] = predicted_mask_tokens[counter]
+                counter += 1
 
     return (
         predicted_tokens,
