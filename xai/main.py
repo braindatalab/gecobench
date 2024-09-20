@@ -14,11 +14,19 @@ from tqdm import tqdm
 from transformers import BertTokenizer
 
 from common import XAIResult, validate_dataset_key
+
+from training.bert_zero_shot_utils import (
+    determine_gender_type,
+    get_zero_shot_prompt_function,
+    PROMPT_TEMPLATES,
+)
+
 from training.bert import (
     create_bert_ids,
     get_bert_ids,
     get_bert_tokenizer,
 )
+
 from utils import (
     filter_eval_datasets,
     generate_training_dir,
@@ -33,6 +41,7 @@ from utils import (
     BERT_MODEL_TYPE,
     ONE_LAYER_ATTENTION_MODEL_TYPE,
     determine_model_type,
+    BERT_ZERO_SHOT,
 )
 from xai.methods import (
     get_captum_attributions,
@@ -171,7 +180,17 @@ def apply_xai_methods_on_sentence(
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
     tokenizer = get_tokenizer[model_type](config)
-    token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0][0]
+    gender_type_of_dataset = determine_gender_type(dataset_type)
+    zero_shot_prompt = get_zero_shot_prompt_function(
+        prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
+    )
+    token_ids = create_token_ids[model_type](
+        [row['sentence']],
+        tokenizer,
+        '',
+        None,
+        zero_shot_prompt,
+    )[0][0]
     token_ids = token_ids.to(DEVICE)
     num_ids = token_ids.shape[0]
     reference_tokens = create_reference_tokens[model_type](tokenizer, num_ids)
@@ -193,8 +212,10 @@ def apply_xai_methods_on_sentence(
         baseline=reference_tokens,
         methods=config['xai']['methods'],
         target=xai_target,
+        dataset_type=dataset_type,
         tokenizer=tokenizer,
     )
+
     if covariance_between_words_target is not None:
         attributions.update(
             get_covariance_between_words_target(
@@ -215,7 +236,7 @@ def apply_xai_methods_on_sentence(
 
 
 def prepare_data_for_covariance_calculation(
-    dataset: pd.DataFrame, model_name: str, config: dict
+    dataset: pd.DataFrame, model_name: str, config: dict, dataset_type: str
 ) -> dict:
     model_type = determine_model_type(s=model_name)
     vocabulary = set()
@@ -223,8 +244,18 @@ def prepare_data_for_covariance_calculation(
     targets = list()
     word_to_bert_id_mapping = dict()
     tokenizer = get_tokenizer[model_type](config)
+    gender_type_of_dataset = determine_gender_type(dataset_type)
     for k, row in tqdm(dataset.iterrows()):
-        token_ids = create_token_ids[model_type]([row['sentence']], tokenizer)[0][0]
+        zero_shot_prompt = get_zero_shot_prompt_function(
+            prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
+        )
+        token_ids = create_token_ids[model_type](
+            [row['sentence']],
+            tokenizer,
+            '',
+            None,
+            zero_shot_prompt,
+        )[0][0]
         decoded_words = list()
         for tid in token_ids:
             decoded_word = tokenizer.decode(tid).replace(' ', '')
@@ -258,6 +289,7 @@ def apply_xai_methods(
         dataset=dataset,
         model_name=model_params['model_name'],
         config=config,
+        dataset_type=dataset_type,
     )
 
     covariance_between_words_target = calculate_covariance_between_words_target(
@@ -342,26 +374,31 @@ def load_test_data(config: dict) -> dict[pd.DataFrame]:
 get_tokenizer = {
     BERT_MODEL_TYPE: get_bert_tokenizer,
     ONE_LAYER_ATTENTION_MODEL_TYPE: get_bert_tokenizer,
+    BERT_ZERO_SHOT: get_bert_tokenizer,
 }
 
 create_token_ids = {
     BERT_MODEL_TYPE: create_bert_ids,
     ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_ids,
+    BERT_ZERO_SHOT: create_bert_ids,
 }
 
 create_model_token_to_original_token_mapping = {
     BERT_MODEL_TYPE: create_bert_to_original_token_mapping,
     ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_to_original_token_mapping,
+    BERT_ZERO_SHOT: create_bert_to_original_token_mapping,
 }
 
 create_reference_tokens = {
     BERT_MODEL_TYPE: create_bert_reference_tokens,
     ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_reference_tokens,
+    BERT_ZERO_SHOT: create_bert_reference_tokens,
 }
 
 raw_attributions_to_original_tokens_mapping = {
     BERT_MODEL_TYPE: map_bert_attributions_to_original_tokens,
     ONE_LAYER_ATTENTION_MODEL_TYPE: map_bert_attributions_to_original_tokens,
+    BERT_ZERO_SHOT: map_bert_attributions_to_original_tokens,
 }
 
 

@@ -35,7 +35,15 @@ from training.bert import (
     add_padding_if_necessary,
     create_attention_mask_from_bert_ids,
 )
-from utils import determine_model_type, BERT_MODEL_TYPE, ONE_LAYER_ATTENTION_MODEL_TYPE
+from training.bert_zero_shot_utils import zero_shot_prediction
+from utils import (
+    determine_model_type,
+    BERT_MODEL_TYPE,
+    ONE_LAYER_ATTENTION_MODEL_TYPE,
+    BERT_ZERO_SHOT,
+    is_non_binary_dataset,
+    get_num_labels,
+)
 
 BERT = 'bert'
 ALL_BUT_CLS_SEP = slice(1, -1)
@@ -50,14 +58,59 @@ GRADIENT_BASED_METHODS = [
 ]
 
 
+def format_logits(
+    input_ids: Tensor,
+    logits: Tensor,
+    target: int,
+    dataset_name: str,
+    input_embeddings: Tensor = None,
+) -> Tensor:
+    n = input_ids.shape[0]
+    if input_embeddings is not None and input_ids.shape[0] != input_embeddings.shape[0]:
+        n = input_embeddings.shape[0]
+    mask = torch.zeros(
+        size=(n, get_num_labels(dataset_name=dataset_name)),
+    ).to(DEVICE)
+    mask[:, target] = 1.0
+    return mask * logits.unsqueeze(1)
+
+
 class SkippingEmbedding(torch.nn.Module):
-    def __init__(self, model: torch.nn.Module, model_type: str):
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        model_type: str,
+        tokenizer: BertTokenizer,
+        dataset_type: str,
+        target: int,
+        input_ids: Tensor = None,
+    ):
         super().__init__()
         self.model = model
         self.model_type = determine_model_type(s=model_type)
+        self.tokenizer = tokenizer
+        self.input_ids = input_ids
+        self.dataset_type = dataset_type
+        self.target = target
 
-    def forward(self, inputs: torch.tensor):
-        if BERT_MODEL_TYPE == self.model_type:
+    def forward(self, inputs: torch.Tensor, attention_mask: Tensor = None):
+        if BERT_ZERO_SHOT == self.model_type:
+            _, predicted_token_ids, logits = zero_shot_prediction(
+                model=self.model,
+                attention_mask=attention_mask,
+                tokenizer=self.tokenizer,
+                input_embeddings=inputs,
+                input_ids=self.input_ids,
+            )
+            x = format_logits(
+                input_ids=self.input_ids,
+                input_embeddings=inputs,
+                logits=logits,
+                target=self.target,
+                dataset_name=self.dataset_type,
+            )
+            x = torch.softmax(x, dim=1)
+        elif BERT_MODEL_TYPE == self.model_type:
             x = self.model(input_ids=None, inputs_embeds=inputs)[0]
         elif ONE_LAYER_ATTENTION_MODEL_TYPE == self.model_type:
             x = self.model(embeddings=inputs)[0]
@@ -86,16 +139,35 @@ def get_captum_attributions(
     baseline: Tensor,
     methods: list,
     target: list,
+    dataset_type: str,
     tokenizer: BertTokenizer,
 ) -> Dict:
     attributions = dict()
     check_availability_of_xai_methods(methods=methods)
 
     def forward_function(inputs: Tensor, attention_mask: Tensor = None) -> Tensor:
-        output = (
-            model(inputs) if attention_mask is None else model(inputs, attention_mask)
-        )
-        forward_function_output = torch.softmax(output.logits, dim=1)
+        if BERT_ZERO_SHOT == model_type:
+            _, predicted_token_ids, logits = zero_shot_prediction(
+                model=model,
+                attention_mask=attention_mask,
+                tokenizer=tokenizer,
+                input_embeddings=None,
+                input_ids=inputs,
+            )
+            formated_logits = format_logits(
+                input_ids=inputs,
+                logits=logits,
+                target=target,
+                dataset_name=dataset_type,
+            )
+            forward_function_output = torch.softmax(formated_logits, dim=1)
+        else:
+            output = (
+                model(inputs)
+                if attention_mask is None
+                else model(inputs, attention_mask)
+            )
+            forward_function_output = torch.softmax(output.logits, dim=1)
         return forward_function_output
 
     if BERT in model_type:
@@ -108,7 +180,14 @@ def get_captum_attributions(
 
         if method_name in GRADIENT_BASED_METHODS:
             a = methods_dict.get(method_name)(
-                forward_function=SkippingEmbedding(model, model_type),
+                forward_function=SkippingEmbedding(
+                    model=model,
+                    model_type=model_type,
+                    tokenizer=tokenizer,
+                    input_ids=x,
+                    target=target,
+                    dataset_type=dataset_type,
+                ),
                 baseline=baseline,
                 data=embeddings(x),
                 model=model,
@@ -116,7 +195,14 @@ def get_captum_attributions(
             )
         elif method_name == "Gradient SHAP":
             a = methods_dict.get(method_name)(
-                forward_function=SkippingEmbedding(model, model_type),
+                forward_function=SkippingEmbedding(
+                    model=model,
+                    model_type=model_type,
+                    tokenizer=tokenizer,
+                    input_ids=x,
+                    target=target,
+                    dataset_type=dataset_type,
+                ),
                 baseline=embeddings(baseline),
                 data=embeddings(x),
                 target=target,

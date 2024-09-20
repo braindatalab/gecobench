@@ -18,6 +18,7 @@ import os
 from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 
 BERT_MODEL_TYPE = 'bert'
+BERT_ZERO_SHOT = 'bert_zero_shot'
 ONE_LAYER_ATTENTION_MODEL_TYPE = 'one_layer_attention'
 
 
@@ -206,6 +207,13 @@ def determine_dataset_type(dataset_name: str) -> str:
         output = DATASET_SUBJECT
     return output
 
+def is_non_binary_dataset(dataset_name: str) -> bool:
+    return 'non_binary' in dataset_name
+
+
+def get_num_labels(dataset_name: str) -> int:
+    return 3 if is_non_binary_dataset(dataset_name) else 2
+
 
 def load_model(path: str) -> Any:
     model = torch.load(path, map_location=torch.device('cpu'))
@@ -216,7 +224,9 @@ def load_model(path: str) -> Any:
 
 def determine_model_type(s: str) -> str:
     result = None
-    if BERT_MODEL_TYPE in s:
+    if BERT_ZERO_SHOT in s:
+        result = BERT_ZERO_SHOT
+    elif BERT_MODEL_TYPE in s:
         result = BERT_MODEL_TYPE
     elif ONE_LAYER_ATTENTION_MODEL_TYPE in s:
         result = ONE_LAYER_ATTENTION_MODEL_TYPE

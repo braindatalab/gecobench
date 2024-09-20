@@ -9,6 +9,7 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from common import DataSet, DatasetKeys, validate_dataset_key
 from training.bert import train_bert
+from training.bert_zero_shot import train_bert_zero_shot
 from training.simple_model import train_simple_attention_model
 from utils import (
     dump_as_pickle,
@@ -48,7 +49,10 @@ def train_models(config: Dict) -> List:
         dataset = load_dataset(config, name)
         num_labels = dataset_config['datasets'][name]['num_labels']
         for model_name, params in config['training']['models'].items():
-            records += TrainModel[model_name](dataset, name, num_labels, params, config)
+            train_func = TrainModel.get(model_name, None)
+            if train_func is None:
+                continue
+            records += train_func(dataset, name, num_labels, params, config)
 
     return records
 
@@ -71,6 +75,7 @@ TrainModel = {
     'bert_all': train_bert,
     'bert_only_embedding': train_bert,
     'bert_randomly_init_embedding_classification': train_bert,
+    'bert_zero_shot': train_bert_zero_shot,
     'one_layer_attention': train_simple_attention_model,
 }
 
