@@ -1,7 +1,7 @@
 import os.path
 from itertools import chain
 from os.path import join
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 
 import pandas as pd
 import torch
@@ -99,6 +99,7 @@ def create_xai_results(
     model_params: dict,
     dataset_type: str,
     pred_probabilities: list = None,
+    zero_shot_prompt: Callable = None,
 ) -> list:
     results = list()
     for xai_method, attribution in attributions.items():
@@ -110,7 +111,11 @@ def create_xai_results(
                 dataset_type=dataset_type,
                 target=row['target'],
                 attribution_method=xai_method,
-                sentence=row['sentence'],
+                sentence=(
+                    row['sentence']
+                    if zero_shot_prompt is None
+                    else zero_shot_prompt(row['sentence'])
+                ),
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
                 sentence_idx=row["sentence_idx"],
@@ -180,10 +185,13 @@ def apply_xai_methods_on_sentence(
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
     tokenizer = get_tokenizer[model_type](config)
-    gender_type_of_dataset = determine_gender_type(dataset_type)
-    zero_shot_prompt = get_zero_shot_prompt_function(
-        prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
-    )
+    if BERT_ZERO_SHOT == model_type:
+        gender_type_of_dataset = determine_gender_type(dataset_type)
+        zero_shot_prompt = get_zero_shot_prompt_function(
+            prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
+        )
+    else:
+        zero_shot_prompt = None
     token_ids = create_token_ids[model_type](
         [row['sentence']],
         tokenizer,
@@ -230,6 +238,7 @@ def apply_xai_methods_on_sentence(
         model_params=model_params,
         dataset_type=dataset_type,
         pred_probabilities=pred_probabilities,
+        zero_shot_prompt=zero_shot_prompt,
     )
 
     return results
@@ -415,6 +424,14 @@ def main(config: Dict) -> None:
     intermediate_results_paths = loop_over_training_records(
         training_records=training_records, data=test_data, config=config
     )
+
+    xai_records_path = join(
+        generate_artifacts_dir(config=config),
+        generate_xai_dir(config=config),
+        config['xai']['xai_records'],
+    )
+
+    intermediate_results_paths = load_pickle(file_path=xai_records_path)
 
     logger.info('Map raw attributions to original words.')
     results = map_raw_attributions_to_original_tokens(
