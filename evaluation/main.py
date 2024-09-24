@@ -548,6 +548,19 @@ def evaluate_xai_performance(config: Dict) -> None:
         data=evaluation_data_all,
         zero_shot_model_data=zero_shot_model_results,
     )
+    
+    # strip the zero-shot attributions. for the zero-shot model, the sentences got
+    # wrapped in a prompt template rendering the corresponding attribution arrays 
+    # as longer than the actual sentence. we need to strip the zero-shot attributions
+    # to match the length of the sentence. at the moment the prompt template appends
+    # the original sentence to the end of the prompt, meaning we can use the attributions 
+    # from another model as a reference to strip the zero-shot attributions.
+    # From the last element of the zero-shot attributions, we slice backwards until we
+    # reach the length of the attribution of the reference model stripping the attributions
+    # for the prompt template.
+    evaluation_data_all['attribution_zero_shot_stripped'] = evaluation_data_all.apply(
+        lambda x: x['attribution_zero_shot'][-2:]/np.sum(x['attribution_zero_shot'][-2:]), axis=1
+    )
 
     evaluation_data_all = evaluation_data_all[
         evaluation_data_all["model_version"] == SaveVersion.best.value
