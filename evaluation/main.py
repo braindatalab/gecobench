@@ -2,13 +2,14 @@ import os
 import warnings
 from dataclasses import asdict
 from os.path import join
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 from sklearn.metrics import auc, roc_curve
 from sklearn.metrics._ranking import _binary_clf_curve, average_precision_score
+from torch import Tensor
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 from transformers import BertTokenizer
@@ -21,6 +22,13 @@ from common import (
     SaveVersion,
 )
 from training.bert import create_bert_ids, create_tensor_dataset
+from training.bert_zero_shot_utils import (
+    determine_gender_type,
+    get_zero_shot_prompt_function,
+    PROMPT_TEMPLATES,
+    zero_shot_prediction,
+    transform_predicted_tokens_to_labels,
+)
 from xai.main import load_test_data
 from evaluation.difference_testing import prepare_difference_data
 from utils import (
@@ -36,6 +44,7 @@ from utils import (
     generate_training_dir,
     load_model,
     generate_artifacts_dir,
+    get_num_labels,
 )
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -108,7 +117,7 @@ def mass_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def relative_mass_accuracy(ma1: float, ma2: float, epsilon=1e-6) -> float:
-    output = np.log((ma1 / ma2 if ma2 > 0 else 1/epsilon) + epsilon)
+    output = np.log((ma1 / ma2 if ma2 > 0 else 1 / epsilon) + epsilon)
     return output
 
 
@@ -176,7 +185,9 @@ def evaluate_xai(data: pd.DataFrame, only_correctly_classified: bool) -> list[di
     return results
 
 
-def create_bert_tensor_data(data: dict, config: dict) -> dict:
+def create_bert_tensor_data(
+    data: dict, config: dict, is_zero_shot: bool = False
+) -> dict:
     output = dict(dataset=dict(), sentences=dict())
     for name, dataset in data.items():
         bert_tokenizer = BertTokenizer.from_pretrained(
@@ -185,11 +196,16 @@ def create_bert_tensor_data(data: dict, config: dict) -> dict:
         )
         sentences, target = dataset['sentence'].tolist(), dataset['target'].tolist()
         logger.info(f"Create tensor data for dataset: {name}")
+        gender_type_of_dataset = determine_gender_type(dataset_name=name)
+        zero_shot_prompt = get_zero_shot_prompt_function(
+            prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
+        )
         bert_ids, valid_idxs = create_bert_ids(
             data=sentences,
             tokenizer=bert_tokenizer,
             type=f"{name}_test_bert_ids",
             config=config,
+            sentence_context=zero_shot_prompt if is_zero_shot else None,
         )
 
         target = [target[i] for i in valid_idxs]
@@ -202,6 +218,35 @@ def create_bert_tensor_data(data: dict, config: dict) -> dict:
         output['sentences'][name] = sentences
         output['dataset'][name] = tensor_data
     return output
+
+
+def zero_shot_model_predictions(
+    x: torch.Tensor,
+    attention_mask: torch.Tensor,
+    model: torch.nn.Module,
+    config: dict,
+    target: Tensor,
+    dataset_name: str,
+) -> Tuple[Tensor, Tensor]:
+    tokenizer = BertTokenizer.from_pretrained(
+        pretrained_model_name_or_path='bert-base-uncased',
+        revision=config['training']['bert_revision'],
+    )
+    with torch.no_grad():
+        tokens, token_ids, logits = zero_shot_prediction(
+            model=model,
+            input_ids=x,
+            attention_mask=attention_mask,
+            tokenizer=tokenizer,
+        )
+
+        prediction = transform_predicted_tokens_to_labels(predictions=tokens)
+        mask = torch.zeros(
+            size=(x.shape[0], get_num_labels(dataset_name=dataset_name)),
+        ).to(DEVICE)
+        mask[torch.nn.functional.one_hot(target, num_classes=get_num_labels(dataset_name=dataset_name)).to(torch.bool)] = 1.0
+        output_logits = mask * logits.unsqueeze(1)
+    return torch.tensor(prediction), output_logits
 
 
 def create_dataset_with_predictions(
@@ -220,6 +265,9 @@ def create_dataset_with_predictions(
     }
     artifacts_dir = generate_artifacts_dir(config=config)
     tensor_data = create_bert_tensor_data(data=data, config=config)
+    tensor_data_zero_shot = create_bert_tensor_data(
+        data=data, config=config, is_zero_shot=True
+    )
     for trained_on_dataset_name, model_params, model_path, _ in tqdm(
         records, desc='Evaluate model predictions'
     ):
@@ -233,9 +281,14 @@ def create_dataset_with_predictions(
             f"Model: {model_params['model_name']}, trained on: {trained_on_dataset_name} - Evaluate on: {datasets}"
         )
 
+        is_zero_shot = model_params['model_name'] == 'bert_zero_shot'
         for dataset_name in datasets:
-            dataset = tensor_data["dataset"][dataset_name]
-            sentences = tensor_data["sentences"][dataset_name]
+            if is_zero_shot:
+                dataset = tensor_data_zero_shot["dataset"][dataset_name]
+                sentences = tensor_data_zero_shot["sentences"][dataset_name]
+            else:
+                dataset = tensor_data["dataset"][dataset_name]
+                sentences = tensor_data["sentences"][dataset_name]
 
             model = load_model(path=join(artifacts_dir, model_path))
             model.to(DEVICE)
@@ -253,8 +306,18 @@ def create_dataset_with_predictions(
                         target.to(DEVICE),
                     )
 
-                    logits = model(x, attention_mask=attention_mask).logits
-                    prediction = torch.argmax(logits, dim=1)
+                    if is_zero_shot:
+                        prediction, logits = zero_shot_model_predictions(
+                            x=x,
+                            attention_mask=attention_mask,
+                            model=model,
+                            config=config,
+                            target=target,
+                            dataset_name=dataset_name,
+                        )
+                    else:
+                        logits = model(x, attention_mask=attention_mask).logits
+                        prediction = torch.argmax(logits, dim=1)
                     n = target.shape[0]
                     data_dict['model_repetition_number'] += n * [
                         model_params['repetition']
@@ -356,6 +419,7 @@ def merge_with_zero_shot_model_results(
             'sentence_idx_x': 'sentence_idx',
             'prediction_x': 'prediction',
             'attribution_y': 'attribution_zero_shot',
+            'pred_probs_x': 'pred_probs',
         },
         inplace=True,
     )
