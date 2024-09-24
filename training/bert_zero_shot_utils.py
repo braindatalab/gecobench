@@ -149,6 +149,10 @@ def zero_shot_prediction(
     )
 
 
+def transform_predicted_tokens_to_labels(predictions: list[str]) -> list[int]:
+    return [LABEL_MAP.get(token, -1) for token in predictions]
+
+
 def accuracy_zero_shot(prediction: list[str], labels: list[int]) -> float:
-    p = np.array([LABEL_MAP.get(token, -1) for token in prediction])
+    p = np.array(transform_predicted_tokens_to_labels(predictions=prediction))
     return np.mean(p == labels)
