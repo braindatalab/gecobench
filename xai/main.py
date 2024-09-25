@@ -425,14 +425,6 @@ def main(config: Dict) -> None:
         training_records=training_records, data=test_data, config=config
     )
 
-    xai_records_path = join(
-        generate_artifacts_dir(config=config),
-        generate_xai_dir(config=config),
-        config['xai']['xai_records'],
-    )
-
-    intermediate_results_paths = load_pickle(file_path=xai_records_path)
-
     logger.info('Map raw attributions to original words.')
     results = map_raw_attributions_to_original_tokens(
         xai_results_paths=intermediate_results_paths, config=config
