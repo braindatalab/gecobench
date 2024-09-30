@@ -283,12 +283,12 @@ def create_dataset_with_predictions(
 
         is_zero_shot = model_params['model_name'] == 'bert_zero_shot'
         for dataset_name in datasets:
+            sentences = tensor_data["sentences"][dataset_name]
             if is_zero_shot:
                 dataset = tensor_data_zero_shot["dataset"][dataset_name]
-                sentences = tensor_data_zero_shot["sentences"][dataset_name]
             else:
                 dataset = tensor_data["dataset"][dataset_name]
-                sentences = tensor_data["sentences"][dataset_name]
+
 
             model = load_model(path=join(artifacts_dir, model_path))
             model.to(DEVICE)
