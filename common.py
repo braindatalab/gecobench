@@ -48,6 +48,7 @@ class XAIResult:
     target: float = None
     attribution_method: str = None
     sentence: list = field(default_factory=list)
+    prompt: list = field(default_factory=list)
     raw_attribution: list = field(default_factory=list)
     attribution: list = field(default_factory=list)
     ground_truth: list = field(default_factory=list)

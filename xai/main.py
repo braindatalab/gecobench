@@ -111,11 +111,8 @@ def create_xai_results(
                 dataset_type=dataset_type,
                 target=row['target'],
                 attribution_method=xai_method,
-                sentence=(
-                    row['sentence']
-                    if zero_shot_prompt is None
-                    else zero_shot_prompt(row['sentence'])
-                ),
+                sentence=row['sentence'],
+                prompt=zero_shot_prompt(row['sentence']),
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
                 sentence_idx=row["sentence_idx"],
