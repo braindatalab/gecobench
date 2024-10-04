@@ -6,6 +6,8 @@ from torch import Tensor
 from torch.nn import Module
 from transformers import BertTokenizer
 
+from utils import get_num_labels
+
 LABEL_MAP = {'female': 0, 'male': 1, 'neutral': 2}
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -210,6 +212,29 @@ def zero_shot_prediction(
         predicted_token_ids,
         predicted_logits,
     )
+
+
+def format_logits(
+    token_ids: Tensor,
+    logits: Tensor,
+    target: int | Tensor,
+    dataset_name: str,
+    input_embeddings: Tensor = None,
+) -> Tensor:
+    n = token_ids.shape[0]
+    if input_embeddings is not None and token_ids.shape[0] != input_embeddings.shape[0]:
+        n = input_embeddings.shape[0]
+    mask = torch.zeros(
+        size=(n, get_num_labels(dataset_name=dataset_name)),
+    ).to(DEVICE)
+    if isinstance(target, int):
+        mask[:, target] = 1.0
+    else:
+        one_hot_target = torch.nn.functional.one_hot(
+            target, num_classes=get_num_labels(dataset_name=dataset_name)
+        ).to(torch.bool)
+        mask[one_hot_target] = 1.0
+    return mask * logits.unsqueeze(1)
 
 
 def transform_predicted_tokens_to_labels(predictions: list[str]) -> list[int]:

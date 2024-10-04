@@ -3,7 +3,6 @@ from typing import Dict, Callable
 import lime
 import numpy as np
 import torch
-from torch.utils.data.dataloader import default_collate
 from captum._utils.models.linear_model import SkLearnLasso
 from captum.attr import (
     Saliency,
@@ -22,27 +21,25 @@ from captum.attr import (
 )
 from lime.lime_text import LimeTextExplainer
 from loguru import logger
-from torch import Tensor
-from torch.utils.data import TensorDataset
-from tqdm import tqdm
-from transformers import BertTokenizer
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.pipeline import Pipeline
-
+from torch import Tensor
+from torch.utils.data import TensorDataset
+from torch.utils.data.dataloader import default_collate
+from tqdm import tqdm
+from transformers import BertTokenizer
 
 from training.bert import (
     create_bert_ids,
     add_padding_if_necessary,
     create_attention_mask_from_bert_ids,
 )
-from training.bert_zero_shot_utils import zero_shot_prediction
+from training.bert_zero_shot_utils import zero_shot_prediction, format_logits
 from utils import (
     determine_model_type,
     BERT_MODEL_TYPE,
     ONE_LAYER_ATTENTION_MODEL_TYPE,
     BERT_ZERO_SHOT,
-    is_non_binary_dataset,
-    get_num_labels,
 )
 
 BERT = 'bert'
@@ -57,22 +54,6 @@ GRADIENT_BASED_METHODS = [
     "DeepLift",
 ]
 
-
-def format_logits(
-    input_ids: Tensor,
-    logits: Tensor,
-    target: int,
-    dataset_name: str,
-    input_embeddings: Tensor = None,
-) -> Tensor:
-    n = input_ids.shape[0]
-    if input_embeddings is not None and input_ids.shape[0] != input_embeddings.shape[0]:
-        n = input_embeddings.shape[0]
-    mask = torch.zeros(
-        size=(n, get_num_labels(dataset_name=dataset_name)),
-    ).to(DEVICE)
-    mask[:, target] = 1.0
-    return mask * logits.unsqueeze(1)
 
 
 class SkippingEmbedding(torch.nn.Module):
@@ -103,7 +84,7 @@ class SkippingEmbedding(torch.nn.Module):
                 input_ids=self.input_ids,
             )
             x = format_logits(
-                input_ids=self.input_ids,
+                token_ids=self.input_ids,
                 input_embeddings=inputs,
                 logits=logits,
                 target=self.target,
