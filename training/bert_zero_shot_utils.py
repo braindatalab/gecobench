@@ -161,8 +161,8 @@ def predict_masked_tokens(
 def predict_max_logit_tokens(
     logits: Tensor, input_ids: Tensor, tokenizer: BertTokenizer
 ) -> Tuple[Tensor, list[str], Tensor]:
-    predicted_logits = logits.max(dim=-1)[0].max(dim=-1)[0]
-    predicted_token_ids = logits.argmax(dim=-1).argmax(dim=-1)
+    predicted_logits = logits.max(dim=-1)[0].max(dim=-1)[0].to(DEVICE)
+    predicted_token_ids = logits.argmax(dim=-1).argmax(dim=-1).to(DEVICE)
     predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_token_ids.tolist())
     return predicted_token_ids, predicted_tokens, predicted_logits
 
@@ -193,13 +193,13 @@ def zero_shot_prediction(
         input_ids=None if input_embeddings is not None else input_ids,
         inputs_embeds=input_embeddings,
         attention_mask=attention_mask,
-    ).logits
+    ).logits.to(DEVICE)
 
     predicted_token_ids, predicted_tokens, predicted_logits = predict_max_logit_tokens(
         logits=output, input_ids=input_ids, tokenizer=tokenizer
     )
 
-    mask_token_ids = input_ids == tokenizer.mask_token_id
+    mask_token_ids = (input_ids == tokenizer.mask_token_id).to(DEVICE)
     if mask_token_ids.any(dim=-1).any(dim=-1):
         predicted_mask_ids, predicted_mask_tokens, predicted_mask_logits = (
             predict_masked_tokens(
