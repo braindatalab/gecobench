@@ -194,9 +194,11 @@ def zero_shot_prediction(
                 logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
             )
         )
+        # Update logits and token ids
         predicted_logits[mask_token_ids.any(dim=-1)] = predicted_mask_logits
         predicted_token_ids[mask_token_ids.any(dim=-1)] = predicted_mask_ids
 
+        # Update tokens
         counter = 0
         for k, has_mask_token in enumerate(mask_token_ids.any(dim=-1)):
             if has_mask_token:
