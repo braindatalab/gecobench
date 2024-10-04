@@ -28,21 +28,82 @@ PROMPT_TEMPLATES = dict(
         # 'Pronouns of {sentence} are male or female: [MASK] .', # 0.49
         # 'Pronouns of "{sentence}" are male or female: [MASK] .', # 0.48
         # 'Female or male: {sentence} [MASK] .', # 0.57
-        'Female or male: [MASK]. {sentence}',  # 0.82
+        # 'Female or male: [MASK]. {sentence}',  # 0.82
+        ['Female', 'or', 'male', ':', '[MASK]', '.', '{sentence}'],  # 0.82
     ],
-    non_binary=['Female, male or neutral: [MASK]. {sentence}'],  # 0.57
+    non_binary=[
+        'Female',
+        ',',
+        'male',
+        'or',
+        'neutral',
+        ':',
+        '[MASK]',
+        '.',
+        '{sentence}',
+    ],  # 0.57
 )
+
+
+def remove_empty_strings_from_list(s: list[str]) -> list[str]:
+    return [w for w in s if w != '']
+
+
+def strip_spaces_from_words(s: list[str]) -> list[str]:
+    return [w.strip() for w in s]
+
+
+def concatenate_sentence(s: list[str]) -> str:
+    return ' '.join(strip_spaces_from_words(s=s))
+
+
+def split_sentence(s: str) -> list[str]:
+    return s.split(' ')
 
 
 def get_zero_shot_prompt_function(
     prompt_templates: list[str], index: int
 ) -> Callable[[list[str]], list[str]]:
     def zero_shot_prompt(sentence: list[str]) -> list[str]:
-        sentence_as_str = ' '.join(sentence)
-        prompt = prompt_templates[index].format(sentence=sentence_as_str)
-        return prompt.split(' ')
+        template = prompt_templates[index]
+        k = template.index('{sentence}')
+        return template[:k] + sentence + template[k + 1 :]
 
     return zero_shot_prompt
+
+
+def extract_original_sentence_from_prompt(
+    prompt: list[str], prompt_templates: list[str], index: int
+) -> list[str]:
+    k = prompt_templates[index].index('{sentence}')
+    num_template_words_before_sentence = len(prompt_templates[:k])
+    num_template_words_after_sentence = len(prompt_templates[k + 1 :])
+
+    original_sentence = prompt[
+        num_template_words_before_sentence : len(prompt)
+        - num_template_words_after_sentence
+    ]
+
+    return original_sentence
+
+
+def get_slicing_indices_of_sentence_embedded_in_prompt(
+    sentence: list[str], prompt_templates: list[str], index: int
+) -> slice:
+    empty_template = prompt_templates[index].format(sentence='').strip()
+    num_template_words = len(empty_template.split())
+    len_sentence = len(sentence)
+
+    if concatenate_sentence(s=sentence).startswith(
+        empty_template.split('{sentence}')[0].strip()
+    ):
+        start_index = num_template_words
+        end_index = len_sentence
+    else:
+        start_index = 0
+        end_index = len_sentence - num_template_words
+
+    return slice(start_index, end_index)
 
 
 def get_first_token_that_coincides_with_label(predictions: list[str]) -> str:
