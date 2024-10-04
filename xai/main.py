@@ -153,13 +153,19 @@ def map_raw_attributions_to_original_tokens(
 ) -> list[XAIResult]:
     output = list()
     artifacts_dir = generate_artifacts_dir(config)
+
+    def process_result(result, config):
+        model_type = determine_model_type(s=result.model_name)
+        result.attribution = raw_attributions_to_original_tokens_mapping[
+            model_type
+        ](model_type, result, config)
+        return result
+
     for path in xai_results_paths:
         results = load_pickle(file_path=join(artifacts_dir, path))
-        for result in results:
-            model_type = determine_model_type(s=result.model_name)
-            result.attribution = raw_attributions_to_original_tokens_mapping[
-                model_type
-            ](model_type, result, config)
+        results = Parallel(n_jobs=4)(
+            delayed(process_result)(result, config) for result in tqdm(results)
+        )
 
         output_dir = generate_xai_dir(config=config)
         filename = append_date(s=config['xai']['intermediate_xai_result_prefix'])
