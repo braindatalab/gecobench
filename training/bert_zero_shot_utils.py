@@ -34,15 +34,17 @@ PROMPT_TEMPLATES = dict(
         ['Female', 'or', 'male', ':', '[MASK]', '.', '{sentence}'],  # 0.82
     ],
     non_binary=[
-        'Female',
-        ',',
-        'male',
-        'or',
-        'neutral',
-        ':',
-        '[MASK]',
-        '.',
-        '{sentence}',
+        [
+            'Female',
+            ',',
+            'male',
+            'or',
+            'neutral',
+            ':',
+            '[MASK]',
+            '.',
+            '{sentence}',
+        ]
     ],  # 0.57
 )
 
@@ -172,6 +174,14 @@ def zero_shot_prediction(
     attention_mask: Tensor = None,
     input_embeddings: Tensor = None,
 ) -> Tuple[list[str], Tensor, Tensor]:
+    '''
+    Predicts the tokens of the input_ids using the model.
+    If input_embeddings is not None, then the input_ids are not used.
+    And the general prediction strategy is to predict the token with the highest logit
+    and if there is a mask token, then the prediction is based on the top 5 logits.
+    Of these top 5 logits, the first token that coincides with the labels is selected.
+    Otherwise, we fall back to the token with the highest logit.
+    '''
     if (
         input_ids is not None
         and input_embeddings is not None
