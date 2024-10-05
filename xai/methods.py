@@ -136,7 +136,7 @@ def get_captum_attributions(
                 input_ids=inputs,
             )
             formated_logits = format_logits(
-                input_ids=inputs,
+                token_ids=inputs,
                 logits=logits,
                 target=target,
                 dataset_name=dataset_type,

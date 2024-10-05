@@ -112,7 +112,7 @@ def create_xai_results(
                 target=row['target'],
                 attribution_method=xai_method,
                 sentence=row['sentence'],
-                prompt=zero_shot_prompt(row['sentence']),
+                prompt=zero_shot_prompt(row['sentence']) if zero_shot_prompt is not None else None,
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
                 sentence_idx=row["sentence_idx"],
