@@ -142,14 +142,22 @@ def predict_masked_tokens(
     predicted_logits = list()
     output_mask_tokens = logits[mask_token_ids]
     _, topk_predicted_tokens_ids = output_mask_tokens.topk(5, axis=-1)
-    for j in range(topk_predicted_tokens_ids.shape[0]):
-        prediction, predicted_id = predict_first_token_coinciding_with_labels(
-            topk_predicted_tokens_ids=topk_predicted_tokens_ids[j],
-            tokenizer=tokenizer,
-        )
-        predicted_tokens += [prediction]
-        predicted_token_ids += [predicted_id]
-        predicted_logits += [output_mask_tokens[j, predicted_id]]
+
+    n = 0
+    for m in mask_token_ids.any(dim=-1):
+        if m:
+            prediction, predicted_id = predict_first_token_coinciding_with_labels(
+                topk_predicted_tokens_ids=topk_predicted_tokens_ids[n],
+                tokenizer=tokenizer,
+            )
+            predicted_tokens += [prediction]
+            predicted_token_ids += [predicted_id]
+            predicted_logits += [output_mask_tokens[n, predicted_id]]
+            n += 1
+        else:
+            predicted_tokens += ['']
+            predicted_token_ids += [-1]
+            predicted_logits += [-1]
 
     return (
         torch.tensor(predicted_token_ids).to(DEVICE),
@@ -207,8 +215,14 @@ def zero_shot_prediction(
             )
         )
         # Update logits and token ids
-        predicted_logits[mask_token_ids.any(dim=-1)] = predicted_mask_logits
-        predicted_token_ids[mask_token_ids.any(dim=-1)] = predicted_mask_ids
+        predicted_logits = (
+            mask_token_ids.any(dim=-1) * predicted_mask_logits
+            + ~mask_token_ids.any(dim=-1) * predicted_logits
+        )
+        predicted_token_ids = (
+            mask_token_ids.any(dim=-1) * predicted_mask_ids
+            + ~mask_token_ids.any(dim=-1) * predicted_token_ids
+        )
 
         # Update tokens
         counter = 0

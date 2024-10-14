@@ -90,7 +90,6 @@ class SkippingEmbedding(torch.nn.Module):
                 target=self.target,
                 dataset_name=self.dataset_type,
             )
-            x = torch.softmax(x, dim=1)
         elif BERT_MODEL_TYPE == self.model_type:
             x = self.model(input_ids=None, inputs_embeds=inputs)[0]
         elif ONE_LAYER_ATTENTION_MODEL_TYPE == self.model_type:
