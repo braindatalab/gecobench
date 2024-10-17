@@ -140,7 +140,7 @@ def predict_masked_tokens(
     predicted_tokens = list()
     predicted_token_ids = list()
     predicted_logits = list()
-    output_mask_tokens = logits[mask_token_ids]
+    output_mask_tokens = logits[mask_token_ids].detach()
     _, topk_predicted_tokens_ids = output_mask_tokens.topk(5, axis=-1)
 
     n = 0
@@ -164,6 +164,32 @@ def predict_masked_tokens(
         predicted_tokens,
         torch.tensor(predicted_logits).to(DEVICE),
     )
+
+
+def create_prediction_mask(
+        logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer
+) -> Tensor:
+    # Initialize the mask tensor with zeros
+    prediction_mask = torch.zeros_like(logits, dtype=torch.bool)
+
+    # Get the top 5 predicted token IDs for the masked positions
+    output_mask_tokens = logits[mask_token_ids].detach()
+    _, topk_predicted_tokens_ids = output_mask_tokens.topk(5, axis=-1)
+
+    n = 0
+    for k, m in enumerate(mask_token_ids.any(dim=-1)):
+        if m:
+            # Get the first token that coincides with the labels
+            topk_predicted_tokens = tokenizer.convert_ids_to_tokens(topk_predicted_tokens_ids[n])
+            prediction = next((token for token in topk_predicted_tokens if token in LABEL_MAP.keys()),
+                              topk_predicted_tokens[0])
+            predicted_id = tokenizer.convert_tokens_to_ids(prediction)
+
+            # Update the mask tensor
+            prediction_mask[k, mask_token_ids[k, :], predicted_id] = True
+            n += 1
+
+    return prediction_mask
 
 
 def predict_max_logit_tokens(
@@ -209,14 +235,17 @@ def zero_shot_prediction(
 
     mask_token_ids = (input_ids == tokenizer.mask_token_id).to(DEVICE)
     if mask_token_ids.any(dim=-1).any(dim=-1):
-        predicted_mask_ids, predicted_mask_tokens, predicted_mask_logits = (
+        mask_token_mask = create_prediction_mask(
+            logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
+        )
+        predicted_mask_ids, predicted_mask_tokens, _ = (
             predict_masked_tokens(
                 logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
             )
         )
         # Update logits and token ids
         predicted_logits = (
-            mask_token_ids.any(dim=-1) * predicted_mask_logits
+            (mask_token_mask * output).max(dim=-1)[0].max(dim=-1)[0].to(DEVICE)
             + ~mask_token_ids.any(dim=-1) * predicted_logits
         )
         predicted_token_ids = (
