@@ -31,21 +31,81 @@ PROMPT_TEMPLATES = dict(
         # 'Pronouns of "{sentence}" are male or female: [MASK] .', # 0.48
         # 'Female or male: {sentence} [MASK] .', # 0.57
         # 'Female or male: [MASK]. {sentence}',  # 0.82
-        ['Female', 'or', 'male', ':', '[MASK]', '.', '{sentence}'],  # 0.82
-    ],
-    non_binary=[
+        # ['Female', 'or', 'male', ':', '[MASK]', '.', '{sentence}'],
+        # val accruacy: 0.87
+        # val accruacy: 0.72
         [
+            'He',
+            'continues',
+            'to',
+            'pursue',
+            'him',
+            '.',
+            'male,',
+            'She',
+            'continues',
+            'to',
+            'pursue',
+            'her',
+            '.',
+            'female,',
             'Female',
-            ',',
-            'male',
             'or',
-            'neutral',
+            'male',
             ':',
             '[MASK]',
             '.',
             '{sentence}',
+        ],
+        # val accruacy: 0.85
+        # val accruacy: 0.69
+    ],
+    non_binary=[
+        # [
+        #     'Female',
+        #     ',',
+        #     'male',
+        #     'or',
+        #     'neutral',
+        #     ':',
+        #     '[MASK]',
+        #     '.',
+        #     '{sentence}',
+        # ],
+        # val accruacy: 0.60
+        # val accruacy: 0.50
+        [
+            'He',
+            'proceeds',
+            'to',
+            'his',
+            'place',
+            '.',
+            'male,',
+            'She',
+            'proceeds',
+            'to',
+            'her',
+            'place',
+            '.',
+            'female,',
+            'They',
+            'proceed',
+            'to',
+            'their',
+            'place',
+            '.',
+            'neutral,',
+            'Female,',
+            'male',
+            'or',
+            'neutral:',
+            '[MASK].',
+            '{sentence}',
         ]
-    ],  # 0.57
+        # val accruacy: 0.66
+        # val accruacy: 0.60
+    ],
 )
 
 
