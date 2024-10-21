@@ -132,6 +132,7 @@
     "output_dir": "xai_gender",
     "intermediate_xai_result_prefix": "intermediate_xai_result",
     "intermediate_raw_xai_result_prefix": "intermediate_raw_xai_result",
+    "intermediate_xai_result_paths": "intermediate_xai_result_paths.pkl",
     "xai_records": "xai_records.pkl",
     "num_workers": 4,
     "class_of_interest": 1,

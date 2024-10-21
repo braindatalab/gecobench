@@ -451,6 +451,14 @@ def main(config: Dict) -> None:
         training_records=training_records, data=test_data, config=config
     )
 
+    logger.info(f'Dump intermediate result paths.')
+    output_dir = generate_xai_dir(config=config)
+    dump_as_pickle(
+        data=intermediate_results_paths,
+        output_dir=join(generate_artifacts_dir(config=config), output_dir),
+        filename=config['xai']['intermediate_xai_result_paths'],
+    )
+
     logger.info('Map raw attributions to original words.')
     results = map_raw_attributions_to_original_tokens(
         xai_results_paths=intermediate_results_paths, config=config
