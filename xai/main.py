@@ -145,6 +145,29 @@ def map_bert_attributions_to_original_tokens(
     return list(original_token_to_attribution_mapping.values())
 
 
+def map_zero_shot_bert_attributions_to_original_tokens(
+    model_type: str, result: XAIResult, config: dict
+) -> list:
+    tokenizer = get_tokenizer[model_type](config)
+    token_mapping = create_model_token_to_original_token_mapping[model_type](
+        [result.prompt], tokenizer
+    )
+    original_token_to_attribution_mapping = dict()
+    for k, word in enumerate(result.prompt):
+        original_token_to_attribution_mapping[word + str(k)] = 0
+
+    bert_token_to_attribution_mapping = dict()
+    for word, attribution in zip(
+        list(token_mapping[0].keys()), result.raw_attribution[ALL_BUT_CLS_SEP]
+    ):
+        bert_token_to_attribution_mapping[word] = attribution
+
+    for k, v in bert_token_to_attribution_mapping.items():
+        original_token_to_attribution_mapping[token_mapping[0][k]] += v
+
+    return list(original_token_to_attribution_mapping.values())
+
+
 def map_raw_attributions_to_original_tokens(
     xai_results_paths: list[str], config: dict
 ) -> list[XAIResult]:
@@ -410,7 +433,7 @@ create_reference_tokens = {
 raw_attributions_to_original_tokens_mapping = {
     BERT_MODEL_TYPE: map_bert_attributions_to_original_tokens,
     ONE_LAYER_ATTENTION_MODEL_TYPE: map_bert_attributions_to_original_tokens,
-    BERT_ZERO_SHOT: map_bert_attributions_to_original_tokens,
+    BERT_ZERO_SHOT: map_zero_shot_bert_attributions_to_original_tokens,
 }
 
 
