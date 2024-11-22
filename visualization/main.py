@@ -67,6 +67,7 @@ def compute_average_score_per_repetition(data: pd.DataFrame) -> pd.DataFrame:
 
     return pd.concat(results, axis=1).T
 
+
 def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
     data: pd.DataFrame,
     metric: str,
@@ -140,7 +141,6 @@ def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
     # data[f'{metric}_new'] = data['Mass Accuracy (MA)'] / data['mass_accuracy_zero_shot']
     # data[f'{metric}_new'] = np.log(data[f'{metric}_new'] + 1e-6)
 
-
     # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
     #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
     # )
@@ -160,7 +160,7 @@ def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
         'LIME',
         'Gradient\nSHAP',
         'Integrated\nGradients',
-        'Pattern\nVariant'
+        'Pattern\nVariant',
     ]
 
     height = 2.5
@@ -179,14 +179,14 @@ def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
             palette=sns.color_palette(palette='pastel'),
             height=height,
             estimator='median',
-            errorbar=None, #("pi", 50),
+            errorbar=None,  # ("pi", 50),
             aspect=9.5 / height,
             legend_out=True,
             linestyles='--',
             linewidth=1.0,
             markersize=10.0,
             markeredgecolor='black',
-            markeredgewidth=0.5
+            markeredgewidth=0.5,
         )
 
         sns.move_legend(
@@ -212,7 +212,6 @@ def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
         plt.savefig(file_path, dpi=300, bbox_inches='tight')
 
         plt.close()
-
 
 
 def plot_evaluation_results_for_relative_mass_accuracy(
@@ -292,14 +291,14 @@ def plot_evaluation_results_for_relative_mass_accuracy(
             palette=sns.color_palette(palette='pastel'),
             height=height,
             estimator='median',
-            errorbar=None, #("pi", 50),
+            errorbar=None,  # ("pi", 50),
             aspect=9.5 / height,
             legend_out=True,
             linestyles='--',
             linewidth=1.0,
             markersize=10.0,
             markeredgecolor='black',
-            markeredgewidth=0.5
+            markeredgewidth=0.5,
         )
 
         sns.move_legend(
@@ -1564,7 +1563,7 @@ def plot_correlation_between_words_and_labels(
             )
 
     # fig.suptitle('Correlation between Tfidf represented words and labels', fontsize=4)
-    file_path = join(output_dir, f'{plot_type}.png')
+    file_path = join(output_dir, f'{plot_type}_{dataset_types[0].split("_")[0]}.png')
     logger.info(file_path)
     # plt.tight_layout()
     plt.savefig(file_path, dpi=300, bbox_inches='tight')
@@ -1572,28 +1571,33 @@ def plot_correlation_between_words_and_labels(
 
 
 def create_data_plots(base_output_dir: str, config: dict) -> None:
-    filename_all = join(
-        generate_data_dir(config), DatasetKeys.binary_gender_all.value, "test.jsonl"
-    )
-    filename_subj = join(
-        generate_data_dir(config), DatasetKeys.binary_gender_subj.value, "test.jsonl"
-    )
+    dataset_keys = [
+        (DatasetKeys.binary_gender_all.value, DatasetKeys.binary_gender_subj.value),
+        (
+            DatasetKeys.non_binary_gender_all.value,
+            DatasetKeys.non_binary_gender_subj.value,
+        ),
+    ]
+    for dk in dataset_keys:
+        filename_all = join(generate_data_dir(config), dk[0], "test.jsonl")
+        filename_subj = join(generate_data_dir(config), dk[1], "test.jsonl")
+        dataset_all = load_jsonl_as_df(filename_all)
+        dataset_subject = load_jsonl_as_df(filename_subj)
+        data = {
+            f'{dk[0]}': dataset_all,
+            f'{dk[1]}': dataset_subject,
+        }
+        visualization_methods = dict(
+            correlation_plot=plot_correlation_between_words_and_labels,
+        )
 
-    dataset_all = load_jsonl_as_df(filename_all)
-    dataset_subject = load_jsonl_as_df(filename_subj)
-
-    data = dict(gender_all=dataset_all, gender_subj=dataset_subject)
-    visualization_methods = dict(
-        correlation_plot=plot_correlation_between_words_and_labels,
-    )
-
-    plot_types = config['visualization']['visualizations']['data']
-    for plot_type in plot_types:
-        logger.info(f'Type of plot: {plot_type}')
-        v = visualization_methods.get(plot_type, None)
-        if v is None:
-            continue
-        v(data, plot_type, base_output_dir, config)
+        plot_types = config['visualization']['visualizations']['data']
+        for plot_type in plot_types:
+            logger.info(f'Type of plot: {plot_type}')
+            v = visualization_methods.get(plot_type, None)
+            if v is None:
+                continue
+            v(data, plot_type, base_output_dir, config)
 
 
 def model_ds_axs(
