@@ -5,6 +5,7 @@ MODEL_NAME_MAP = dict(
     bert_all='\\textit{BERT}-CEfAf',
     one_layer_attention_classification='\\textit{OLA}-CEA',
     bert_only_embedding='\\textit{BERT}-Ef',
+    bert_zero_shot='\\textit{BERT}-ZS',
 )
 
 MODEL_NAME_HTML_MAP = dict(
@@ -32,6 +33,7 @@ METRIC_NAME_MAP = dict(
 METHOD_NAME_MAP = dict(Covariance="Pattern Variant")
 
 MODEL_ORDER = [
+    MODEL_NAME_MAP["bert_zero_shot"],
     MODEL_NAME_MAP["bert_only_classification"],
     MODEL_NAME_MAP["bert_only_embedding_classification"],
     MODEL_NAME_MAP["bert_randomly_init_embedding_classification"],
