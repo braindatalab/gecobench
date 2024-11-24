@@ -238,9 +238,9 @@ def plot_evaluation_results_for_relative_mass_accuracy(
                         fontsize=12,
                     )
                 g.axes[k, j].set_xlabel('')
-                g.axes[k, j].set_ylim(0, 1)
+                # g.axes[k, j].set_ylim(0, 1)
                 # g.axes[k, j].set_yticks([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
-                g.axes[k, j].set_yticks([-0.5, 0.0, 1.0, 2.0])
+                # g.axes[k, j].set_yticks([-0.5, 0.0, 1.5, 2.0, 2.5])
 
                 for label in (
                     g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
@@ -270,7 +270,7 @@ def plot_evaluation_results_for_relative_mass_accuracy(
     # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
     #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
     # )
-
+    # data = data[data['Dataset'].map(lambda x: 'non_binary' not in x)]
     data = data['Pattern Variant' != data['XAI Method']]
 
     average_data = compute_average_score_per_repetition(data=data)
@@ -284,7 +284,7 @@ def plot_evaluation_results_for_relative_mass_accuracy(
             y=METRIC_NAME_MAP[metric],
             order=MODEL_ORDER,
             hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
-            row_order=ROW_ORDER,
+            row_order=ROW_ORDER[:2],
             hue='XAI Method',
             row='Dataset',
             kind='point',
