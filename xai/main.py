@@ -183,7 +183,7 @@ def map_raw_attributions_to_original_tokens(
 
     for path in xai_results_paths:
         results = load_pickle(file_path=join(artifacts_dir, path))
-        results = Parallel(n_jobs=4)(
+        results = Parallel(n_jobs=1)(
             delayed(process_result)(result, config) for result in tqdm(results)
         )
 
