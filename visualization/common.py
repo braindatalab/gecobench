@@ -64,6 +64,15 @@ DATASET_NAME_MAP = dict(
     all='$\mathcal{D}_{A}$',
     imdb='IMDB',
 )
+DATASET_NAME_MAP_INV = {
+    '$\mathcal{D}_{S}^{b}$': 'binary_gender_subj',
+    '$\mathcal{D}_{A}^{b}$': 'binary_gender_all',
+    '$\mathcal{D}_{S}^{nb}$': 'non_binary_gender_subj',
+    '$\mathcal{D}_{A}^{nb}$': 'non_binary_gender_all',
+    '$\mathcal{D}_{S}$': 'subj',
+    '$\mathcal{D}_{A}$': 'all',
+    'IMDB': 'imdb',
+}
 ROW_ORDER = [
     DATASET_NAME_MAP['binary_gender_all'],
     DATASET_NAME_MAP['binary_gender_subj'],

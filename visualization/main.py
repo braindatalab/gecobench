@@ -23,6 +23,7 @@ from visualization.gender_difference import create_gender_difference_plots
 from visualization.common import (
     MODEL_NAME_MAP,
     DATASET_NAME_MAP,
+    DATASET_NAME_MAP_INV,
     METHOD_NAME_MAP,
     METRIC_NAME_MAP,
     MODEL_NAME_HTML_MAP,
@@ -276,7 +277,12 @@ def plot_evaluation_results_for_relative_mass_accuracy(
     average_data = compute_average_score_per_repetition(data=data)
     datasets = [('', data), ('averaged', average_data)]
 
-    height = 2.5
+    # height = 2.5
+    height = 4.5
+    # height = 1.0
+
+    # data[METRIC_NAME_MAP[metric]] = data[METRIC_NAME_MAP[metric]].map(lambda x: np.exp(x) - 1)
+
     for s, d in datasets:
         g = sns.catplot(
             data=d,
@@ -600,6 +606,11 @@ def plot_model_performance(
     model_version: str,
     base_output_dir: str,
 ) -> None:
+
+    training_history = training_history[
+        training_history['dataset_type'].map(lambda x: 'non_binary' not in x)
+    ]
+
     training_history['mapped_model_name'] = training_history['model_name'].map(
         lambda x: MODEL_NAME_MAP[x]
     )
@@ -2007,7 +2018,82 @@ def create_stats(base_output_dir: str, config: dict) -> None:
     data = data.drop(columns=["model_name"])
     result = apply_wilcoxon_test(data=data)
     r = 1
+    # group by XAI Method and create a string for a latex table
+    # the table has the following format:
+    # XAI Method | Model1 | Model2 | Model3 | Model4
+    # Method1    | w_stat11| p_vale11 | w_stat12 | p_vale12 | w_stat13 | p_value13 | w_stat14 | p_value14
+    # Method2    | w_stat21| p_vale21 | w_stat22 | p_vale22 | w_stat23 | p_value23 | w_stat24 | p_value24
+    # Method3    | w_stat31| p_vale31 | w_stat32 | p_vale32 | w_stat33 | p_value33 | w_stat34 | p_value34
 
+    for dataset in data['Dataset'].unique():
+        result_filtered = result[result['Dataset'].map(lambda x: dataset in x)]
+        result_filtered = result_filtered[
+            result['Model'].map(lambda x: '\\textit{BERT}-ZS' not in x)
+        ]
+        result_filtered = result_filtered[
+            result['XAI Method'].map(lambda x: 'Pattern Variant' not in x)
+        ]
+        grouped = result_filtered.groupby("XAI Method")
+        num_models = len(result_filtered['Model'].unique())
+        num_datasets = len(result_filtered['Dataset'].unique())
+
+        latex_table = "\\begin{tabular}{l" + "cc" * num_models * num_datasets + "}\n"
+        # latex_table += "XAI Method & " + " & ".join([f"\\multicolumn{{2}}{{c}}{{{dataset}}}" for _ in result_for_dataset['Model'].unique() for dataset in
+        #      result_for_dataset['Dataset'].unique()]) + " \\\\\n"
+        # latex_table += "XAI Method & " + " & ".join([f"\\multicolumn{{2}}{{c}}{{{model}}}" for model in result_for_dataset['Model'].unique() for _ in
+        #      range(num_datasets)]) + " \\\\\n"
+        latex_table += (
+            "XAI Method & "
+            + " & ".join(
+                [
+                    f"{model}"
+                    for model in result_filtered['Model'].unique()
+                    for _ in range(num_datasets)
+                ]
+            )
+            + " \\\\\n"
+        )
+        # latex_table += " & " + " & ".join(["w_stat & p_value" for _ in range(num_models * num_datasets)]) + " \\\\\n"
+        latex_table += (
+            " & "
+            + " & ".join(["p\\_value" for _ in range(num_models * num_datasets)])
+            + " \\\\\n"
+        )
+        latex_table += "\\hline\n"
+
+        # Iterate over each group and format the rows
+        for xai_method, group in grouped:
+            row = [xai_method]
+            for model in result_filtered['Model'].unique():
+                for dataset in result_filtered['Dataset'].unique():
+                    model_data = group[
+                        (group['Model'] == model) & (group['Dataset'] == dataset)
+                    ]
+                    if not model_data.empty:
+                        # w_stat = model_data['w_stat'].values[0]
+                        p_value = model_data['p_value'].values[0]
+                        # row.append(f"{w_stat:.2f}")
+                        row.append(
+                            f"{p_value:.2e}"
+                            if model_data['reject'].values[0]
+                            else f"\\bf{{{p_value:.2e}}}"
+                        )
+                        # row.append(f"{p_value:.4f}")
+                    else:
+                        row.append("")
+                        row.append("")
+            latex_table += " & ".join(row) + " \\\\\n"
+
+        latex_table += "\\end{tabular}"
+
+        print(latex_table)
+        file_path = join(
+            base_output_dir,
+            f'_rma_wilcoxon_latex_table_{DATASET_NAME_MAP_INV[dataset]}.txt',
+        )
+        print(file_path)
+        with open(file_path, 'w') as file:
+            file.write(latex_table)
 
 
 def visualize_results(base_output_dir: str, config: dict) -> None:
@@ -2024,8 +2110,7 @@ VISUALIZATIONS = dict(
     model=create_model_performance_plots,
     prediction=create_prediction_plots,
     gender_difference=create_gender_difference_plots,
-    stats=create_stats
-
+    stats=create_stats,
 )
 
 
