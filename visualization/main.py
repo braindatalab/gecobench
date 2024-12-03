@@ -43,7 +43,7 @@ from utils import (
     generate_data_dir,
     generate_artifacts_dir,
 )
-
+from visualization.statistical_analysis import apply_wilcoxon_test
 
 MOST_COMMON_XAI_ATTRIBUTION_PLOT_TYPES = dict(
     accumulated="most_common_xai_attributions",
@@ -1978,6 +1978,38 @@ def create_prediction_plots(base_output_dir: str, config: dict) -> None:
             v(group, plot_type, model_version, base_output_dir, config)
 
 
+def create_stats(base_output_dir: str, config: dict) -> None:
+    output_dir = generate_visualization_dir(config=config)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    artifacts_dir = generate_artifacts_dir(config=config)
+    evaluation_dir = generate_evaluation_dir(config=config)
+    file_path = join(
+        artifacts_dir, evaluation_dir, config['evaluation']['evaluation_records']
+    )
+    evaluation_results: EvaluationResult = load_pickle(file_path)
+    data = pd.DataFrame(evaluation_results.xai_results_correct)
+
+    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+    data['attribution_method'] = data['attribution_method'].map(
+        lambda x: METHOD_NAME_MAP.get(x, x)
+    )
+
+    data = data.rename(
+        columns={
+            "mapped_model_name": "Model",
+            "dataset_type": "Dataset",
+            "attribution_method": "XAI Method",
+            **METRIC_NAME_MAP,
+        }
+    )
+
+    data = data.drop(columns=["model_name"])
+    result = apply_wilcoxon_test(data=data)
+    r = 1
+
+
+
 def visualize_results(base_output_dir: str, config: dict) -> None:
     for visualization, _ in config['visualization']['visualizations'].items():
         v = VISUALIZATIONS.get(visualization, None)
@@ -1992,6 +2024,8 @@ VISUALIZATIONS = dict(
     model=create_model_performance_plots,
     prediction=create_prediction_plots,
     gender_difference=create_gender_difference_plots,
+    stats=create_stats
+
 )
 
 
