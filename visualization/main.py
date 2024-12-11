@@ -333,7 +333,7 @@ def plot_evaluation_results_for_relative_mass_accuracy(
 
 
 def plot_evaluation_results(
-    data: pd.DataFrame,
+    input_data: pd.DataFrame,
     metric: str,
     model_version: str,
     result_type: str,
@@ -369,115 +369,121 @@ def plot_evaluation_results(
         for t in g._legend.texts:
             t.set_fontsize(12)
 
-    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
-    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
-    data['attribution_method'] = data['attribution_method'].map(
-        lambda x: METHOD_NAME_MAP.get(x, x)
-    )
+    binary_data_filter = input_data['dataset_type'].map(lambda x: 'non_binary' not in x)
+    binary_data = input_data[binary_data_filter]
+    nonbinary_data = input_data[~binary_data_filter]
 
-    data = data.rename(
-        columns={
-            "mapped_model_name": "Model",
-            "dataset_type": "Dataset",
-            "attribution_method": "XAI Method",
-            **METRIC_NAME_MAP,
-        }
-    )
+    for data_type, data in [('binary', binary_data), ('non_binary', nonbinary_data)]:
+        data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+        data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+        data['attribution_method'] = data['attribution_method'].map(
+            lambda x: METHOD_NAME_MAP.get(x, x)
+        )
 
-    if metric != 'top_k_precision':
-        average_data = compute_average_score_per_repetition(data=data)
-        datasets = [('', data), ('averaged', average_data)]
+        data = data.rename(
+            columns={
+                "mapped_model_name": "Model",
+                "dataset_type": "Dataset",
+                "attribution_method": "XAI Method",
+                **METRIC_NAME_MAP,
+            }
+        )
 
-        height = 2.5
-        for s, d in datasets:
-            g = sns.catplot(
-                data=d,
-                x='Model',
-                y=METRIC_NAME_MAP[metric],
-                order=MODEL_ORDER,
-                hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
-                row_order=ROW_ORDER,
-                hue='XAI Method',
-                row='Dataset',
-                kind='box',
-                palette=sns.color_palette(palette='pastel'),
-                fill=True,
-                height=height,
-                fliersize=0,
-                estimator='median',
-                aspect=9.5 / height,
-                legend_out=True,
-            )
 
-            sns.move_legend(
-                g,
-                "lower center",
-                bbox_to_anchor=(0.41, -0.13),
-                ncol=5,
-                frameon=True,
-            )
+        if metric != 'top_k_precision':
+            average_data = compute_average_score_per_repetition(data=data)
+            datasets = [('', data), ('averaged', average_data)]
 
-            _plot_postprocessing(g=g)
-            file_path = join(
-                base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
-            )
-            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+            height = 2.5
+            for s, d in datasets:
+                g = sns.catplot(
+                    data=d,
+                    x='Model',
+                    y=METRIC_NAME_MAP[metric],
+                    order=MODEL_ORDER,
+                    hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
+                    row_order=ROW_ORDER[:2],
+                    hue='XAI Method',
+                    row='Dataset',
+                    kind='box',
+                    palette=sns.color_palette(palette='pastel'),
+                    fill=True,
+                    height=height,
+                    fliersize=0,
+                    estimator='median',
+                    aspect=9.5 / height,
+                    legend_out=True,
+                )
 
-            # Disable legend
-            g._legend.remove()
-            file_path = join(
-                base_output_dir,
-                f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
-            )
-            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+                sns.move_legend(
+                    g,
+                    "lower center",
+                    bbox_to_anchor=(0.41, -0.13),
+                    ncol=5,
+                    frameon=True,
+                )
 
-            plt.close()
+                _plot_postprocessing(g=g)
+                file_path = join(
+                    base_output_dir, f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png'
+                )
+                plt.savefig(file_path, dpi=300, bbox_inches='tight')
 
-    else:
-        average_data = compute_average_score_per_repetition(data=data)
-        datasets = [('', data), ('averaged', average_data)]
-        for s, d in datasets:
-            g = sns.catplot(
-                data=d,
-                x='Model',
-                y=METRIC_NAME_MAP[metric],
-                order=MODEL_ORDER,
-                hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
-                hue='XAI Method',
-                col='Dataset',
-                kind='bar',
-                palette=sns.color_palette('pastel'),
-                height=3,
-                estimator='mean',
-                # errorbar='sd',
-                # err_kws={'linewidth': 2.0},
-                aspect=2.0,
-                legend_out=True,
-            )
+                # Disable legend
+                g._legend.remove()
+                file_path = join(
+                    base_output_dir,
+                    f'{metric}_{s}_{result_type}_{model_version}_{data_type}_no_legend.png',
+                )
+                plt.savefig(file_path, dpi=300, bbox_inches='tight')
 
-            sns.move_legend(
-                g,
-                "lower center",
-                bbox_to_anchor=(0.5, -0.2),
-                ncol=5,
-                frameon=True,
-            )
+                plt.close()
 
-            _plot_postprocessing(g=g)
-            file_path = join(
-                base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
-            )
-            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        else:
+            average_data = compute_average_score_per_repetition(data=data)
+            datasets = [('', data), ('averaged', average_data)]
+            for s, d in datasets:
+                g = sns.catplot(
+                    data=d,
+                    x='Model',
+                    y=METRIC_NAME_MAP[metric],
+                    order=MODEL_ORDER,
+                    hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
+                    hue='XAI Method',
+                    col='Dataset',
+                    kind='bar',
+                    palette=sns.color_palette('pastel'),
+                    height=3,
+                    estimator='mean',
+                    # errorbar='sd',
+                    # err_kws={'linewidth': 2.0},
+                    aspect=2.0,
+                    legend_out=True,
+                )
 
-            # Disable legend
-            g._legend.remove()
-            file_path = join(
-                base_output_dir,
-                f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
-            )
-            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+                sns.move_legend(
+                    g,
+                    "lower center",
+                    bbox_to_anchor=(0.5, -0.2),
+                    ncol=5,
+                    frameon=True,
+                )
 
-            plt.close()
+                _plot_postprocessing(g=g)
+                file_path = join(
+                    base_output_dir, f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png'
+                )
+                plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+                # Disable legend
+                g._legend.remove()
+                file_path = join(
+                    base_output_dir,
+                    f'{metric}_{s}_{result_type}_{model_version}_{data_type}_no_legend.png',
+                )
+                plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+                plt.close()
 
 
 def plot_mass_accuracy_reversed(
@@ -536,68 +542,73 @@ def plot_evaluation_results_grouped_by_xai_method(
         for t in g._legend.texts:
             t.set_fontsize(12)
 
-    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
-    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
-    data['attribution_method'] = data['attribution_method'].map(
-        lambda x: METHOD_NAME_MAP.get(x, x)
-    )
+    binary_data_filter = data['dataset_type'].map(lambda x: 'non_binary' not in x)
+    binary_data = data[binary_data_filter]
+    nonbinary_data = data[~binary_data_filter]
 
-    data = data.rename(
-        columns={
-            "mapped_model_name": "Model",
-            "dataset_type": "Dataset",
-            "attribution_method": "XAI Method",
-            **METRIC_NAME_MAP,
-        }
-    )
-
-    average_data = compute_average_score_per_repetition(data=data)
-    datasets = [('', data), ('averaged', average_data)]
-
-    height = 2.5
-    for s, d in datasets:
-        g = sns.catplot(
-            data=d,
-            x='XAI Method',
-            y=METRIC_NAME_MAP[metric],
-            order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
-            hue_order=MODEL_ORDER,
-            row_order=ROW_ORDER,
-            hue='Model',
-            row='Dataset',
-            kind='box',
-            palette=sns.color_palette(palette='pastel'),
-            fill=True,
-            height=height,
-            fliersize=0,
-            estimator='median',
-            aspect=9.5 / height,
-            legend_out=True,
+    for data_type, data in [('binary', binary_data), ('non_binary', nonbinary_data)]:
+        data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+        data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+        data['attribution_method'] = data['attribution_method'].map(
+            lambda x: METHOD_NAME_MAP.get(x, x)
         )
 
-        sns.move_legend(
-            g,
-            "lower center",
-            bbox_to_anchor=(0.41, -0.25),
-            ncol=5,
-            frameon=True,
+        data = data.rename(
+            columns={
+                "mapped_model_name": "Model",
+                "dataset_type": "Dataset",
+                "attribution_method": "XAI Method",
+                **METRIC_NAME_MAP,
+            }
         )
 
-        _plot_postprocessing(g=g)
-        file_path = join(
-            base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
-        )
-        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        average_data = compute_average_score_per_repetition(data=data)
+        datasets = [('', data), ('averaged', average_data)]
 
-        # Disable legend
-        g._legend.remove()
-        file_path = join(
-            base_output_dir,
-            f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
-        )
-        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        height = 2.5
+        for s, d in datasets:
+            g = sns.catplot(
+                data=d,
+                x='XAI Method',
+                y=METRIC_NAME_MAP[metric],
+                order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
+                hue_order=MODEL_ORDER,
+                row_order=ROW_ORDER,
+                hue='Model',
+                row='Dataset',
+                kind='box',
+                palette=sns.color_palette(palette='pastel'),
+                fill=True,
+                height=height,
+                fliersize=0,
+                estimator='median',
+                aspect=9.5 / height,
+                legend_out=True,
+            )
 
-        plt.close()
+            sns.move_legend(
+                g,
+                "lower center",
+                bbox_to_anchor=(0.41, -0.25),
+                ncol=5,
+                frameon=True,
+            )
+
+            _plot_postprocessing(g=g)
+            file_path = join(
+                base_output_dir, f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png'
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            # Disable legend
+            g._legend.remove()
+            file_path = join(
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_{data_type}_no_legend.png',
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            plt.close()
 
 
 def plot_model_performance(
