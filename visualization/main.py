@@ -69,14 +69,15 @@ def compute_average_score_per_repetition(data: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(results, axis=1).T
 
 
+
 def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
-    data: pd.DataFrame,
+    input_data: pd.DataFrame,
     metric: str,
     model_version: str,
     result_type: str,
     base_output_dir: str,
 ) -> None:
-    def _plot_postprocessing(g):
+    def _plot_postprocessing(g, dt):
         g.set_titles(row_template="Dataset: {row_name}", size=12)
         for k in range(g.axes.shape[0]):
             for j in range(g.axes.shape[1]):
@@ -96,7 +97,11 @@ def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
                 g.axes[k, j].set_ylim(0, 1)
                 # g.axes[k, j].set_yticks([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
                 # g.axes[k, j].set_yticks([-0.5, 0.0, 1.0, 2.0])
-                g.axes[k, j].set_yticks([0.0, 0.5, 1.0, 1.5, 2.0])
+                g.axes[k, j].set_yticks(
+                    [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
+                    if 'non_binary' != dt
+                    else [0.0, 0.5, 1.0, 1.5, 2.0]
+                )
 
                 for label in (
                     g.axes[k, j].get_xticklabels() + g.axes[k, j].get_yticklabels()
@@ -121,102 +126,109 @@ def plot_evaluation_results_for_relative_mass_accuracy_grouped_by_xai_method(
         'Pattern Variant': 'Pattern\nVariant',
     }
 
-    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
-    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
-    data['attribution_method'] = data['attribution_method'].map(
-        lambda x: METHOD_NAME_MAP.get(x, x)
-    )
-    data['attribution_method'] = data['attribution_method'].map(
-        lambda x: XAI_METHOD_MAP[x.strip()]
-    )
+    binary_data_filter = input_data['dataset_type'].map(lambda x: 'non_binary' not in x)
+    binary_data = input_data[binary_data_filter]
+    nonbinary_data = input_data[~binary_data_filter]
 
-    data = data.rename(
-        columns={
-            "mapped_model_name": "Model",
-            "dataset_type": "Dataset",
-            "attribution_method": "XAI Method",
-            **METRIC_NAME_MAP,
-        }
-    )
+    for data_type, data in [('binary', binary_data), ('non_binary', nonbinary_data)]:
 
-    # data[f'{metric}_new'] = data['Mass Accuracy (MA)'] / data['mass_accuracy_zero_shot']
-    # data[f'{metric}_new'] = np.log(data[f'{metric}_new'] + 1e-6)
-
-    # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
-    #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
-    # )
-
-    # data = data['Pattern\nVariant' != data['XAI Method']]
-
-    average_data = compute_average_score_per_repetition(data=data)
-    datasets = [('', data), ('averaged', average_data)]
-
-    _HUE_ORDER = [
-        'Uniform\nrandom',
-        'Saliency',
-        'Kernel\nSHAP',
-        'Guided\nBackprop',
-        'DeepLift',
-        'InputXGradient',
-        'LIME',
-        'Gradient\nSHAP',
-        'Integrated\nGradients',
-        'Pattern\nVariant',
-    ]
-
-    height = 2.5
-    for s, d in datasets:
-        g = sns.catplot(
-            data=d,
-            x='XAI Method',
-            y=METRIC_NAME_MAP[metric],
-            # y=f'{metric}_new',
-            order=list_intersection(_HUE_ORDER, d['XAI Method'].unique()),
-            hue_order=MODEL_ORDER,
-            row_order=ROW_ORDER,
-            hue='Model',
-            row='Dataset',
-            kind='point',
-            palette=sns.color_palette(palette='pastel'),
-            height=height,
-            estimator='median',
-            errorbar=None,  # ("pi", 50),
-            aspect=9.5 / height,
-            legend_out=True,
-            linestyles='--',
-            linewidth=1.0,
-            markersize=10.0,
-            markeredgecolor='black',
-            markeredgewidth=0.5,
+        data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+        data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+        data['attribution_method'] = data['attribution_method'].map(
+            lambda x: METHOD_NAME_MAP.get(x, x)
+        )
+        data['attribution_method'] = data['attribution_method'].map(
+            lambda x: XAI_METHOD_MAP[x.strip()]
         )
 
-        sns.move_legend(
-            g,
-            "lower center",
-            bbox_to_anchor=(0.41, -0.13),
-            ncol=5,
-            frameon=True,
+        data = data.rename(
+            columns={
+                "mapped_model_name": "Model",
+                "dataset_type": "Dataset",
+                "attribution_method": "XAI Method",
+                **METRIC_NAME_MAP,
+            }
         )
 
-        _plot_postprocessing(g=g)
-        file_path = join(
-            base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
-        )
-        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        # data[f'{metric}_new'] = data['Mass Accuracy (MA)'] / data['mass_accuracy_zero_shot']
+        # data[f'{metric}_new'] = np.log(data[f'{metric}_new'] + 1e-6)
 
-        # Disable legend
-        g._legend.remove()
-        file_path = join(
-            base_output_dir,
-            f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
-        )
-        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
+        #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
+        # )
 
-        plt.close()
+        # data = data['Pattern\nVariant' != data['XAI Method']]
+
+        average_data = compute_average_score_per_repetition(data=data)
+        datasets = [('', data), ('averaged', average_data)]
+
+        _HUE_ORDER = [
+            'Uniform\nrandom',
+            'Saliency',
+            'Kernel\nSHAP',
+            'Guided\nBackprop',
+            'DeepLift',
+            'InputXGradient',
+            'LIME',
+            'Gradient\nSHAP',
+            'Integrated\nGradients',
+            'Pattern\nVariant',
+        ]
+
+        height = 2.5
+        for s, d in datasets:
+            g = sns.catplot(
+                data=d,
+                x='XAI Method',
+                y=METRIC_NAME_MAP[metric],
+                # y=f'{metric}_new',
+                order=list_intersection(_HUE_ORDER, d['XAI Method'].unique()),
+                hue_order=MODEL_ORDER,
+                row_order=ROW_ORDER[:2] if data_type != 'non_binary' else ROW_ORDER[2:],
+                hue='Model',
+                row='Dataset',
+                kind='point',
+                palette=sns.color_palette(palette='pastel'),
+                height=height,
+                estimator='median',
+                errorbar=None,  # ("pi", 50),
+                aspect=9.5 / height,
+                legend_out=True,
+                linestyles='--',
+                linewidth=1.0,
+                markersize=10.0,
+                markeredgecolor='black',
+                markeredgewidth=0.5,
+            )
+
+            sns.move_legend(
+                g,
+                "lower center",
+                bbox_to_anchor=(0.41, -0.13),
+                ncol=5,
+                frameon=True,
+            )
+
+            _plot_postprocessing(g=g, dt=data_type)
+            file_path = join(
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png',
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            # Disable legend
+            g._legend.remove()
+            file_path = join(
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_{data_type}_no_legend.png',
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            plt.close()
 
 
 def plot_evaluation_results_for_relative_mass_accuracy(
-    data: pd.DataFrame,
+    input_data: pd.DataFrame,
     metric: str,
     model_version: str,
     result_type: str,
@@ -253,83 +265,89 @@ def plot_evaluation_results_for_relative_mass_accuracy(
         for t in g._legend.texts:
             t.set_fontsize(12)
 
-    data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
-    data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
-    data['attribution_method'] = data['attribution_method'].map(
-        lambda x: METHOD_NAME_MAP.get(x, x)
-    )
+    binary_data_filter = input_data['dataset_type'].map(lambda x: 'non_binary' not in x)
+    binary_data = input_data[binary_data_filter]
+    nonbinary_data = input_data[~binary_data_filter]
 
-    data = data.rename(
-        columns={
-            "mapped_model_name": "Model",
-            "dataset_type": "Dataset",
-            "attribution_method": "XAI Method",
-            **METRIC_NAME_MAP,
-        }
-    )
-
-    # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
-    #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
-    # )
-    # data = data[data['Dataset'].map(lambda x: 'non_binary' not in x)]
-    data = data['Pattern Variant' != data['XAI Method']]
-
-    average_data = compute_average_score_per_repetition(data=data)
-    datasets = [('', data), ('averaged', average_data)]
-
-    # height = 2.5
-    height = 4.5
-    # height = 1.0
-
-    # data[METRIC_NAME_MAP[metric]] = data[METRIC_NAME_MAP[metric]].map(lambda x: np.exp(x) - 1)
-
-    for s, d in datasets:
-        g = sns.catplot(
-            data=d,
-            x='Model',
-            y=METRIC_NAME_MAP[metric],
-            order=MODEL_ORDER,
-            hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
-            row_order=ROW_ORDER[:2],
-            hue='XAI Method',
-            row='Dataset',
-            kind='point',
-            palette=sns.color_palette(palette='pastel'),
-            height=height,
-            estimator='median',
-            errorbar=None,  # ("pi", 50),
-            aspect=9.5 / height,
-            legend_out=True,
-            linestyles='--',
-            linewidth=1.0,
-            markersize=10.0,
-            markeredgecolor='black',
-            markeredgewidth=0.5,
+    for data_type, data in [('binary', binary_data), ('non_binary', nonbinary_data)]:
+        data['mapped_model_name'] = data['model_name'].map(lambda x: MODEL_NAME_MAP[x])
+        data['dataset_type'] = data['dataset_type'].map(lambda x: DATASET_NAME_MAP[x])
+        data['attribution_method'] = data['attribution_method'].map(
+            lambda x: METHOD_NAME_MAP.get(x, x)
         )
 
-        sns.move_legend(
-            g,
-            "lower center",
-            bbox_to_anchor=(0.41, -0.13),
-            ncol=5,
-            frameon=True,
+        data = data.rename(
+            columns={
+                "mapped_model_name": "Model",
+                "dataset_type": "Dataset",
+                "attribution_method": "XAI Method",
+                **METRIC_NAME_MAP,
+            }
         )
 
-        _plot_postprocessing(g=g)
-        file_path = join(
-            base_output_dir, f'{metric}_{s}_{result_type}_{model_version}.png'
-        )
-        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        # data[f'{METRIC_NAME_MAP[metric]}_scaled'] = MinMaxScaler(feature_range=(0, 2)).fit_transform(
+        #     data[METRIC_NAME_MAP[metric]].values.reshape(-1, 1)
+        # )
+        # data = data[data['Dataset'].map(lambda x: 'non_binary' not in x)]
+        data = data['Pattern Variant' != data['XAI Method']]
 
-        # Disable legend
-        g._legend.remove()
-        file_path = join(
-            base_output_dir,
-            f'{metric}_{s}_{result_type}_{model_version}_no_legend.png',
-        )
-        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        average_data = compute_average_score_per_repetition(data=data)
+        datasets = [('', data), ('averaged', average_data)]
 
-        plt.close()
+        # height = 2.5
+        height = 4.5
+        # height = 1.0
+
+        # data[METRIC_NAME_MAP[metric]] = data[METRIC_NAME_MAP[metric]].map(lambda x: np.exp(x) - 1)
+
+        for s, d in datasets:
+            g = sns.catplot(
+                data=d,
+                x='Model',
+                y=METRIC_NAME_MAP[metric],
+                order=MODEL_ORDER,
+                hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
+                row_order=ROW_ORDER[:2] if data_type != 'non_binary' else ROW_ORDER[2:],
+                hue='XAI Method',
+                row='Dataset',
+                kind='point',
+                palette=sns.color_palette(palette='pastel'),
+                height=height,
+                estimator='median',
+                errorbar=None,  # ("pi", 50),
+                aspect=9.5 / height,
+                legend_out=True,
+                linestyles='--',
+                linewidth=1.0,
+                markersize=10.0,
+                markeredgecolor='black',
+                markeredgewidth=0.5,
+            )
+
+            sns.move_legend(
+                g,
+                "lower center",
+                bbox_to_anchor=(0.41, -0.13),
+                ncol=5,
+                frameon=True,
+            )
+
+            _plot_postprocessing(g=g)
+            file_path = join(
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png',
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            # Disable legend
+            g._legend.remove()
+            file_path = join(
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_{data_type}_no_legend.png',
+            )
+            plt.savefig(file_path, dpi=300, bbox_inches='tight')
+
+            plt.close()
 
 
 def plot_evaluation_results(
@@ -389,7 +407,6 @@ def plot_evaluation_results(
             }
         )
 
-
         if metric != 'top_k_precision':
             average_data = compute_average_score_per_repetition(data=data)
             datasets = [('', data), ('averaged', average_data)]
@@ -402,7 +419,9 @@ def plot_evaluation_results(
                     y=METRIC_NAME_MAP[metric],
                     order=MODEL_ORDER,
                     hue_order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
-                    row_order=ROW_ORDER[:2],
+                    row_order=(
+                        ROW_ORDER[:2] if data_type != 'non_binary' else ROW_ORDER[2:]
+                    ),
                     hue='XAI Method',
                     row='Dataset',
                     kind='box',
@@ -425,7 +444,8 @@ def plot_evaluation_results(
 
                 _plot_postprocessing(g=g)
                 file_path = join(
-                    base_output_dir, f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png'
+                    base_output_dir,
+                    f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png',
                 )
                 plt.savefig(file_path, dpi=300, bbox_inches='tight')
 
@@ -471,7 +491,8 @@ def plot_evaluation_results(
 
                 _plot_postprocessing(g=g)
                 file_path = join(
-                    base_output_dir, f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png'
+                    base_output_dir,
+                    f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png',
                 )
                 plt.savefig(file_path, dpi=300, bbox_inches='tight')
 
@@ -573,7 +594,7 @@ def plot_evaluation_results_grouped_by_xai_method(
                 y=METRIC_NAME_MAP[metric],
                 order=list_intersection(HUE_ORDER, d['XAI Method'].unique()),
                 hue_order=MODEL_ORDER,
-                row_order=ROW_ORDER,
+                row_order=ROW_ORDER[:2] if data_type != 'non_binary' else ROW_ORDER[2:],
                 hue='Model',
                 row='Dataset',
                 kind='box',
@@ -596,7 +617,8 @@ def plot_evaluation_results_grouped_by_xai_method(
 
             _plot_postprocessing(g=g)
             file_path = join(
-                base_output_dir, f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png'
+                base_output_dir,
+                f'{metric}_{s}_{result_type}_{model_version}_{data_type}.png',
             )
             plt.savefig(file_path, dpi=300, bbox_inches='tight')
 
