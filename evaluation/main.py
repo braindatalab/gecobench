@@ -122,7 +122,9 @@ def mass_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def relative_mass_accuracy(ma1: float, ma2: float, epsilon=1e-6) -> float:
-    output = 1.0 if ma1 == ma2 else ma1 / ma2 - 1 if ma2 > 0 else 1 / epsilon - 1
+    output = np.log(
+        1.0 if ma1 == ma2 else ma1 / ma2 - 1 if ma2 > 0 else 1 / epsilon - 1
+    )
     return output
 
 
@@ -612,13 +614,17 @@ def evaluate_xai_performance(config: Dict) -> Tuple:
     )
 
     evaluation_data_all['attribution'] = evaluation_data_all.apply(
-        lambda x: x['attribution'] if x['model_name'] != BERT_ZERO_SHOT else x['attribution_zero_shot_stripped'], axis=1
+        lambda x: (
+            x['attribution']
+            if x['model_name'] != BERT_ZERO_SHOT
+            else x['attribution_zero_shot_stripped']
+        ),
+        axis=1,
     )
 
     evaluation_data_all = evaluation_data_all[
         evaluation_data_all["model_version"] == SaveVersion.best.value
     ]
-
 
     evaluation_data_correct = determine_correctly_classified(data=evaluation_data_all)
 
