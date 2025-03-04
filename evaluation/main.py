@@ -6,14 +6,13 @@ from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
+import torch
 from loguru import logger
 from sklearn.metrics import auc, roc_curve
 from sklearn.metrics._ranking import _binary_clf_curve, average_precision_score
 from torch import Tensor
 from tqdm import tqdm
-from tqdm.contrib.concurrent import process_map
 from transformers import BertTokenizer
-import torch
 
 from common import (
     XAIEvaluationResult,
@@ -28,9 +27,12 @@ from training.bert_zero_shot_utils import (
     PROMPT_TEMPLATES,
     zero_shot_prediction,
     transform_predicted_tokens_to_labels,
+    extract_original_sentence_from_prompt,
+    remove_empty_strings_from_list,
+    get_slicing_indices_of_sentence_embedded_in_prompt,
+    format_logits,
+    extract_attribution_for_original_sentence_from_prompt_attribution,
 )
-from xai.main import load_test_data
-from evaluation.difference_testing import prepare_difference_data
 from utils import (
     filter_eval_datasets,
     filter_train_datasets,
@@ -45,7 +47,10 @@ from utils import (
     load_model,
     generate_artifacts_dir,
     get_num_labels,
+    BERT_ZERO_SHOT,
 )
+from xai.main import load_test_data
+from xai.methods import normalize_attributions
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -117,7 +122,7 @@ def mass_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def relative_mass_accuracy(ma1: float, ma2: float, epsilon=1e-6) -> float:
-    output = np.log((ma1 / ma2 if ma2 > 0 else 1 / epsilon) + epsilon)
+    output = 1.0 if ma1 == ma2 else ma1 / ma2 - 1 if ma2 > 0 else 1 / epsilon - 1
     return output
 
 
@@ -156,9 +161,17 @@ def evaluate_row(
 ) -> dict:
     _, xai_record = idx_row
 
+    attribution = np.array(xai_record['attribution'])
+    if len(attribution) != len(xai_record['attribution_zero_shot_stripped']):
+        raise ValueError(
+            'Zero-shot attribution length does not match the original sentence length.'
+        )
+
     scores = calculate_scores(
-        attribution=np.abs(np.array(xai_record['attribution'])),
-        attribution_zero_shot=np.abs(np.array(xai_record['attribution_zero_shot'])),
+        attribution=np.abs(attribution),
+        attribution_zero_shot=np.abs(
+            np.array(xai_record['attribution_zero_shot_stripped'])
+        ),
         ground_truth=np.array(xai_record['ground_truth']),
     )
 
@@ -180,7 +193,10 @@ def evaluate_xai(data: pd.DataFrame, only_correctly_classified: bool) -> list[di
     results = []
 
     for idx_row in tqdm(data.iterrows(), desc="Evaluate XAI results", total=len(data)):
-        results += [evaluate_row(idx_row, only_correctly_classified)]
+        try:
+            results += [evaluate_row(idx_row, only_correctly_classified)]
+        except Exception as e:
+            logger.error(f"Error evaluating row: {idx_row[0]} - {e}")
 
     return results
 
@@ -241,11 +257,9 @@ def zero_shot_model_predictions(
         )
 
         prediction = transform_predicted_tokens_to_labels(predictions=tokens)
-        mask = torch.zeros(
-            size=(x.shape[0], get_num_labels(dataset_name=dataset_name)),
-        ).to(DEVICE)
-        mask[torch.nn.functional.one_hot(target, num_classes=get_num_labels(dataset_name=dataset_name)).to(torch.bool)] = 1.0
-        output_logits = mask * logits.unsqueeze(1)
+        output_logits = format_logits(
+            logits=logits, target=target, token_ids=token_ids, dataset_name=dataset_name
+        )
     return torch.tensor(prediction), output_logits
 
 
@@ -281,14 +295,13 @@ def create_dataset_with_predictions(
             f"Model: {model_params['model_name']}, trained on: {trained_on_dataset_name} - Evaluate on: {datasets}"
         )
 
-        is_zero_shot = model_params['model_name'] == 'bert_zero_shot'
+        is_zero_shot = model_params['model_name'] == BERT_ZERO_SHOT
         for dataset_name in datasets:
             sentences = tensor_data["sentences"][dataset_name]
             if is_zero_shot:
                 dataset = tensor_data_zero_shot["dataset"][dataset_name]
             else:
                 dataset = tensor_data["dataset"][dataset_name]
-
 
             model = load_model(path=join(artifacts_dir, model_path))
             model.to(DEVICE)
@@ -327,7 +340,7 @@ def create_dataset_with_predictions(
                     ]
                     data_dict['model_name'] += n * [model_params['model_name']]
                     data_dict['sentence'] += [
-                        str(sentences[sentence_idx]) for sentence_idx in sentence_idxs
+                        sentences[sentence_idx] for sentence_idx in sentence_idxs
                     ]
                     data_dict['target'] += target.detach().cpu().numpy().tolist()
                     data_dict['prediction'] += (
@@ -342,6 +355,20 @@ def create_dataset_with_predictions(
     return pd.DataFrame(data_dict)
 
 
+def extract_sentence_from_prompt(x: pd.Series) -> list:
+    return (
+        x['sentence']
+        if x['model_name'] != BERT_ZERO_SHOT
+        else extract_original_sentence_from_prompt(
+            prompt=x['sentence'],
+            prompt_templates=PROMPT_TEMPLATES[
+                ('non_binary' if 'non_binary' in x['dataset_type'] else 'binary')
+            ],
+            index=0,
+        )
+    )
+
+
 def load_xai_results(config: dict) -> list:
     output = list()
 
@@ -353,7 +380,6 @@ def load_xai_results(config: dict) -> list:
     for result_path in tqdm(xai_result_paths, desc="Loading XAI results"):
         xai_records = load_pickle(file_path=join(artifacts_dir, result_path))
         for record in xai_records:
-            record.sentence = str(record.sentence)
             record.model_version = record.model_version.value
             output += [asdict(record)]
 
@@ -387,15 +413,28 @@ def merge_xai_results_with_prediction_data(
         'model_repetition_number',
         'model_version',
         'model_name',
-        'sentence',
+        'sentence_str',
         'target',
         'dataset_type',
     ]
-    data_for_evaluation = pd.merge(
-        xai_data, predication_data, how='outer', on=merge_columns
+
+    xai_data['sentence_str'] = xai_data['sentence'].map(
+        lambda x: ''.join(x).lower().replace(' ', '')
+    )
+    predication_data['sentence_str'] = predication_data['sentence'].map(
+        lambda x: ''.join(x).lower().replace(' ', '')
     )
 
-    return data_for_evaluation
+    output = pd.merge(xai_data, predication_data, how='outer', on=merge_columns)
+
+    output.rename(
+        columns={
+            'sentence_x': 'sentence',
+        },
+        inplace=True,
+    )
+
+    return output
 
 
 def merge_with_zero_shot_model_results(
@@ -405,7 +444,7 @@ def merge_with_zero_shot_model_results(
         'model_repetition_number',
         'model_version',
         'attribution_method',
-        'sentence',
+        'sentence_str',
         'target',
         'dataset_type',
     ]
@@ -417,6 +456,8 @@ def merge_with_zero_shot_model_results(
             'attribution_x': 'attribution',
             'ground_truth_x': 'ground_truth',
             'sentence_idx_x': 'sentence_idx',
+            'sentence_y': 'sentence',
+            'original_sentence_x': 'original_sentence',
             'prediction_x': 'prediction',
             'attribution_y': 'attribution_zero_shot',
             'pred_probs_x': 'pred_probs',
@@ -465,7 +506,7 @@ def load_test_data_for_trained_on_ds(config: dict) -> pd.DataFrame:
     return data
 
 
-def evaluate_model_performance(config: Dict) -> None:
+def evaluate_model_performance(config: Dict) -> list:
     logger.info("Evaluate model performance.")
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
@@ -522,7 +563,22 @@ def evaluate_model_performance(config: Dict) -> None:
     return results
 
 
-def evaluate_xai_performance(config: Dict) -> None:
+# strip the zero-shot attributions. for the zero-shot model, the sentences got
+# wrapped in a prompt template rendering the corresponding attribution arrays
+# as longer than the actual sentence. we need to strip the zero-shot attributions
+# to match the length of the original sentence.
+def strip_zero_shot_attributions(x) -> list:
+    a = extract_attribution_for_original_sentence_from_prompt_attribution(
+        attribution_prompt=x['attribution_zero_shot'],
+        prompt_templates=PROMPT_TEMPLATES[
+            ('non_binary' if 'non_binary' in x['dataset_type'] else 'binary')
+        ],
+        index=0,
+    )
+    return normalize_attributions(a=np.array(a)[np.newaxis, :]).tolist()
+
+
+def evaluate_xai_performance(config: Dict) -> Tuple:
     artifacts_dir = generate_artifacts_dir(config=config)
     evaluation_output_dir = generate_evaluation_dir(config=config)
     output_dir = join(artifacts_dir, evaluation_output_dir)
@@ -530,6 +586,8 @@ def evaluate_xai_performance(config: Dict) -> None:
 
     xai_data = create_xai_data(config=config)
     xai_data.to_pickle(join(output_dir, 'xai_data.pkl'))
+
+    xai_data['original_sentence'] = xai_data.apply(extract_sentence_from_prompt, axis=1)
 
     data_with_predictions = create_prediction_data(config=config)
     data_with_predictions.to_pickle(
@@ -541,30 +599,26 @@ def evaluate_xai_performance(config: Dict) -> None:
     )
 
     zero_shot_model_results = evaluation_data_all[
-        evaluation_data_all['model_name'] == 'bert_zero_shot'
+        evaluation_data_all['model_name'] == BERT_ZERO_SHOT
     ]
 
     evaluation_data_all = merge_with_zero_shot_model_results(
         data=evaluation_data_all,
         zero_shot_model_data=zero_shot_model_results,
     )
-    
-    # strip the zero-shot attributions. for the zero-shot model, the sentences got
-    # wrapped in a prompt template rendering the corresponding attribution arrays 
-    # as longer than the actual sentence. we need to strip the zero-shot attributions
-    # to match the length of the sentence. at the moment the prompt template appends
-    # the original sentence to the end of the prompt, meaning we can use the attributions 
-    # from another model as a reference to strip the zero-shot attributions.
-    # From the last element of the zero-shot attributions, we slice backwards until we
-    # reach the length of the attribution of the reference model stripping the attributions
-    # for the prompt template.
+
     evaluation_data_all['attribution_zero_shot_stripped'] = evaluation_data_all.apply(
-        lambda x: x['attribution_zero_shot'][-2:]/np.sum(x['attribution_zero_shot'][-2:]), axis=1
+        strip_zero_shot_attributions, axis=1
+    )
+
+    evaluation_data_all['attribution'] = evaluation_data_all.apply(
+        lambda x: x['attribution'] if x['model_name'] != BERT_ZERO_SHOT else x['attribution_zero_shot_stripped'], axis=1
     )
 
     evaluation_data_all = evaluation_data_all[
         evaluation_data_all["model_version"] == SaveVersion.best.value
     ]
+
 
     evaluation_data_correct = determine_correctly_classified(data=evaluation_data_all)
 
@@ -573,18 +627,18 @@ def evaluate_xai_performance(config: Dict) -> None:
     binary_data = evaluation_data_correct[
         ~evaluation_data_correct['dataset_type'].str.contains('non_binary')
     ]
-    if difference_config["correctly_classified_only"]:
-        prepare_difference_data(
-            df=binary_data,
-            idxs=difference_config["prediction_idx"],
-            output_dir=output_dir,
-        )
-    else:
-        prepare_difference_data(
-            df=binary_data,
-            idxs=difference_config["prediction_idx"],
-            output_dir=output_dir,
-        )
+    # if difference_config["correctly_classified"]:
+    #     prepare_difference_data(
+    #         df=binary_data,
+    #         idxs=difference_config["prediction_idx"],
+    #         output_dir=output_dir,
+    #     )
+    # else:
+    #     prepare_difference_data(
+    #         df=binary_data,
+    #         idxs=difference_config["prediction_idx"],
+    #         output_dir=output_dir,
+    #     )
 
     logger.info("Calculate evaluation scores.")
     xai_evaluation_results = evaluate_xai(
