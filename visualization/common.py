@@ -26,8 +26,8 @@ METRIC_NAME_MAP = dict(
     mass_accuracy='Mass Accuracy (MA)',
     mass_accuracy_method_grouped="Mass Accuracy (MA)",
     mass_accuracy_reversed="1 - Mass Accuracy (MA)",
-    mass_accuracy_relative="median(RMA)",
-    mass_accuracy_relative_grouped="median(RMA)",
+    mass_accuracy_relative="median($\log$(RMA))",
+    mass_accuracy_relative_grouped="median($\log$(RMA))",
 )
 
 METHOD_NAME_MAP = dict(Covariance="Pattern Variant")
