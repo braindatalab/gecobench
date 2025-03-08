@@ -11,6 +11,7 @@ from common import DataSet, DatasetKeys, validate_dataset_key
 from training.bert import train_bert
 from training.bert_zero_shot import train_bert_zero_shot
 from training.simple_model import train_simple_attention_model
+from training.gpt2 import train_gpt2
 from utils import (
     dump_as_pickle,
     load_json_file,
@@ -77,6 +78,12 @@ TrainModel = {
     'bert_randomly_init_embedding_classification': train_bert,
     'bert_zero_shot': train_bert_zero_shot,
     'one_layer_attention': train_simple_attention_model,
+    'gpt2_only_classification': train_gpt2,
+    'gpt2_only_embedding_classification': train_gpt2,
+    'gpt2_all': train_gpt2,
+    'gpt2_only_embedding': train_gpt2,
+    'gpt2_randomly_init_embedding_classification': train_gpt2,
+    'gpt2_zero_shot': train_gpt2
 }
 
 

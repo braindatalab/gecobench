@@ -1,0 +1,510 @@
+from copy import deepcopy
+from os.path import join
+from pathlib import Path
+from typing import Tuple, Dict, List, Any, Callable
+
+import torch
+from loguru import logger
+from tqdm import tqdm
+from torch import Tensor
+from torch.nn import CrossEntropyLoss, Module
+from torch.optim import Adam
+from torch.utils.data import DataLoader, TensorDataset
+from transformers import (
+    GPT2ForSequenceClassification,
+    GPT2Tokenizer,
+    get_linear_schedule_with_warmup,
+)
+import wandb
+
+from common import DataSet, SaveVersion
+from utils import (
+    set_random_states,
+    generate_training_dir,
+    dump_as_pickle,
+    load_from_cache,
+    save_to_cache,
+    generate_artifacts_dir,
+)
+
+GPT2_PADDING = '<|endoftext|>'
+GPT2_SEPARATION = '<|endoftext|>'
+NUM_SPECIAL_GPT2_TOKENS = 1
+MAX_TOKEN_LENGTH = 1024
+
+
+class Trainer:
+    def __init__(
+        self,
+        config: Dict,
+        model: Module,
+        model_name: str,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        loss: CrossEntropyLoss,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
+        device: str,
+        run_name: str,
+        accumulate_batches: int = 0,
+    ):
+        self.config = config
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.loss = loss
+        self.optimizer = optimizer
+        self.scheduler = scheduler
+        self.device = device
+        self.logger_enabled = "wandb" in self.config['general']
+        self.run_name = run_name
+        self.model_name = model_name
+        self.global_step = 0
+        self.accumulate_batches = accumulate_batches
+
+        self.init_logger()
+
+    def init_logger(self):
+        if self.logger_enabled:
+            wandb.init(
+                project=self.config['general']['wandb']['project'],
+                entity=self.config['general']['wandb']['entity'],
+                name=self.run_name,
+                config={"model_name": self.model_name, **self.config},
+            )
+
+    def finish_run(self):
+        if self.logger_enabled:
+            wandb.finish()
+
+    def log_dict(self, log_dict):
+        if self.logger_enabled:
+            wandb.log(log_dict)
+
+    def log_val(self, step):
+        if (
+            self.logger_enabled
+            and self.config['general']['wandb']['validate_every_n_steps'] > 0
+            and step % self.config['general']['wandb']['validate_every_n_steps'] == 0
+            and step > 0
+        ):
+            val_loss, val_acc = self.validate_epoch()
+            self.log_dict(
+                {
+                    'val_loss': val_loss / len(self.val_loader),
+                    'val_acc': val_acc / len(self.val_loader),
+                    'learning_rate': self.scheduler.get_last_lr()[0],
+                }
+            )
+
+    def train_epoch(self) -> Tuple:
+        train_loss, train_acc = 0.0, 0
+
+        bar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
+        for step, batch in bar:
+            if self.accumulate_batches == 0 or (
+                self.accumulate_batches > 0 and step % self.accumulate_batches == 0
+            ):
+                self.optimizer.zero_grad()
+
+            input_ids = batch[0].to(torch.long).to(self.device)
+            attention_mask = batch[1].to(self.device)
+            labels = batch[2].to(torch.long).to(self.device)
+
+            output = self.model(
+                input_ids, token_type_ids=None, attention_mask=attention_mask
+            )
+            logits = output.logits
+            l = self.loss(logits, labels)
+
+            l.backward()
+            self.optimizer.step()
+            self.scheduler.step()
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), 1.0
+            )  # for exploding gradients
+
+            train_loss += l.item()
+            scores, predictions = torch.max(logits, 1)
+            batch_train_acc = torch.sum(
+                (predictions == labels), dtype=torch.float
+            ).item() / float(labels.shape[0])
+
+            train_acc += batch_train_acc
+
+            self.log_dict(
+                {
+                    'train_loss': l.item(),
+                    'train_acc': batch_train_acc,
+                    'learning_rate': self.scheduler.get_last_lr()[0],
+                }
+            )
+
+            # Validate every n steps, as specified in the config
+            self.log_val(step)
+
+            bar.set_description(
+                f"Train Loss:{train_loss / float(step + 1):.2f}, "
+                f"Train Acc:{train_acc / float(step + 1):.2f}"
+            )
+
+        return train_loss, train_acc
+
+    def validate_epoch(self) -> Tuple:
+        val, val_correct = 0.0, 0
+        self.model.eval()
+        bar = tqdm(enumerate(self.val_loader), total=len(self.val_loader))
+        for step, batch in bar:
+            input_ids = batch[0].to(torch.long).to(self.device)
+            attention_mask = batch[1].to(self.device)
+            lables = batch[2].to(torch.long).to(self.device)
+
+            output = self.model(
+                input_ids, token_type_ids=None, attention_mask=attention_mask
+            )
+            logits = output.logits
+            l = self.loss(logits, lables)
+
+            val += l.item()
+            scores, predictions = torch.max(logits, 1)
+            val_correct += torch.sum(
+                (predictions == lables), dtype=torch.float
+            ).item() / float(lables.shape[0])
+
+            bar.set_description(
+                f"Val Loss:{val / float(step + 1):.2f}, "
+                f"Val Acc:{val_correct / float(step + 1):.2f}"
+            )
+
+        return val, val_correct
+
+
+def get_gpt2_ids(tokenizer: GPT2Tokenizer, token: str) -> Tensor:
+    return tokenizer(
+        text=token,
+        padding=True,
+        truncation=True,
+        return_tensors='pt',
+        add_special_tokens=False,
+    )['input_ids'].flatten()
+
+
+def create_gpt2_ids_from_sentence(
+    tokenizer: GPT2Tokenizer, sentence: List[str]
+) -> Tensor:
+    tokens = torch.tensor([])
+    separation_id = get_gpt2_ids(tokenizer=tokenizer, token=GPT2_SEPARATION)
+    
+    for k, word in enumerate(sentence):
+        word_id = get_gpt2_ids(tokenizer=tokenizer, token=word)
+        tokens = torch.cat((tokens, word_id), dim=0)
+
+    tokens = torch.cat((tokens, separation_id), dim=0)
+    return tokens.type(torch.long)
+
+
+def add_padding_if_necessary(
+    tokenizer: GPT2Tokenizer, ids: Tensor, max_sentence_length: int
+) -> Tensor:
+    difference = max_sentence_length - ids.shape[0]
+    output = ids
+    if difference > 0:
+        padding_id = get_gpt2_ids(tokenizer=tokenizer, token=GPT2_PADDING)
+        padding = torch.tensor([padding_id.numpy()[0]] * difference)
+        output = torch.cat((ids, padding), dim=0)
+
+    return output
+
+
+def create_attention_mask_from_gpt2_ids(
+    tokenizer: GPT2Tokenizer, ids: Tensor
+) -> Tensor:
+    attention_mask = torch.ones_like(ids)
+    padding_id = get_gpt2_ids(tokenizer=tokenizer, token=GPT2_PADDING)
+    padding_mask = ids == padding_id
+    attention_mask[padding_mask] = 0
+    return attention_mask
+
+
+def create_tensor_dataset(
+    data: List,
+    target: List,
+    tokenizer: GPT2Tokenizer,
+    include_idx: bool = False,
+) -> TensorDataset:
+    max_sentence_length = max([len(ids) for ids in data])
+    tokens = torch.zeros(size=(len(data), max_sentence_length))
+    attention_mask = torch.zeros(size=(len(data), max_sentence_length))
+    for k, ids in tqdm(enumerate(data), total=len(data), desc='Creating GPT2 dataset'):
+        tokens[k, :] = add_padding_if_necessary(
+            tokenizer=tokenizer, ids=ids, max_sentence_length=max_sentence_length
+        )
+        attention_mask[k, :] = create_attention_mask_from_gpt2_ids(
+            tokenizer=tokenizer,
+            ids=tokens[k, :],
+        )
+
+    if include_idx:
+        return TensorDataset(
+            tokens.type(torch.long),
+            attention_mask,
+            torch.tensor(target),
+            torch.arange(len(data)),
+        )
+
+    return TensorDataset(
+        tokens.type(torch.long),
+        attention_mask,
+        torch.tensor(target),
+    )
+
+
+def save_model(model: Any, model_name: str, config: dict) -> str:
+    base_output_dir = generate_artifacts_dir(config)
+    training_dir = generate_training_dir(config)
+    output_dir = join(base_output_dir, training_dir)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    torch.save(model, join(output_dir, model_name))
+    return join(training_dir, model_name)
+
+
+def dump_history(history: Dict, config: dict, history_name: str) -> str:
+    base_output_dir = generate_artifacts_dir(config)
+    training_dir = generate_training_dir(config)
+    output_dir = join(base_output_dir, training_dir)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    dump_as_pickle(data=history, output_dir=output_dir, filename=history_name)
+    return join(training_dir, history_name)
+
+
+def create_gpt2_ids(
+    data: List, tokenizer: GPT2Tokenizer, type: str = "", config: dict = None,
+        sentence_context: Callable = None
+) -> List:
+    should_cache = type != "" and config is not None
+
+    if should_cache and sentence_context is None:
+        cache_key = f"gpt2_ids_{type}"
+        cache_entry = load_from_cache(cache_key, config)
+        if cache_entry is not None:
+            return cache_entry
+
+    gpt2_ids = list()
+    valid_idxs = list()
+    for k, sentence in tqdm(
+        enumerate(data), total=len(data), desc=f'Creating GPT2 IDs {type}'
+    ):
+        sentence = sentence if sentence_context is None else sentence_context(sentence)
+        cur = create_gpt2_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
+
+        if len(cur) <= MAX_TOKEN_LENGTH:
+            gpt2_ids.append(cur)
+            valid_idxs.append(k)
+
+    if should_cache and sentence_context is None:
+        save_to_cache(cache_key, (gpt2_ids, valid_idxs), config)
+
+    return gpt2_ids, valid_idxs
+
+
+def initialize_embedding(module: torch.nn.Module) -> None:
+    if isinstance(module, torch.nn.Embedding):
+        torch.nn.init.xavier_uniform_(module.weight)
+
+
+def train_model(
+    config: dict,
+    dataset_name: str,
+    training_params: dict,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    num_labels: int,
+    idx: int,
+) -> list:
+    set_random_states(seed=config['general']['seed'] + idx)
+    logger.info(
+        f"GPT2 Training, repetition {idx + 1} of "
+        f"{config['training']['num_training_repetitions']}, "
+        f"dataset: {dataset_name}, and "
+        f"model name: {training_params['model_name']}"
+    )
+
+    training_history = {
+        'train_loss': list(),
+        'val_loss': list(),
+        'train_acc': list(),
+        'val_acc': list(),
+    }
+
+    num_epochs = training_params['epochs']
+    learning_rate = training_params['learning_rate']
+
+    model = GPT2ForSequenceClassification.from_pretrained(
+        pretrained_model_name_or_path="gpt2",
+        revision=config['training']['gpt2_revision'],
+        num_labels=num_labels,
+        pad_token_id=50256  # GPT2's default pad token
+    )
+
+    model.to(config['training']['device'])
+    optimizer = Adam(model.parameters(), lr=learning_rate)
+    loss = CrossEntropyLoss()
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=num_epochs * len(train_loader) * 0.1,
+        num_training_steps=num_epochs * len(train_loader),
+    )
+
+    for name, param in model.named_parameters():
+        if name.startswith(tuple(training_params['layers_to_train'])) or 0 == len(
+            training_params['layers_to_train']
+        ):
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+
+    if 'gpt2_randomly_init_embedding_classification' == training_params['model_name']:
+        model.apply(initialize_embedding)
+
+    trainer = Trainer(
+        config=config,
+        model=model,
+        model_name=training_params['model_name'],
+        train_loader=train_loader,
+        val_loader=val_loader,
+        loss=loss,
+        scheduler=scheduler,
+        optimizer=optimizer,
+        device=config['training']['device'],
+        run_name=f'{dataset_name}_{training_params["model_name"]}_{idx}',
+        accumulate_batches=(
+            training_params['accumulate_batches']
+            if 'accumulate_batches' in training_params
+            else 1
+        ),
+    )
+    lowest_loss_so_far = 1e7
+    for epoch in range(num_epochs):
+        train_loss, train_acc = trainer.train_epoch()
+        val_loss, val_acc = trainer.validate_epoch()
+
+        training_history['train_loss'] += [train_loss / float(len(train_loader))]
+        training_history['train_acc'] += [train_acc / float(len(train_loader))]
+        training_history['val_loss'] += [val_loss / float(len(val_loader))]
+        training_history['val_acc'] += [val_acc / float(len(val_loader))]
+
+        logger.info(
+            f"Epoch:{epoch}/{num_epochs},"
+            f"AVG Training Loss:{training_history['train_loss'][-1]:.2f}, "
+            f"AVG Val Loss:{training_history['val_loss'][-1]:.2f}, "
+            f"AVG Training Acc {training_history['train_acc'][-1]:.2f}, "
+            f"AVG Val Acc {training_history['val_acc'][-1]:.2f}"
+        )
+
+        trainer.log_dict(
+            {
+                'train_loss': training_history['train_loss'][-1],
+                'val_loss': training_history['val_loss'][-1],
+                'train_acc': training_history['train_acc'][-1],
+                'val_acc': training_history['val_acc'][-1],
+            }
+        )
+
+        if lowest_loss_so_far > val_loss:
+            logger.info(f'Save model weights at epoch: {epoch}')
+            lowest_loss_so_far = val_loss
+            model_path = save_model(
+                model=model,
+                config=config,
+                model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}_best.pt',
+            )
+            history_path = dump_history(
+                history=training_history,
+                config=config,
+                history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}_best.pkl',
+            )
+
+    # Best validiation accuracy model
+    output_params = deepcopy(training_params)
+    output_params['repetition'] = idx
+    output_params['save_version'] = SaveVersion.best
+    records = [(dataset_name, output_params, model_path, history_path)]
+
+    # Last epoch model
+    output_params_last = deepcopy(training_params)
+    output_params_last['repetition'] = idx
+    output_params_last['save_version'] = SaveVersion.last
+
+    model_path_last = save_model(
+        model=model,
+        config=config,
+        model_name=f'{dataset_name}_{training_params["model_name"]}_{idx}_last.pt',
+    )
+    history_path_last = dump_history(
+        history=training_history,
+        config=config,
+        history_name=f'{dataset_name}_{training_params["model_performance"]}_{idx}_last.pkl',
+    )
+    records += [(dataset_name, output_params_last, model_path_last, history_path_last)]
+
+    trainer.finish_run()
+
+    return records
+
+
+def get_gpt2_tokenizer(config: dict) -> GPT2Tokenizer:
+    tokenizer = GPT2Tokenizer.from_pretrained(
+        pretrained_model_name_or_path='gpt2',
+        revision=config['training']['gpt2_revision'],
+    )
+    tokenizer.pad_token = tokenizer.eos_token
+    return tokenizer
+
+
+def train_gpt2(
+    dataset: DataSet, dataset_name: str, num_labels: int, params: Dict, config: Dict
+) -> List[Tuple]:
+    output = list()
+    gpt2_tokenizer = get_gpt2_tokenizer(config=config)
+    gpt2_ids_train, train_idxs = create_gpt2_ids(
+        data=dataset.x_train,
+        tokenizer=gpt2_tokenizer,
+        type=f"train_{dataset_name}",
+        config=config,
+    )
+    gpt2_ids_val, val_idxs = create_gpt2_ids(
+        data=dataset.x_test,
+        tokenizer=gpt2_tokenizer,
+        type=f"test_{dataset_name}",
+        config=config,
+    )
+
+    # Keep valid train targets
+    y_train = [dataset.y_train[i] for i in train_idxs]
+    y_test = [dataset.y_test[i] for i in val_idxs]
+
+    logger.info(f'Creating GPT2 datasets')
+    train_data = create_tensor_dataset(
+        data=gpt2_ids_train, target=y_train, tokenizer=gpt2_tokenizer
+    )
+    val_data = create_tensor_dataset(
+        data=gpt2_ids_val, target=y_test, tokenizer=gpt2_tokenizer
+    )
+
+    logger.info(f'Creating GPT2 data loaders')
+    train_loader = DataLoader(train_data, shuffle=True, batch_size=params['batch_size'])
+    val_loader = DataLoader(val_data, shuffle=True, batch_size=params['batch_size'])
+
+    logger.info(f'Begin training GPT2 model')
+    for k in range(config['training']['num_training_repetitions']):
+        output += train_model(
+            config=config,
+            dataset_name=dataset_name,
+            training_params=params,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            num_labels=num_labels,
+            idx=k,
+        )
+
+    return output
