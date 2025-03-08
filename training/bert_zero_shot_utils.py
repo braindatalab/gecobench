@@ -31,32 +31,32 @@ PROMPT_TEMPLATES = dict(
         # 'Pronouns of "{sentence}" are male or female: [MASK] .', # 0.48
         # 'Female or male: {sentence} [MASK] .', # 0.57
         # 'Female or male: [MASK]. {sentence}',  # 0.82
-        # ['Female', 'or', 'male', ':', '[MASK]', '.', '{sentence}'],
+        ['Female', 'or', 'male', ':', '[MASK]', '.', '{sentence}'],
         # val accruacy: 0.87
         # val accruacy: 0.72
-        [
-            'He',
-            'continues',
-            'to',
-            'pursue',
-            'him',
-            '.',
-            'male,',
-            'She',
-            'continues',
-            'to',
-            'pursue',
-            'her',
-            '.',
-            'female,',
-            'Female',
-            'or',
-            'male',
-            ':',
-            '[MASK]',
-            '.',
-            '{sentence}',
-        ],
+        # [
+        #     'He',
+        #     'continues',
+        #     'to',
+        #     'pursue',
+        #     'him',
+        #     '.',
+        #     'male,',
+        #     'She',
+        #     'continues',
+        #     'to',
+        #     'pursue',
+        #     'her',
+        #     '.',
+        #     'female,',
+        #     'Female',
+        #     'or',
+        #     'male',
+        #     ':',
+        #     '[MASK]',
+        #     '.',
+        #     '{sentence}',
+        # ],
         # val accruacy: 0.85
         # val accruacy: 0.69
     ],
@@ -151,6 +151,21 @@ def extract_original_sentence_from_prompt(
     return original_sentence
 
 
+def extract_attribution_for_original_sentence_from_prompt_attribution(
+    attribution_prompt: list[float], prompt_templates: list[str], index: int
+) -> list[float]:
+    k = prompt_templates[index].index('{sentence}')
+    num_template_words_before_sentence = len(prompt_templates[index][:k])
+    num_template_words_after_sentence = len(prompt_templates[index][k + 1 :])
+
+    attribution_original_sentence = attribution_prompt[
+        num_template_words_before_sentence : len(attribution_prompt)
+        - num_template_words_after_sentence
+    ]
+
+    return attribution_original_sentence
+
+
 def get_slicing_indices_of_sentence_embedded_in_prompt(
     sentence: list[str], prompt_templates: list[str], index: int
 ) -> slice:
@@ -227,7 +242,7 @@ def predict_masked_tokens(
 
 
 def create_prediction_mask(
-        logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer
+    logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer
 ) -> Tensor:
     # Initialize the mask tensor with zeros
     prediction_mask = torch.zeros_like(logits, dtype=torch.bool)
@@ -240,9 +255,13 @@ def create_prediction_mask(
     for k, m in enumerate(mask_token_ids.any(dim=-1)):
         if m:
             # Get the first token that coincides with the labels
-            topk_predicted_tokens = tokenizer.convert_ids_to_tokens(topk_predicted_tokens_ids[n])
-            prediction = next((token for token in topk_predicted_tokens if token in LABEL_MAP.keys()),
-                              topk_predicted_tokens[0])
+            topk_predicted_tokens = tokenizer.convert_ids_to_tokens(
+                topk_predicted_tokens_ids[n]
+            )
+            prediction = next(
+                (token for token in topk_predicted_tokens if token in LABEL_MAP.keys()),
+                topk_predicted_tokens[0],
+            )
             predicted_id = tokenizer.convert_tokens_to_ids(prediction)
 
             # Update the mask tensor
@@ -298,16 +317,13 @@ def zero_shot_prediction(
         mask_token_mask = create_prediction_mask(
             logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
         )
-        predicted_mask_ids, predicted_mask_tokens, _ = (
-            predict_masked_tokens(
-                logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
-            )
+        predicted_mask_ids, predicted_mask_tokens, _ = predict_masked_tokens(
+            logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
         )
         # Update logits and token ids
-        predicted_logits = (
-            (mask_token_mask * output).max(dim=-1)[0].max(dim=-1)[0].to(DEVICE)
-            + ~mask_token_ids.any(dim=-1) * predicted_logits
-        )
+        predicted_logits = (mask_token_mask * output).max(dim=-1)[0].max(dim=-1)[0].to(
+            DEVICE
+        ) + ~mask_token_ids.any(dim=-1) * predicted_logits
         predicted_token_ids = (
             mask_token_ids.any(dim=-1) * predicted_mask_ids
             + ~mask_token_ids.any(dim=-1) * predicted_token_ids
