@@ -46,6 +46,7 @@ def accuracy_over_data_loader(
             input_ids=input_ids,
             attention_mask=attention_mask,
             tokenizer=tokenizer,
+            num_labels=torch.unique(labels).shape[0],
         )
 
         accuracies += [

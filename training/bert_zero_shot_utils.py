@@ -4,12 +4,22 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Module
+import torch.nn.functional as F
 from transformers import BertTokenizer
 
+from common import LABEL_MAP
 from utils import get_num_labels
 
-LABEL_MAP = {'female': 0, 'male': 1, 'neutral': 2}
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+TOKEN_ID_FEMALE = 2931
+TOKEN_ID_MALE = 3287
+TOKEN_ID_NEUTRAL = 8699
+
+TOKEN_SUBSET = {
+    2: [TOKEN_ID_FEMALE, TOKEN_ID_MALE],
+    3: [TOKEN_ID_FEMALE, TOKEN_ID_MALE, TOKEN_ID_NEUTRAL],
+}
 
 
 def determine_gender_type(dataset_name: str) -> str:
@@ -185,49 +195,28 @@ def get_slicing_indices_of_sentence_embedded_in_prompt(
     return slice(start_index, end_index)
 
 
-def get_first_token_that_coincides_with_label(predictions: list[str]) -> str:
-    output = None
-    for prediction in predictions:
-        if prediction in LABEL_MAP.keys():
-            output = prediction
-            break
-    return output
-
-
-def predict_first_token_coinciding_with_labels(
-    topk_predicted_tokens_ids: Tensor, tokenizer: BertTokenizer
-) -> tuple:
-    topk_predicted_tokens = tokenizer.convert_ids_to_tokens(topk_predicted_tokens_ids)
-    ids_and_tokens_map = {
-        token: token_id
-        for token, token_id in zip(topk_predicted_tokens, topk_predicted_tokens_ids)
-    }
-    prediction = get_first_token_that_coincides_with_label(topk_predicted_tokens)
-    if prediction is None:
-        prediction = topk_predicted_tokens[0]
-
-    return prediction, ids_and_tokens_map[prediction]
-
-
 def predict_masked_tokens(
-    logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer
+    logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer, num_labels: int
 ) -> Tuple[Tensor, list[str], Tensor]:
     predicted_tokens = list()
     predicted_token_ids = list()
     predicted_logits = list()
-    output_mask_tokens = logits[mask_token_ids].detach()
-    _, topk_predicted_tokens_ids = output_mask_tokens.topk(5, axis=-1)
+    logits_of_mask_tokens = logits[mask_token_ids].detach()
+    token_logits, token_indices = (
+        logits_of_mask_tokens[:, TOKEN_SUBSET[num_labels]],
+        torch.tensor(TOKEN_SUBSET[num_labels])
+        * torch.ones((logits.shape[0], num_labels), dtype=torch.long).to(DEVICE),
+    )
 
     n = 0
-    for m in mask_token_ids.any(dim=-1):
+    for k, m in enumerate(mask_token_ids.any(dim=-1)):
         if m:
-            prediction, predicted_id = predict_first_token_coinciding_with_labels(
-                topk_predicted_tokens_ids=topk_predicted_tokens_ids[n],
-                tokenizer=tokenizer,
-            )
+            predicted_id = token_indices[n, F.softmax(token_logits[n]).argmax()]
+            prediction = tokenizer.convert_ids_to_tokens(predicted_id.unsqueeze(-1))[0]
+
             predicted_tokens += [prediction]
             predicted_token_ids += [predicted_id]
-            predicted_logits += [output_mask_tokens[n, predicted_id]]
+            predicted_logits += [token_logits[n, F.softmax(token_logits[n]).argmax()]]
             n += 1
         else:
             predicted_tokens += ['']
@@ -242,27 +231,33 @@ def predict_masked_tokens(
 
 
 def create_prediction_mask(
-    logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer
+    logits: Tensor, mask_token_ids: Tensor, tokenizer: BertTokenizer, num_labels: int
 ) -> Tensor:
-    # Initialize the mask tensor with zeros
     prediction_mask = torch.zeros_like(logits, dtype=torch.bool)
 
     # Get the top 5 predicted token IDs for the masked positions
-    output_mask_tokens = logits[mask_token_ids].detach()
-    _, topk_predicted_tokens_ids = output_mask_tokens.topk(5, axis=-1)
+    logits_of_mask_tokens = logits[mask_token_ids].detach()
+    # _, topk_predicted_tokens_ids = output_mask_tokens.topk(5, axis=-1)
+    token_logits, token_indices = (
+        logits_of_mask_tokens[:, TOKEN_SUBSET[num_labels]],
+        torch.tensor(TOKEN_SUBSET[num_labels])
+        * torch.ones((logits.shape[0], num_labels), dtype=torch.long).to(DEVICE),
+    )
 
     n = 0
     for k, m in enumerate(mask_token_ids.any(dim=-1)):
         if m:
-            # Get the first token that coincides with the labels
-            topk_predicted_tokens = tokenizer.convert_ids_to_tokens(
-                topk_predicted_tokens_ids[n]
-            )
-            prediction = next(
-                (token for token in topk_predicted_tokens if token in LABEL_MAP.keys()),
-                topk_predicted_tokens[0],
-            )
-            predicted_id = tokenizer.convert_tokens_to_ids(prediction)
+            # # Get the first token that coincides with the labels
+            # topk_predicted_tokens = tokenizer.convert_ids_to_tokens(
+            #     topk_predicted_tokens_ids[n]
+            # )
+            # prediction = next(
+            #     (token for token in topk_predicted_tokens if token in LABEL_MAP.keys()),
+            #     topk_predicted_tokens[0],
+            # )
+            # predicted_id = tokenizer.convert_tokens_to_ids(prediction)
+
+            predicted_id = token_indices[k][F.softmax(token_logits[k]).argmax()]
 
             # Update the mask tensor
             prediction_mask[k, mask_token_ids[k, :], predicted_id] = True
@@ -286,12 +281,14 @@ def zero_shot_prediction(
     input_ids: Tensor = None,
     attention_mask: Tensor = None,
     input_embeddings: Tensor = None,
+    num_labels: int = 2,
 ) -> Tuple[list[str], Tensor, Tensor]:
     '''
     Predicts the tokens of the input_ids using the model.
     If input_embeddings is not None, then the input_ids are not used.
     And the general prediction strategy is to predict the token with the highest logit
-    and if there is a mask token, then the prediction is based on the top 5 logits.
+    and if there is a mask token, then the prediction is based on the maximum logits
+    among the pre-defined tokens female or male (or neutral).
     Of these top 5 logits, the first token that coincides with the labels is selected.
     Otherwise, we fall back to the token with the highest logit.
     '''
@@ -315,12 +312,17 @@ def zero_shot_prediction(
     mask_token_ids = (input_ids == tokenizer.mask_token_id).to(DEVICE)
     if mask_token_ids.any(dim=-1).any(dim=-1):
         mask_token_mask = create_prediction_mask(
-            logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
+            logits=output,
+            mask_token_ids=mask_token_ids,
+            tokenizer=tokenizer,
+            num_labels=num_labels,
         )
         predicted_mask_ids, predicted_mask_tokens, _ = predict_masked_tokens(
-            logits=output, mask_token_ids=mask_token_ids, tokenizer=tokenizer
+            logits=output,
+            mask_token_ids=mask_token_ids,
+            tokenizer=tokenizer,
+            num_labels=num_labels,
         )
-        # Update logits and token ids
         predicted_logits = (mask_token_mask * output).max(dim=-1)[0].max(dim=-1)[0].to(
             DEVICE
         ) + ~mask_token_ids.any(dim=-1) * predicted_logits

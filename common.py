@@ -8,6 +8,7 @@ CLUSTER_PLATFORM_NAME = '#102-Ubuntu'
 CLUSTER_DATA_DIR = '/mnt'
 DATASET_ALL = 'all'
 DATASET_SUBJECT = 'subject'
+LABEL_MAP = {'female': 0, 'male': 1, 'neutral': 2}
 
 DataTargetPair = namedtuple('DataTargetPair', 'data target')
 DataSet = namedtuple('DataSet', 'x_train y_train x_test y_test')
