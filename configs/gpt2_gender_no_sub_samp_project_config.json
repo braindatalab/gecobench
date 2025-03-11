@@ -70,6 +70,7 @@
     "num_training_repetitions": 5,
     "device": "cuda",
     "training_records": "training_records.pkl",
+    "gpt2_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
     "bert_revision": "1dbc166cf8765166998eff31ade2eb64c8a40076",
     "models": {
       "one_layer_attention": {
@@ -84,7 +85,7 @@
       "gpt2_randomly_init_embedding_classification": {
         "batch_size": 32,
         "epochs": 20,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.01,
         "model_name": "gpt2_randomly_init_embedding_classification",
         "model_performance": "gpt2_only_embedding_history",
         "layers_to_train": [
