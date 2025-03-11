@@ -10,6 +10,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from common import DataSet, DatasetKeys, validate_dataset_key
 from training.bert import train_bert
 from training.bert_zero_shot import train_bert_zero_shot
+from training.gpt2_zero_shot import train_gpt2_zero_shot
 from training.simple_model import train_simple_attention_model
 from training.gpt2 import train_gpt2
 from utils import (
@@ -83,7 +84,7 @@ TrainModel = {
     'gpt2_all': train_gpt2,
     'gpt2_only_embedding': train_gpt2,
     'gpt2_randomly_init_embedding_classification': train_gpt2,
-    'gpt2_zero_shot': train_gpt2
+    'gpt2_zero_shot': train_gpt2_zero_shot,
 }
 
 
