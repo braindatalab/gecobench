@@ -194,7 +194,7 @@ def create_gpt2_ids_from_sentence(
 ) -> Tensor:
     tokens = torch.tensor([])
     separation_id = get_gpt2_ids(tokenizer=tokenizer, token=GPT2_SEPARATION)
-    
+
     for k, word in enumerate(sentence):
         word_id = get_gpt2_ids(tokenizer=tokenizer, token=word)
         tokens = torch.cat((tokens, word_id), dim=0)
@@ -278,8 +278,11 @@ def dump_history(history: Dict, config: dict, history_name: str) -> str:
 
 
 def create_gpt2_ids(
-    data: List, tokenizer: GPT2Tokenizer, type: str = "", config: dict = None,
-        sentence_context: Callable = None
+    data: List,
+    tokenizer: GPT2Tokenizer,
+    type: str = "",
+    config: dict = None,
+    sentence_context: Callable = None,
 ) -> List:
     should_cache = type != "" and config is not None
 
@@ -292,7 +295,7 @@ def create_gpt2_ids(
     gpt2_ids = list()
     valid_idxs = list()
     for k, sentence in tqdm(
-        enumerate(data), total=len(data), desc=f'Creating GPT2 IDs {type}'
+        enumerate(data), total=len(data), desc=f'Creating GPT2 IDs {type}', disable=True
     ):
         sentence = sentence if sentence_context is None else sentence_context(sentence)
         cur = create_gpt2_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
@@ -343,7 +346,7 @@ def train_model(
         pretrained_model_name_or_path="gpt2",
         revision=config['training']['gpt2_revision'],
         num_labels=num_labels,
-        pad_token_id=50256  # GPT2's default pad token
+        pad_token_id=50256,  # GPT2's default pad token
     )
 
     model.to(config['training']['device'])

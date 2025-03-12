@@ -280,8 +280,11 @@ def dump_history(history: Dict, config: dict, history_name: str) -> str:
 
 
 def create_bert_ids(
-    data: List, tokenizer: BertTokenizer, type: str = "", config: dict = None,
-        sentence_context: Callable = None
+    data: List,
+    tokenizer: BertTokenizer,
+    type: str = "",
+    config: dict = None,
+    sentence_context: Callable = None,
 ) -> List:
     should_cache = type != "" and config is not None
 
@@ -294,7 +297,7 @@ def create_bert_ids(
     bert_ids = list()
     valid_idxs = list()
     for k, sentence in tqdm(
-        enumerate(data), total=len(data), desc=f'Creating BERT IDs {type}'
+        enumerate(data), total=len(data), desc=f'Creating BERT IDs {type}', disable=True
     ):
         sentence = sentence if sentence_context is None else sentence_context(sentence)
         cur = create_bert_ids_from_sentence(tokenizer=tokenizer, sentence=sentence)
