@@ -20,6 +20,8 @@ from common import DATASET_ALL, DATASET_SUBJECT, validate_dataset_key
 BERT_MODEL_TYPE = 'bert'
 BERT_ZERO_SHOT = 'bert_zero_shot'
 ONE_LAYER_ATTENTION_MODEL_TYPE = 'one_layer_attention'
+GPT2_MODEL_TYPE = 'gpt2'
+GPT2_ZERO_SHOT = 'gpt2_zero_shot'
 
 
 def load_pickle(file_path: str) -> Any:
@@ -226,8 +228,12 @@ def determine_model_type(s: str) -> str:
     result = None
     if BERT_ZERO_SHOT in s:
         result = BERT_ZERO_SHOT
+    elif GPT2_ZERO_SHOT in s:
+        result = GPT2_ZERO_SHOT
     elif BERT_MODEL_TYPE in s:
         result = BERT_MODEL_TYPE
+    elif GPT2_MODEL_TYPE in s:
+        result = GPT2_MODEL_TYPE
     elif ONE_LAYER_ATTENTION_MODEL_TYPE in s:
         result = ONE_LAYER_ATTENTION_MODEL_TYPE
     return result

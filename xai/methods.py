@@ -27,22 +27,42 @@ from torch import Tensor
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import default_collate
 from tqdm import tqdm
-from transformers import BertTokenizer
+from transformers import BertTokenizer, GPT2Tokenizer
 
 from training.bert import (
     create_bert_ids,
     add_padding_if_necessary,
     create_attention_mask_from_bert_ids,
 )
-from training.bert_zero_shot_utils import zero_shot_prediction, format_logits
+from training.bert_zero_shot_utils import (
+    zero_shot_prediction as bert_zero_shot_prediction,
+    format_logits,
+)
+from training.gpt2 import (
+    create_gpt2_ids,
+    add_padding_if_necessary as add_padding_if_necessary_gpt2,
+    create_attention_mask_from_gpt2_ids,
+)
+from training.gpt2_zero_shot_utils import (
+    zero_shot_prediction as gpt2_zero_shot_prediction,
+    format_scores_gpt2,
+    TOKEN_LABEL_MAP,
+)
 from utils import (
     determine_model_type,
     BERT_MODEL_TYPE,
     ONE_LAYER_ATTENTION_MODEL_TYPE,
     BERT_ZERO_SHOT,
+    GPT2_MODEL_TYPE,
+    GPT2_ZERO_SHOT,
 )
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
 BERT = 'bert'
+GPT2 = 'gpt2'
 ALL_BUT_CLS_SEP = slice(1, -1)
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -55,13 +75,12 @@ GRADIENT_BASED_METHODS = [
 ]
 
 
-
 class SkippingEmbedding(torch.nn.Module):
     def __init__(
         self,
         model: torch.nn.Module,
         model_type: str,
-        tokenizer: BertTokenizer,
+        tokenizer: BertTokenizer | GPT2Tokenizer,
         dataset_type: str,
         target: int,
         input_ids: Tensor = None,
@@ -76,17 +95,36 @@ class SkippingEmbedding(torch.nn.Module):
 
     def forward(self, inputs: torch.Tensor, attention_mask: Tensor = None):
         if BERT_ZERO_SHOT == self.model_type:
-            _, predicted_token_ids, logits = zero_shot_prediction(
+            _, predicted_token_ids, logits = bert_zero_shot_prediction(
                 model=self.model,
                 attention_mask=attention_mask,
                 tokenizer=self.tokenizer,
                 input_embeddings=inputs,
                 input_ids=self.input_ids,
             )
+            pred = logits.argmax(dim=-1)
             x = format_logits(
                 token_ids=self.input_ids,
                 input_embeddings=inputs,
                 logits=logits,
+                target=pred,
+                dataset_name=self.dataset_type,
+            )
+        elif GPT2_ZERO_SHOT == self.model_type:
+            _, predicted_token_ids, scores = gpt2_zero_shot_prediction(
+                model=self.model,
+                attention_mask=attention_mask,
+                tokenizer=self.tokenizer,
+                input_embeddings=inputs,
+                input_ids=self.input_ids,
+            )
+            pred = torch.tensor(
+                [TOKEN_LABEL_MAP[s.item()] for s in scores.argmax(dim=-1)]
+            )
+            x = format_scores_gpt2(
+                token_ids=self.input_ids,
+                input_embeddings=inputs,
+                logits=scores,
                 target=self.target,
                 dataset_name=self.dataset_type,
             )
@@ -94,6 +132,8 @@ class SkippingEmbedding(torch.nn.Module):
             x = self.model(input_ids=None, inputs_embeds=inputs)[0]
         elif ONE_LAYER_ATTENTION_MODEL_TYPE == self.model_type:
             x = self.model(embeddings=inputs)[0]
+        elif GPT2_MODEL_TYPE == self.model_type:
+            x = self.model(input_ids=None, inputs_embeds=inputs)[0]
         return x
 
 
@@ -120,23 +160,42 @@ def get_captum_attributions(
     methods: list,
     target: list,
     dataset_type: str,
-    tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer | GPT2Tokenizer,
 ) -> Dict:
     attributions = dict()
     check_availability_of_xai_methods(methods=methods)
 
     def forward_function(inputs: Tensor, attention_mask: Tensor = None) -> Tensor:
         if BERT_ZERO_SHOT == model_type:
-            _, predicted_token_ids, logits = zero_shot_prediction(
+            _, predicted_token_ids, logits = bert_zero_shot_prediction(
                 model=model,
                 attention_mask=attention_mask,
                 tokenizer=tokenizer,
                 input_embeddings=None,
                 input_ids=inputs,
             )
+            pred = logits.argmax(dim=-1)
             formated_logits = format_logits(
                 token_ids=inputs,
                 logits=logits,
+                target=pred,
+                dataset_name=dataset_type,
+            )
+            forward_function_output = torch.softmax(formated_logits, dim=1)
+        elif GPT2_ZERO_SHOT == model_type:
+            _, predicted_token_ids, scores = gpt2_zero_shot_prediction(
+                model=model,
+                attention_mask=attention_mask,
+                tokenizer=tokenizer,
+                input_embeddings=None,
+                input_ids=inputs,
+            )
+            pred = torch.tensor(
+                [TOKEN_LABEL_MAP[s.item()] for s in scores.argmax(dim=-1)]
+            )
+            formated_logits = format_scores_gpt2(
+                token_ids=inputs,
+                logits=scores,
                 target=target,
                 dataset_name=dataset_type,
             )
@@ -145,18 +204,20 @@ def get_captum_attributions(
             output = (
                 model(inputs)
                 if attention_mask is None
-                else model(inputs, attention_mask)
+                else model(input_ids=inputs, attention_mask=attention_mask)
             )
             forward_function_output = torch.softmax(output.logits, dim=1)
         return forward_function_output
 
     if BERT in model_type:
         embeddings = model.base_model.embeddings
+    elif GPT2 in model_type:
+        embeddings = model.transformer.wte
     else:
         embeddings = model.embeddings
 
     for method_name in methods:
-        logger.info(method_name)
+        # logger.info(method_name)
 
         if method_name in GRADIENT_BASED_METHODS:
             a = methods_dict.get(method_name)(
@@ -330,14 +391,35 @@ def get_shapley_sampling_attributions(
         feature_mask=None,
         n_samples=25,
         perturbations_per_eval=1,
-        show_progress=True,
+        show_progress=False,
     )
 
 
-def create_tensor_dataset(data: list, tokenizer: BertTokenizer) -> TensorDataset:
+def create_tensor_dataset_gpt2(
+    data: list, target: list, tokenizer: GPT2Tokenizer
+) -> TensorDataset:
     max_sentence_length = max([ids.shape[0] for ids in data])
     tokens = torch.zeros(size=(len(data), max_sentence_length))
     attention_mask = torch.zeros(size=(len(data), max_sentence_length))
+
+    for k, ids in enumerate(data):
+        tokens[k, :] = add_padding_if_necessary_gpt2(
+            tokenizer=tokenizer, ids=ids, max_sentence_length=max_sentence_length
+        )
+        attention_mask[k, :] = create_attention_mask_from_gpt2_ids(
+            tokenizer=tokenizer,
+            ids=tokens[k, :],
+        )
+
+    return TensorDataset(tokens.type(torch.long), attention_mask)
+
+
+def create_tensor_dataset(data: list, tokenizer: BertTokenizer) -> TensorDataset:
+    """Create a tensor dataset for BERT models."""
+    max_sentence_length = max([ids.shape[0] for ids in data])
+    tokens = torch.zeros(size=(len(data), max_sentence_length))
+    attention_mask = torch.zeros(size=(len(data), max_sentence_length))
+
     for k, ids in enumerate(data):
         tokens[k, :] = add_padding_if_necessary(
             tokenizer=tokenizer, ids=ids, max_sentence_length=max_sentence_length
@@ -351,7 +433,9 @@ def create_tensor_dataset(data: list, tokenizer: BertTokenizer) -> TensorDataset
 
 
 def assemble_lime_explanations(
-    explanation: lime.explanation.Explanation, x: np.ndarray, tokenizer: BertTokenizer
+    explanation: lime.explanation.Explanation,
+    x: np.ndarray,
+    tokenizer: BertTokenizer | GPT2Tokenizer,
 ) -> Tensor:
     explanations_per_word = [
         (
@@ -363,8 +447,8 @@ def assemble_lime_explanations(
     ]
 
     explanations = np.zeros(x.shape[0])
-    for k, bert_id in enumerate(x):
-        word = tokenizer.decode(bert_id).replace(' ', '')
+    for k, token_id in enumerate(x):
+        word = tokenizer.decode(token_id).replace(' ', '')
         for exp_word in explanations_per_word:
             if word in exp_word[0]:
                 explanations[k] = exp_word[2]
@@ -379,24 +463,35 @@ def get_lime_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-    tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer | GPT2Tokenizer,
 ) -> torch.tensor:
     def new_forward_function(text_input: list) -> np.ndarray:
         output = list()
-        list_of_bert_ids = list()
+        list_of_ids = list()
         for sentence in text_input:
-            bert_ids = create_bert_ids(data=[sentence.split()], tokenizer=tokenizer)[0][
-                0
-            ]
-            list_of_bert_ids += [bert_ids]
+            if isinstance(tokenizer, BertTokenizer):
+                ids = create_bert_ids(data=[sentence.split()], tokenizer=tokenizer)[0][
+                    0
+                ]
+            else:  # GPT2Tokenizer
+                ids = create_gpt2_ids(data=[sentence.split()], tokenizer=tokenizer)[0][
+                    0
+                ]
+            list_of_ids += [ids]
 
-        dataset = create_tensor_dataset(data=list_of_bert_ids, tokenizer=tokenizer)
+        if isinstance(tokenizer, BertTokenizer):
+            dataset = create_tensor_dataset(data=list_of_ids, tokenizer=tokenizer)
+        else:  # GPT2Tokenizer
+            dataset = create_tensor_dataset_gpt2(
+                data=list_of_ids, target=[0] * len(list_of_ids), tokenizer=tokenizer
+            )
+
         dataloader = torch.utils.data.DataLoader(
             dataset,
             batch_size=100,
             collate_fn=lambda x: tuple(x_.to(DEVICE) for x_ in default_collate(x)),
         )
-        for batch in tqdm(dataloader):
+        for batch in tqdm(dataloader, disable=True):
             output += [forward_function(*batch).cpu().detach().numpy()]
 
         return np.concatenate(output)
@@ -427,27 +522,25 @@ def get_lime_attributions2(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-    tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer | GPT2Tokenizer,
 ) -> torch.tensor:
     # Adopted from: https://captum.ai/tutorials/Image_and_Text_Classification_LIME
     def exponential_cosine_similarity(
         original_input: Tensor, perturbed_input: Tensor, _, **kwargs
     ):
-        embedding_model = model
-        average_embedding = torch.mean(embedding_model.word_embeddings.weight, dim=0)
+        if isinstance(tokenizer, BertTokenizer):
+            embedding_layer = model.word_embeddings
+        else:  # GPT2Tokenizer
+            embedding_layer = model.transformer.wte
+
+        average_embedding = torch.mean(embedding_layer.weight, dim=0)
         mask = 0 == perturbed_input
-        # perturbed_input[mask] = 0
-        # original_emb = embedding_model(original_input)
         original_emb = 1 * (0 != original_input).float()
-        # perturbed_emb = embedding_model(perturbed_input)
         perturbed_emb = 1 * (0 != perturbed_input).float()
-        # perturbed_emb[mask] = average_embedding
         distance = 1 - torch.nn.functional.cosine_similarity(
             original_emb, perturbed_emb, dim=1
         )
-        # similarity = torch.exp(-1 * (distance**2) / 2)
         similarity = distance
-        # return torch.mean(similarity, axis=1)
         return similarity
 
     def bernoulli_perturbation(x: Tensor, **kwargs):
@@ -458,12 +551,10 @@ def get_lime_attributions2(
     def interpretable_to_input(
         interpretable_sample: Tensor, original_input: Tensor, **kwargs
     ):
-        # m = torch.sum(interpretable_sample.bool()).int()
         output = torch.zeros_like(original_input)
         output[interpretable_sample.bool()] = original_input[
             interpretable_sample.bool()
         ]
-        # ].view(original_input.size(0), -1)
         return output
 
     def new_forward_function(inputs: Tensor) -> Tensor:
@@ -472,7 +563,6 @@ def get_lime_attributions2(
     lasso_lime_base = LimeBase(
         new_forward_function,
         interpretable_model=SkLearnLasso(alpha=0.08),
-        # interpretable_model=SkLearnLasso(),
         similarity_func=exponential_cosine_similarity,
         perturb_func=bernoulli_perturbation,
         perturb_interpretable_space=True,
@@ -480,23 +570,11 @@ def get_lime_attributions2(
         to_interp_rep_transform=None,
     )
     explanations = lasso_lime_base.attribute(
-        # test_text.unsqueeze(0), # add batch dimension for Captum
         data,
         target=int(target),
-        # additional_forward_args=(test_offsets,),
         n_samples=int(1e2),
-        show_progress=True,
+        show_progress=False,
     )
-
-    # l = Lime(forward_function)
-    # explanations = l.attribute(
-    #     inputs=data,
-    #     target=int(target),
-    #     n_samples=25,
-    #     perturbations_per_eval=1,
-    #     return_input_shape=True,
-    #     show_progress=True,
-    # )
 
     return explanations
 
@@ -507,7 +585,7 @@ def get_kernel_shap_attributions(
     model: torch.nn.Module,
     forward_function: Callable,
     target: list,
-    tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer | GPT2Tokenizer,
 ) -> torch.tensor:
     explainer = KernelShap(forward_function)
     return explainer.attribute(
@@ -519,7 +597,7 @@ def get_kernel_shap_attributions(
         n_samples=25,
         perturbations_per_eval=1,
         return_input_shape=True,
-        show_progress=True,
+        show_progress=False,
     )
 
 
@@ -528,7 +606,7 @@ def get_lrp_attributions(
     baseline: Tensor,
     model: torch.nn.Module,
     forward_function: Callable,
-    tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer | GPT2Tokenizer,
 ) -> torch.tensor:
     return LayerLRP(forward_function, model).attribute(inputs=data)
 
@@ -545,7 +623,7 @@ def get_uniform_random_attributions(
     model: torch.nn.Module,
     baseline: Tensor,
     forward_function: Callable,
-    tokenizer: BertTokenizer,
+    tokenizer: BertTokenizer | GPT2Tokenizer,
 ) -> torch.tensor:
     return torch.rand(data.shape)
 

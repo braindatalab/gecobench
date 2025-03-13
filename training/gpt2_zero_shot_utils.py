@@ -20,6 +20,12 @@ TOKEN_SUBSET = {
     3: [TOKEN_ID_FEMALE, TOKEN_ID_MALE, TOKEN_ID_NEUTRAL],
 }
 
+TOKEN_LABEL_MAP = {
+    TOKEN_ID_FEMALE: 0,
+    TOKEN_ID_MALE: 1,
+    TOKEN_ID_NEUTRAL: 2,
+}
+
 
 def determine_gender_type(dataset_name: str) -> str:
     output = 'binary'
@@ -195,33 +201,27 @@ def predict_next_token(
     tokenizer: GPT2Tokenizer,
     num_labels: int,
 ) -> Tuple[Tensor, list[str], Tensor]:
-    token_logits, token_indices = (
-        logits[:, -1, TOKEN_SUBSET[num_labels]],
-        torch.tensor(TOKEN_SUBSET[num_labels])
-        * torch.ones((logits.shape[0], num_labels), dtype=torch.long).to(DEVICE),
-    )
+    token_scores = torch.nn.functional.softmax(logits[:, -1, :])
+    mask = torch.zeros_like(token_scores, dtype=torch.bool).to(DEVICE)
+    mask[:, TOKEN_SUBSET[num_labels]] = True
+    masked_token_scores = mask * token_scores
 
-    scores = torch.nn.functional.softmax(token_logits, dim=-1)
 
     predicted_tokens = []
     predicted_token_ids = []
-    predicted_logits = []
-
+    predicted_scores = []
     for batch_idx in range(logits.shape[0]):
-        predicted_id = token_indices[batch_idx][scores[batch_idx].argmax()]
-        predicted_token = tokenizer.convert_ids_to_tokens(
-            predicted_id.unsqueeze(dim=-1)
-        )[0]
-        predicted_logit = token_logits[batch_idx][scores[batch_idx].argmax()]
-
+        predicted_id = masked_token_scores[batch_idx].argmax()
+        predicted_token = tokenizer.convert_ids_to_tokens(predicted_id.unsqueeze(0))[0]
+        predicted_score = masked_token_scores[batch_idx].max(dim=-1)
         predicted_tokens.append(predicted_token)
         predicted_token_ids.append(predicted_id)
-        predicted_logits.append(predicted_logit)
+        predicted_scores.append(predicted_score)
 
     return (
         torch.tensor(predicted_token_ids).to(DEVICE),
         predicted_tokens,
-        torch.tensor(predicted_logits).to(DEVICE),
+        masked_token_scores,
     )
 
 
@@ -255,7 +255,7 @@ def zero_shot_prediction(
     return pred_tokens, pred_token_ids, pred_logits
 
 
-def format_logits(
+def format_scores_gpt2(
     token_ids: Tensor,
     logits: Tensor,
     target: int | Tensor,
@@ -274,8 +274,15 @@ def format_logits(
         one_hot_target = torch.nn.functional.one_hot(
             target, num_classes=get_num_labels(dataset_name=dataset_name)
         ).to(torch.bool)
-        mask[one_hot_target] = 1.0
-    return mask * logits.unsqueeze(1)
+        mask[
+            (
+                one_hot_target.unsqueeze(dim=0)
+                if 1 == len(one_hot_target.shape)
+                else one_hot_target
+            )
+        ] = 1.0
+    return mask * logits.max(dim=-1).values.unsqueeze(-1)
+
 
 
 def transform_predicted_tokens_to_labels(predictions: list[str]) -> list[int]:

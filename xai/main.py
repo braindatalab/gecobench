@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 from loguru import logger
 from torch import Tensor
 from tqdm import tqdm
-from transformers import BertTokenizer
+from transformers import BertTokenizer, GPT2Tokenizer
 
 from common import XAIResult, validate_dataset_key
 
@@ -27,6 +27,12 @@ from training.bert import (
     get_bert_tokenizer,
 )
 
+from training.gpt2 import (
+    create_gpt2_ids,
+    get_gpt2_ids,
+    get_gpt2_tokenizer,
+)
+
 from utils import (
     filter_eval_datasets,
     generate_training_dir,
@@ -40,8 +46,10 @@ from utils import (
     generate_artifacts_dir,
     BERT_MODEL_TYPE,
     ONE_LAYER_ATTENTION_MODEL_TYPE,
-    determine_model_type,
     BERT_ZERO_SHOT,
+    GPT2_MODEL_TYPE,
+    GPT2_ZERO_SHOT,
+    determine_model_type,
 )
 from xai.methods import (
     get_captum_attributions,
@@ -93,6 +101,42 @@ def create_bert_reference_tokens(
     return reference_indices
 
 
+def create_gpt2_to_original_token_mapping_from_sentence(
+    tokenizer: GPT2Tokenizer, sentence: list[str]
+) -> dict:
+    output = dict()
+    for k, word in enumerate(sentence):
+        gpt2_ids = get_gpt2_ids(tokenizer=tokenizer, token=word)
+        for gpt2_id in gpt2_ids:
+            key = tokenizer.decode(gpt2_id).replace(' ', '') + f'{k}'
+            output[key] = word + f'{k}'
+    return output
+
+
+def create_gpt2_to_original_token_mapping(data: list, tokenizer: GPT2Tokenizer) -> list:
+    mappings = list()
+    for k, sentence in enumerate(data):
+        mappings += [
+            create_gpt2_to_original_token_mapping_from_sentence(
+                tokenizer=tokenizer, sentence=sentence
+            )
+        ]
+    return mappings
+
+
+def create_gpt2_reference_tokens(
+    gpt2_tokenizer: GPT2Tokenizer, sequence_length: int
+) -> Tensor:
+    reference_tokens_pad = TokenReferenceBase(
+        reference_token_idx=gpt2_tokenizer.pad_token_id
+    )
+    reference_indices = reference_tokens_pad.generate_reference(
+        sequence_length=sequence_length, device=DEVICE
+    ).unsqueeze(0)
+    reference_indices[0, -1] = gpt2_tokenizer.eos_token_id
+    return reference_indices
+
+
 def create_xai_results(
     attributions: dict,
     row: pd.Series,
@@ -112,7 +156,11 @@ def create_xai_results(
                 target=row['target'],
                 attribution_method=xai_method,
                 sentence=row['sentence'],
-                prompt=zero_shot_prompt(row['sentence']) if zero_shot_prompt is not None else None,
+                prompt=(
+                    zero_shot_prompt(row['sentence'])
+                    if zero_shot_prompt is not None
+                    else None
+                ),
                 raw_attribution=attribution,
                 ground_truth=row['ground_truth'],
                 sentence_idx=row["sentence_idx"],
@@ -168,6 +216,52 @@ def map_zero_shot_bert_attributions_to_original_tokens(
     return list(original_token_to_attribution_mapping.values())
 
 
+def map_gpt2_attributions_to_original_tokens(
+    model_type: str, result: XAIResult, config: dict
+) -> list:
+    tokenizer = get_tokenizer[model_type](config)
+    token_mapping = create_model_token_to_original_token_mapping[model_type](
+        [result.sentence], tokenizer
+    )
+    original_token_to_attribution_mapping = dict()
+    for k, word in enumerate(result.sentence):
+        original_token_to_attribution_mapping[word + str(k)] = 0
+
+    gpt2_token_to_attribution_mapping = dict()
+    for word, attribution in zip(
+        list(token_mapping[0].keys()), result.raw_attribution[ALL_BUT_CLS_SEP]
+    ):
+        gpt2_token_to_attribution_mapping[word] = attribution
+
+    for k, v in gpt2_token_to_attribution_mapping.items():
+        original_token_to_attribution_mapping[token_mapping[0][k]] += v
+
+    return list(original_token_to_attribution_mapping.values())
+
+
+def map_zero_shot_gpt2_attributions_to_original_tokens(
+    model_type: str, result: XAIResult, config: dict
+) -> list:
+    tokenizer = get_tokenizer[model_type](config)
+    token_mapping = create_model_token_to_original_token_mapping[model_type](
+        [result.prompt], tokenizer
+    )
+    original_token_to_attribution_mapping = dict()
+    for k, word in enumerate(result.prompt):
+        original_token_to_attribution_mapping[word + str(k)] = 0
+
+    gpt2_token_to_attribution_mapping = dict()
+    for word, attribution in zip(
+        list(token_mapping[0].keys()), result.raw_attribution[ALL_BUT_CLS_SEP]
+    ):
+        gpt2_token_to_attribution_mapping[word] = attribution
+
+    for k, v in gpt2_token_to_attribution_mapping.items():
+        original_token_to_attribution_mapping[token_mapping[0][k]] += v
+
+    return list(original_token_to_attribution_mapping.values())
+
+
 def map_raw_attributions_to_original_tokens(
     xai_results_paths: list[str], config: dict
 ) -> list[XAIResult]:
@@ -176,9 +270,9 @@ def map_raw_attributions_to_original_tokens(
 
     def process_result(result, config):
         model_type = determine_model_type(s=result.model_name)
-        result.attribution = raw_attributions_to_original_tokens_mapping[
-            model_type
-        ](model_type, result, config)
+        result.attribution = raw_attributions_to_original_tokens_mapping[model_type](
+            model_type, result, config
+        )
         return result
 
     for path in xai_results_paths:
@@ -280,7 +374,7 @@ def prepare_data_for_covariance_calculation(
     word_to_bert_id_mapping = dict()
     tokenizer = get_tokenizer[model_type](config)
     gender_type_of_dataset = determine_gender_type(dataset_type)
-    for k, row in tqdm(dataset.iterrows()):
+    for k, row in tqdm(dataset.iterrows(), disable=True):
         zero_shot_prompt = get_zero_shot_prompt_function(
             prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
         )
@@ -359,7 +453,9 @@ def loop_over_training_records(
     output = list()
     torch.set_num_threads(1)
     artifacts_dir = generate_artifacts_dir(config)
-    for trained_on_dataset_name, model_params, model_path, _ in tqdm(training_records):
+    for trained_on_dataset_name, model_params, model_path, _ in tqdm(
+        training_records, disable=True
+    ):
         # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
         # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
         datasets = [trained_on_dataset_name]
@@ -410,30 +506,40 @@ get_tokenizer = {
     BERT_MODEL_TYPE: get_bert_tokenizer,
     ONE_LAYER_ATTENTION_MODEL_TYPE: get_bert_tokenizer,
     BERT_ZERO_SHOT: get_bert_tokenizer,
+    GPT2_MODEL_TYPE: get_gpt2_tokenizer,
+    GPT2_ZERO_SHOT: get_gpt2_tokenizer,
 }
 
 create_token_ids = {
     BERT_MODEL_TYPE: create_bert_ids,
     ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_ids,
     BERT_ZERO_SHOT: create_bert_ids,
+    GPT2_MODEL_TYPE: create_gpt2_ids,
+    GPT2_ZERO_SHOT: create_gpt2_ids,
 }
 
 create_model_token_to_original_token_mapping = {
     BERT_MODEL_TYPE: create_bert_to_original_token_mapping,
     ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_to_original_token_mapping,
     BERT_ZERO_SHOT: create_bert_to_original_token_mapping,
+    GPT2_MODEL_TYPE: create_gpt2_to_original_token_mapping,
+    GPT2_ZERO_SHOT: create_gpt2_to_original_token_mapping,
 }
 
 create_reference_tokens = {
     BERT_MODEL_TYPE: create_bert_reference_tokens,
     ONE_LAYER_ATTENTION_MODEL_TYPE: create_bert_reference_tokens,
     BERT_ZERO_SHOT: create_bert_reference_tokens,
+    GPT2_MODEL_TYPE: create_gpt2_reference_tokens,
+    GPT2_ZERO_SHOT: create_gpt2_reference_tokens,
 }
 
 raw_attributions_to_original_tokens_mapping = {
     BERT_MODEL_TYPE: map_bert_attributions_to_original_tokens,
     ONE_LAYER_ATTENTION_MODEL_TYPE: map_bert_attributions_to_original_tokens,
-    BERT_ZERO_SHOT: map_zero_shot_bert_attributions_to_original_tokens,
+    BERT_ZERO_SHOT: map_bert_attributions_to_original_tokens,
+    GPT2_MODEL_TYPE: map_gpt2_attributions_to_original_tokens,
+    GPT2_ZERO_SHOT: map_zero_shot_gpt2_attributions_to_original_tokens,
 }
 
 
