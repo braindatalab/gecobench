@@ -305,43 +305,19 @@ def zero_shot_prediction(
         attention_mask=attention_mask,
     ).logits.to(DEVICE)
 
-    predicted_token_ids, predicted_tokens, predicted_logits = predict_max_logit_tokens(
-        logits=output, input_ids=input_ids, tokenizer=tokenizer
-    )
+    mask_token_ids_mask = (input_ids == tokenizer.mask_token_id).to(DEVICE)
+    token_scores = torch.nn.functional.softmax(mask_token_ids_mask.unsqueeze(-1) * output)
+    label_token_ids_mask = torch.zeros_like(token_scores, dtype=torch.bool).to(DEVICE)
+    label_token_ids_mask[:, :, TOKEN_SUBSET[num_labels]] = True
+    masked_token_scores = label_token_ids_mask * token_scores
 
-    mask_token_ids = (input_ids == tokenizer.mask_token_id).to(DEVICE)
-    if mask_token_ids.any(dim=-1).any(dim=-1):
-        mask_token_mask = create_prediction_mask(
-            logits=output,
-            mask_token_ids=mask_token_ids,
-            tokenizer=tokenizer,
-            num_labels=num_labels,
-        )
-        predicted_mask_ids, predicted_mask_tokens, _ = predict_masked_tokens(
-            logits=output,
-            mask_token_ids=mask_token_ids,
-            tokenizer=tokenizer,
-            num_labels=num_labels,
-        )
-        predicted_logits = (mask_token_mask * output).max(dim=-1)[0].max(dim=-1)[0].to(
-            DEVICE
-        ) + ~mask_token_ids.any(dim=-1) * predicted_logits
-        predicted_token_ids = (
-            mask_token_ids.any(dim=-1) * predicted_mask_ids
-            + ~mask_token_ids.any(dim=-1) * predicted_token_ids
-        )
-
-        # Update tokens
-        counter = 0
-        for k, has_mask_token in enumerate(mask_token_ids.any(dim=-1)):
-            if has_mask_token:
-                predicted_tokens[k] = predicted_mask_tokens[counter]
-                counter += 1
+    predicted_token_ids = masked_token_scores.argmax(dim=-1).max(dim=-1).values.to(DEVICE)
+    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_token_ids.tolist())
 
     return (
         predicted_tokens,
         predicted_token_ids,
-        predicted_logits,
+        masked_token_scores,
     )
 
 
@@ -350,6 +326,7 @@ def format_logits(
     logits: Tensor,
     target: int | Tensor,
     dataset_name: str,
+
     input_embeddings: Tensor = None,
 ) -> Tensor:
     n = token_ids.shape[0]
