@@ -11,7 +11,7 @@
   },
   "data": {
     "data_scenario": "nlp-benchmark_2024-09-03-16-21-21",
-    "data_dir": "./artifacts/data",
+    "data_dir": "/home/space/uniml/datasabzi/xai_nlp",
     "tags": {
       "binary_gender_all": [
         "train",
