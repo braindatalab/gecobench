@@ -89,8 +89,9 @@
         "model_name": "gpt2_randomly_init_embedding_classification",
         "model_performance": "gpt2_only_embedding_history",
         "layers_to_train": [
-          "bert.embeddings",
-          "classifier"
+          "wpe",
+          "wte",
+          "score"
         ]
       },
       "gpt2_only_classification": {
@@ -100,7 +101,7 @@
         "model_name": "gpt2_only_classification",
         "model_performance": "gpt2_only_classification_history",
         "layers_to_train": [
-          "classifier"
+          "score"
         ]
       },
       "gpt2_only_embedding_classification": {
@@ -110,8 +111,9 @@
         "model_name": "gpt2_only_embedding_classification",
         "model_performance": "gpt2_only_embedding_classification_history",
         "layers_to_train": [
-          "bert.embeddings",
-          "classification"
+          "wpe",
+          "wte",
+          "score"
         ]
       },
       "gpt2_all": {
