@@ -371,7 +371,7 @@ def prepare_data_for_covariance_calculation(
     vocabulary = set()
     sentences = list()
     targets = list()
-    word_to_bert_id_mapping = dict()
+    word_to_token_id = dict()
     tokenizer = get_tokenizer[model_type](config)
     gender_type_of_dataset = determine_gender_type(dataset_type)
     for k, row in tqdm(dataset.iterrows(), disable=True):
@@ -389,7 +389,7 @@ def prepare_data_for_covariance_calculation(
         for tid in token_ids:
             decoded_word = tokenizer.decode(tid).replace(' ', '')
             decoded_words += [decoded_word]
-            word_to_bert_id_mapping[decoded_word] = tid.numpy().item()
+            word_to_token_id[decoded_word] = tid.numpy().item()
 
         vocabulary.update(decoded_words)
         sentences += [SPACE.join(decoded_words)]
@@ -399,7 +399,7 @@ def prepare_data_for_covariance_calculation(
         'vocabulary': vocabulary,
         'sentences': sentences,
         'targets': targets,
-        'word_to_bert_id_mapping': word_to_bert_id_mapping,
+        'word_to_token_id_mapping': word_to_token_id,
     }
 
 
@@ -425,7 +425,7 @@ def apply_xai_methods(
         sentences=prepared_data['sentences'],
         targets=prepared_data['targets'],
         vocabulary=prepared_data['vocabulary'],
-        word_to_bert_id_mapping=prepared_data['word_to_bert_id_mapping'],
+        word_to_token_id_mapping=prepared_data['word_to_token_id_mapping'],
     )
 
     # results = Parallel(n_jobs=config["xai"]["num_workers"])(

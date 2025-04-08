@@ -646,7 +646,7 @@ def calculate_covariance_between_words_target(
     sentences: list,
     targets: list,
     vocabulary: set,
-    word_to_bert_id_mapping: dict,
+    word_to_token_id_mapping: dict,
 ) -> dict:
     pipeline = Pipeline(
         [
@@ -664,7 +664,7 @@ def calculate_covariance_between_words_target(
         )
 
         c = np.cov(word_representation, targets)[0, 1]
-        ret[word_to_bert_id_mapping[word]] = 0.0 if np.isnan(c) else c
+        ret[word_to_token_id_mapping[word]] = 0.0 if np.isnan(c) else c
 
     return ret
 
