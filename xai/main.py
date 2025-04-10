@@ -62,6 +62,7 @@ from xai.methods import (
 
 DEVICE = 'cpu'
 ALL_BUT_CLS_SEP = slice(1, -1)
+ALL_BUT_END_OF_TEXT = slice(0, -1)
 SPACE = ' '
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -232,7 +233,7 @@ def map_gpt2_attributions_to_original_tokens(
 
     gpt2_token_to_attribution_mapping = dict()
     for word, attribution in zip(
-        list(token_mapping[0].keys()), result.raw_attribution[ALL_BUT_CLS_SEP]
+        list(token_mapping[0].keys()), result.raw_attribution[ALL_BUT_END_OF_TEXT]
     ):
         gpt2_token_to_attribution_mapping[word] = attribution
 
