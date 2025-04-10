@@ -1,3 +1,4 @@
+import json
 import os.path
 from collections import defaultdict
 from itertools import chain
@@ -53,6 +54,8 @@ from utils import (
     GPT2_ZERO_SHOT,
     determine_model_type,
     ZERO_SHOT,
+    load_json_file,
+    dump_as_json_file,
 )
 from xai.methods import (
     get_captum_attributions,
@@ -458,13 +461,16 @@ def apply_xai_methods(
 
 
 def loop_over_training_records(
-    training_records: list, data: dict, config: dict
+    training_records: list,
+    data: dict,
+    config: dict,
+    tracking_file_path: str,
 ) -> list[str]:
     output = list()
     torch.set_num_threads(1)
     artifacts_dir = generate_artifacts_dir(config)
-    for trained_on_dataset_name, model_params, model_path, _ in tqdm(
-        training_records, disable=True
+    for j, (trained_on_dataset_name, model_params, model_path, _) in tqdm(
+        enumerate(training_records), disable=True
     ):
         # If model was trained on a dataset e.g. gender_all, only evaluate on that dataset.
         # Otherwise, e.g. in the case of sentiment analysis, evaluate on all datasets.
@@ -496,6 +502,9 @@ def loop_over_training_records(
                 filename=filename,
             )
             output += [join(xai_output_dir, filename)]
+            update_tracking_file(
+                tracking_file_path=tracking_file_path, record=training_records[j]
+            )
 
     return output
 
@@ -553,18 +562,69 @@ raw_attributions_to_original_tokens_mapping = {
 }
 
 
+def convert_record_to_str(r: tuple) -> str:
+    if not isinstance(r[1]['save_version'], str):
+        r[1]['save_version'] = r[1]['save_version'].value
+    return f'{r[0]}-{json.dumps(r[1])}-{r[2]}-{r[3]}'
+
+
+def update_tracking_file(tracking_file_path: str, record: tuple) -> list:
+    if os.path.exists(tracking_file_path):
+        processed_records = list(load_json_file(file_path=tracking_file_path))
+    else:
+        processed_records = list()
+    record_str = convert_record_to_str(r=record)
+    if record_str in processed_records:
+        raise ValueError(
+            f'The record {record_str} already exists in the tracking file {tracking_file_path}.'
+        )
+    processed_records.append(record_str)
+    dump_as_json_file(data=processed_records, file_path=tracking_file_path)
+
+    return processed_records
+
+
+def load_training_records_with_tracking(
+    training_records_path: str, tracking_file_path: str
+) -> tuple:
+    training_records = load_pickle(file_path=training_records_path)
+    if os.path.exists(tracking_file_path):
+        processed_records = list(load_json_file(file_path=tracking_file_path))
+    else:
+        processed_records = list()
+
+    unprocessed_records = list()
+    for training_record in training_records:
+        train_record_str = convert_record_to_str(training_record)
+        if train_record_str not in processed_records:
+            unprocessed_records.append(training_record)
+
+    return unprocessed_records, processed_records
+
+
 def main(config: Dict) -> None:
     training_records_path = join(
         generate_artifacts_dir(config=config),
         generate_training_dir(config=config),
         config['training']['training_records'],
     )
-    training_records = load_pickle(file_path=training_records_path)
+    tracking_file_path = join(
+        generate_artifacts_dir(config=config),
+        generate_xai_dir(config=config),
+        config['xai']['tracking_file'],
+    )
+    unprocessed_training_records, _ = load_training_records_with_tracking(
+        training_records_path=training_records_path,
+        tracking_file_path=tracking_file_path,
+    )
     test_data = load_test_data(config=config)
 
     logger.info(f'Generate explanations.')
     intermediate_results_paths = loop_over_training_records(
-        training_records=training_records, data=test_data, config=config
+        training_records=unprocessed_training_records,
+        data=test_data,
+        config=config,
+        tracking_file_path=tracking_file_path,
     )
 
     logger.info(f'Dump intermediate result paths.')

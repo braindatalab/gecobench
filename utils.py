@@ -1,7 +1,7 @@
 import json
 import platform
 from datetime import datetime
-from os.path import join
+from os.path import join, split
 from pathlib import Path
 import random
 from typing import Any, Dict, List
@@ -70,6 +70,8 @@ def load_json_file(file_path: str) -> Dict:
 
 
 def dump_as_json_file(data: Dict, file_path: str) -> None:
+    output_dir = join(*split(file_path)[:-1])
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     with open(file_path, 'w') as f:
         json.dump(obj=data, fp=f)
 
