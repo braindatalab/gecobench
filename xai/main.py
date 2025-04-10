@@ -1,4 +1,5 @@
 import os.path
+from collections import defaultdict
 from itertools import chain
 from os.path import join
 from typing import Dict, Any, Callable
@@ -15,10 +16,11 @@ from transformers import BertTokenizer, GPT2Tokenizer
 
 from common import XAIResult, validate_dataset_key
 
+from training.main import get_prompt_template
+
 from training.bert_zero_shot_utils import (
     determine_gender_type,
     get_zero_shot_prompt_function,
-    PROMPT_TEMPLATES,
 )
 
 from training.bert import (
@@ -50,6 +52,7 @@ from utils import (
     GPT2_MODEL_TYPE,
     GPT2_ZERO_SHOT,
     determine_model_type,
+    ZERO_SHOT,
 )
 from xai.methods import (
     get_captum_attributions,
@@ -305,19 +308,29 @@ def apply_xai_methods_on_sentence(
     logger.info(f'Dataset type: {dataset_type}, sentence: {index} of {num_samples}')
     model_type = determine_model_type(s=model_params['model_name'])
     tokenizer = get_tokenizer[model_type](config)
-    if BERT_ZERO_SHOT == model_type:
+    zero_shot_prompt = None
+    if ZERO_SHOT in model_type:
         gender_type_of_dataset = determine_gender_type(dataset_type)
         zero_shot_prompt = get_zero_shot_prompt_function(
-            prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
+            prompt_templates=get_prompt_template(
+                dataset_type=gender_type_of_dataset, model_type=model_type
+            ),
+            index=0,
         )
-    else:
-        zero_shot_prompt = None
+
     token_ids = create_token_ids[model_type](
         [row['sentence']],
         tokenizer,
         '',
         None,
         zero_shot_prompt,
+    )[0][0]
+    token_ids_without_prompt = create_token_ids[model_type](
+        [row['sentence']],
+        tokenizer,
+        '',
+        None,
+        None,
     )[0][0]
     token_ids = token_ids.to(DEVICE)
     num_ids = token_ids.shape[0]
@@ -348,7 +361,7 @@ def apply_xai_methods_on_sentence(
         attributions.update(
             get_covariance_between_words_target(
                 covariance_between_words_target=covariance_between_words_target,
-                token_ids=token_ids,
+                token_ids=token_ids_without_prompt,
             )
         )
 
@@ -371,25 +384,21 @@ def prepare_data_for_covariance_calculation(
     vocabulary = set()
     sentences = list()
     targets = list()
-    word_to_token_id = dict()
+    word_to_token_id = defaultdict(list)
     tokenizer = get_tokenizer[model_type](config)
-    gender_type_of_dataset = determine_gender_type(dataset_type)
     for k, row in tqdm(dataset.iterrows(), disable=True):
-        zero_shot_prompt = get_zero_shot_prompt_function(
-            prompt_templates=PROMPT_TEMPLATES[gender_type_of_dataset], index=0
-        )
         token_ids = create_token_ids[model_type](
             [row['sentence']],
             tokenizer,
             '',
             None,
-            zero_shot_prompt,
+            None,
         )[0][0]
         decoded_words = list()
         for tid in token_ids:
             decoded_word = tokenizer.decode(tid).replace(' ', '')
             decoded_words += [decoded_word]
-            word_to_token_id[decoded_word] = tid.numpy().item()
+            word_to_token_id[decoded_word].append(tid.numpy().item())
 
         vocabulary.update(decoded_words)
         sentences += [SPACE.join(decoded_words)]

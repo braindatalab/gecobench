@@ -22,6 +22,7 @@ BERT_ZERO_SHOT = 'bert_zero_shot'
 ONE_LAYER_ATTENTION_MODEL_TYPE = 'one_layer_attention'
 GPT2_MODEL_TYPE = 'gpt2'
 GPT2_ZERO_SHOT = 'gpt2_zero_shot'
+ZERO_SHOT = 'zero_shot'
 
 
 def load_pickle(file_path: str) -> Any:

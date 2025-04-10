@@ -59,11 +59,14 @@ from utils import (
 
 import warnings
 
+
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 BERT = 'bert'
 GPT2 = 'gpt2'
 ALL_BUT_CLS_SEP = slice(1, -1)
+ALL_BUT_END_OF_TEXT = slice(0, -1)
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 GRADIENT_BASED_METHODS = [
@@ -497,11 +500,14 @@ def get_lime_attributions(
         return np.concatenate(output)
 
     x = data.flatten().detach()
-    text = tokenizer.decode(x[1:-1])
+    if isinstance(tokenizer, BertTokenizer):
+        text = [tokenizer.decode(k, skip_special_tokens=True) for k in x[ALL_BUT_CLS_SEP]]
+    else:
+        text = [tokenizer.decode(k, skip_special_tokens=True) for k in x[ALL_BUT_END_OF_TEXT]]
     class_names = [str(k) for k in np.unique(target)]
     explainer = LimeTextExplainer(class_names=class_names, char_level=False)
     lime_explanation = explainer.explain_instance(
-        text,
+        ' '.join(text),
         new_forward_function,
         num_features=x.shape[0],
         num_samples=int(1e2),
@@ -664,7 +670,8 @@ def calculate_covariance_between_words_target(
         )
 
         c = np.cov(word_representation, targets)[0, 1]
-        ret[word_to_token_id_mapping[word]] = 0.0 if np.isnan(c) else c
+        for k in word_to_token_id_mapping[word]:
+            ret[k] = 0.0 if np.isnan(c) else c
 
     return ret
 
