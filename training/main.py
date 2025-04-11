@@ -23,6 +23,8 @@ from utils import (
     generate_artifacts_dir,
     GPT2_MODEL_TYPE,
     BERT_MODEL_TYPE,
+    GPT2_ZERO_SHOT,
+    BERT_ZERO_SHOT,
 )
 
 
@@ -32,9 +34,9 @@ from training.gpt2_zero_shot_utils import PROMPT_TEMPLATES as GPT2_PROMPT_TEMPLA
 
 def get_prompt_template(dataset_type: str, model_type: str) -> list:
     output = None
-    if GPT2_MODEL_TYPE == model_type:
+    if GPT2_ZERO_SHOT == model_type:
         output = GPT2_PROMPT_TEMPLATES[dataset_type]
-    elif BERT_MODEL_TYPE == model_type:
+    elif BERT_ZERO_SHOT == model_type:
         output = BERT_PROMPT_TEMPLATES[dataset_type]
 
     return output
